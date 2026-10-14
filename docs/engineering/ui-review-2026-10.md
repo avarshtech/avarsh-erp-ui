@@ -15,8 +15,12 @@ rather than editing this file by hand.
   (production finishing, production job work, job-work bill passing — all browser demo data with a
   Preview tag) wait for the Preview batch. Batch 2 ids start at
   U208; batch 1 ids are unchanged.
-- **Next batches, in plan order:** admin, sample-request, hr, reports; then the shared code as a
-  whole; then the Preview modules.
+- **Batch 3:** admin (users, roles, approval flows, company profile, admin dashboard, My
+  Approvals), sample request (all seven stages), HR and reports (report list, designer, run screen,
+  saved reports and the AI chat): `src/pages/{admin,approvals,sample-request,hr,reports}`, their
+  services and the API behind them (`erp/{iam,approval,sampling,hr,reporting,ai}`). Batch 3 ids
+  start at U305; it also adds one PO finding raised by lane B.
+- **Next batches, in plan order:** the shared code as a whole; then the Preview modules.
 - **Method:** nine reviewers, one per slice (orders; BOM; cut panel and garment process
   requirements; costing list and view; costing sheet; supplier PO form; supplier PO view and list;
   production POs; job-work POs), read every line of their slice against Appendix A of the plan and
@@ -28,7 +32,8 @@ rather than editing this file by hand.
   P1 against the code. Anything that could not be confirmed was dropped. To stay within the
   account's usage limit, batch 2's reviewers confirmed each finding themselves by re-reading the
   code path before reporting it (no separate verifier pass); the lead re-checked every P0 and P1
-  and spot-checked the P2s.
+  and spot-checked the P2s. Batch 3 used the same method with three reviewers (HR; admin, approvals
+  and reports; sample request).
 - **Severity:** P0 = crash, data loss or a security hole. P1 = wrong data, a blocked workflow, or a
   visible bug users hit. P2 = degraded UX, or a maintainability risk with a real consequence.
   P3 = cleanup.
@@ -51,14 +56,18 @@ Open findings by module and severity, with the estimate in developer hours. The 
 | Orders | 1 | 5 | 11 | 10 | 27 | 20.4 | 0 |
 | BOM (bill of materials, cut panel and garment process requirements) | 1 | 9 | 18 | 20 | 48 | 47.6 | 2 |
 | Costing | 2 | 7 | 20 | 16 | 45 | 57 | 0 |
-| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 44 | 24 | 82 | 110.6 | 2 |
+| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 45 | 24 | 83 | 111.1 | 2 |
 | Inventory (GRN, QC, bill passing, issues, transfers, stock) | 0 | 10 | 20 | 11 | 41 | 84 | 0 |
 | Production (cutting, sewing, packing, production masters) | 0 | 8 | 14 | 7 | 29 | 70.8 | 0 |
 | Master data | 0 | 5 | 11 | 5 | 21 | 34.3 | 0 |
+| Admin (users, roles, approval flows, company profile, approvals inbox) | 0 | 2 | 8 | 3 | 13 | 12.8 | 0 |
+| Sample requests | 1 | 5 | 10 | 5 | 21 | 28.5 | 0 |
+| HR and payroll | 0 | 4 | 12 | 4 | 20 | 35.5 | 0 |
+| Reports (report builder, saved reports, AI chat) | 1 | 4 | 4 | 3 | 12 | 15.5 | 0 |
 | Shared code, as used by these screens | 0 | 2 | 1 | 3 | 6 | 6.3 | 1 |
-| **Total** | **4** | **60** | **139** | **96** | **299** | **430.8** | **5** |
+| **Total** | **6** | **75** | **174** | **111** | **366** | **523.5** | **5** |
 
-P0 and P1 together: 64 findings, about 139.3 h. Every one was re-checked by the lead against the code on `dev`.
+P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the lead against the code on `dev`.
 
 ## Orders
 
@@ -1537,6 +1546,15 @@ P0 and P1 together: 64 findings, about 139.3 h. Every one was re-checked by the 
 - **Fix:** Tag each load with the poId (or a counter) and drop results for any other PO; revoke blob URLs that arrive after close. *(not visible)*
 - **Estimate:** 1.5 h
 
+#### U371 · P2 · rule 4 — A deep-link Approve/Reject stays armed on the PO list and re-opens the action dialog on the next PO the user opens (the U001 pattern)
+
+*POList, POView* — `src/pages/po/POList.jsx:64, 74, 161-171, 404-416; src/pages/po/POView.jsx:422-444; src/components/NotificationCenter.jsx:196-203`
+
+- **What happens:** A notification action chip opens /purchase-orders/supplier-po/list?viewId=…&action=approve. pendingAction is cleared only by the dialog's own close, never by handleStatusActionComplete or handleView, so after the first PO is actioned, opening any other PO whose status allows that action pops its 'Approve Purchase Order?' confirm (or the reject/refer-back reason dialog) unprompted; a habitual OK approves the wrong PO. Unlike U001 it never acts without the user's OK. Mostly dormant today: the server never emits the PO-specific approval notification, so it fires only from generic notifications that carry action chips.
+- **Fix:** Clear pendingAction in handleStatusActionComplete, handleView and the deep-link fetch's failure path, and bind it to the deep-linked PO id (act only when po.id matches) — the same fix as U001. *(not visible (no unprompted dialogs))*
+- **Estimate:** 0.5 h
+- **Note:** Reported by lane B; verified by the lead.
+
 ### P3
 
 #### U178 · P3 · rule 1 — A failed requirement lookup leaves the CPP table spinning (or the GPO picker saying there are no requirements) with no retry
@@ -2501,6 +2519,589 @@ P0 and P1 together: 64 findings, about 139.3 h. Every one was re-checked by the 
 - **Fix:** Delete them. *(not visible)*
 - **Estimate:** 0.5 h
 
+## Admin (users, roles, approval flows, company profile, approvals inbox)
+
+### P1
+
+#### U310 · P1 · rule 10, rule 8 — Pressing Ctrl+S while editing a user, or a report in the Designer, clicks the page's Add button and wipes the edits.
+
+*User Management / Report list (Ctrl+S inside a dialog)* — `src/hooks/useKeyboardShortcuts.js:23-29; src/pages/admin/UserManagement.jsx:98-116; src/pages/admin/UserManagement.jsx:323; src/pages/reports/ReportListPage.jsx:65-68; src/pages/reports/ReportListPage.jsx:277; src/pages/reports/components/ReportDesignerDrawer.jsx:59-66`
+
+- **What happens:** Admin opens Edit User for Priya, changes her role and branches, presses Ctrl+S. querySelector returns the first primary button in document order, which is 'Add User' in #main-content (the modal is portaled after it), so openModal() runs: editingUser becomes null, form.resetFields() clears the changes and the dialog turns into 'Add New User'. Same on Reports: Ctrl+S in the Edit Report drawer clicks 'New Report', handleCreate nulls editingReport and the drawer resets to a blank new report.
+- **Fix:** Make the shortcut act on the topmost open dialog first (query the last open .ant-modal-wrap / .ant-drawer-open, fall back to #main-content), as rule 10 requires. *(visible: Ctrl+S in a dialog saves that dialog instead of opening Add)*
+- **Estimate:** 1.5 h
+- **Note:** Cross-cutting (Appendix B 7); these are the two admin/report screens where the wrong click loses input. On Report Builder the same key runs Generate Report behind the Save drawer (harmless).
+
+#### U311 · P1 · rule 9 — The admin dashboard's activity log and login count miss everything after 6:30 PM IST on the last day and include 6:30 PM onwards of the day before the range.
+
+*Admin Dashboard (activity log)* — `src/pages/admin/AdminDashboard.jsx:74-75; erp/activity/userlog/UserActivityLogController.java:43-47; erp/activity/userlog/UserActivityLogService.java:244`
+
+- **What happens:** Range today-7 .. today. The UI sends startOf('day').toISOString() = '...T18:30:00.000Z' of the previous day and endOf('day') = '...T18:29:59.999Z' of today. Spring parses them into LocalDateTime and drops the Z, while activity rows are stored as IST wall time (ZonedDateTime.now(IST)). So a 7 PM login today never appears, and 'Recent logins' undercounts every evening.
+- **Fix:** Send local wall time: dateRange[0].startOf('day').format('YYYY-MM-DDTHH:mm:ss') and the same for the end. *(visible: today's evening activity appears and the range matches the picked dates)*
+- **Estimate:** 0.5 h
+
+### P2
+
+#### U312 · P2 · rule 1 — The Phone field on the user form is never saved: the API has no phone field or column, so a typed number vanishes after 'User updated successfully'.
+
+*User Management* — `src/pages/admin/UserManagement.jsx:162; src/pages/admin/UserManagement.jsx:391; src/pages/admin/UserManagement.jsx:455; erp/iam/dto/UserCreateDTO.java:12-20; erp/iam/dto/UserUpdateDTO.java:12-22; erp/iam/domain/User.java:21-56`
+
+- **What happens:** Admin edits a user, types phone 98450 12345 (the only change, so Update is enabled), saves, gets the success toast; reopening the user shows an empty phone and the details drawer says 'Not provided'.
+- **Fix:** Either add phone to sys_users and the DTOs, or remove the field from the form and drawer. *(visible: the phone either persists or the field is gone)*
+- **Estimate:** 1.5 h
+
+#### U313 · P2 · rule 1 — A non-superuser administrator can switch their own account to Inactive and is locked out at once.
+
+*User Management* — `src/pages/admin/UserManagement.jsx:396; erp/iam/service/UserAdministrationPolicy.java:46-61; erp/iam/service/UserService.java:96-108`
+
+- **What happens:** An HR admin (users.update, not superuser) edits their own row, flips Status to Inactive and saves. checkUpdate only protects superusers and role changes; the server revokes all the admin's refresh tokens and they cannot sign in again until someone else reactivates them.
+- **Fix:** Refuse self-deactivation in UserAdministrationPolicy (as self role change is refused) and disable the Status switch on the current user's own row. *(visible: the Status switch is disabled on your own account)*
+- **Estimate:** 1 h
+
+#### U314 · P2 · rule 5 — The approval-flow update ignores the version the screen sends, so two admins editing the same flow silently overwrite each other.
+
+*Approval Flows (edit drawer)* — `src/pages/admin/ApprovalFlowForm.jsx:108; erp/approval/service/ApprovalFlowService.java:125-178; erp/approval/dto/ApprovalFlowRequest.java:44`
+
+- **What happens:** Admin A opens 'PO above 5 lakh' and raises the threshold; admin B, with the drawer already open, changes the second-level role and saves after A. updateFlow never compares request.version with the entity, loads fresh, and saves B's full payload, so A's threshold change is lost with no conflict dialog.
+- **Fix:** Compare request.getVersion() with flow.getVersion() and throw ObjectOptimisticLockingFailureException as UserService/RoleService do; send loadedFlow.version rather than the list row's. *(visible: the second saver gets the standard conflict dialog)*
+- **Estimate:** 1 h
+
+#### U315 · P2 · rule 1 — Editing a flow that has pending requests looks allowed until Update, which then fails with a 500 and loses the edits' purpose.
+
+*Approval Flows (edit drawer)* — `src/pages/admin/ApprovalFlowForm.jsx:35; src/pages/admin/ApprovalFlowForm.jsx:142; erp/approval/service/ApprovalFlowService.java:133-136`
+
+- **What happens:** A PO is pending level 2. Admin opens the flow to rename it or change its priority; the drawer only locks levels for hasHistory and the banner says name, priority and conditions can still change. On Update the server refuses any edit with 'Cannot modify flow with 1 pending approval requests' (as a 500), after the admin has done the work.
+- **Fix:** Use the list's pendingRequestsCount to open the drawer read-only with a banner naming the pending count (keep the Active toggle on the list, which the server allows); return the refusal as a 409 CONFLICT. *(visible: a banner and read-only fields when requests are pending)*
+- **Estimate:** 1.5 h
+
+#### U316 · P2 · rule 28 — The row Edit button renders blank and 'New Flow' renders as a bare + icon, because both pass type/label instead of action/text to ActionButton.
+
+*Approval Flows (list)* — `src/pages/admin/ApprovalFlowList.jsx:237; src/pages/admin/ApprovalFlowList.jsx:286-291; src/components/buttons/ActionButton.jsx:195-284`
+
+- **What happens:** <ActionButton type="edit"> falls back to action 'custom' (no icon, no text) and the spread restProps overrides antd's type with the invalid 'edit', so each row shows an empty button; <ActionButton type="add" label="New Flow" icon=+> is icon-only with no tooltip and puts a stray label attribute on the DOM button.
+- **Fix:** Use action="edit" on the row and action="create" text="New Flow" on the header, as every other register does. *(visible: the edit pencil and the 'New Flow' label appear)*
+- **Estimate:** 0.25 h
+
+#### U317 · P2 · rule 1 — New approval flows default to allowing self-approval, so a submitter who also holds the approver role approves their own PO.
+
+*Approval Flows (new flow)* — `src/pages/admin/ApprovalFlowForm.jsx:82; erp/approval/service/ApprovalRequestService.java:184`
+
+- **What happens:** Purchase manager raises a PO for 8 lakh; the flow's level 1 is the Purchase Manager role and Prevent Self-Approval was left at its default (off). The same person opens My Approvals and approves their own PO, defeating maker-checker.
+- **Fix:** Default preventSelfApproval to true for new flows (UI and ApprovalFlowRequest); keep the switch so the owner can turn it off. *(visible: the Prevent Self-Approval switch starts on for new flows)*
+- **Estimate:** 0.5 h
+- **Note:** Owner decision; existing flows are untouched.
+
+#### U318 · P2 · rule 4 — The Review drawer can show another document's approval history when two rows are reviewed in quick succession.
+
+*My Approvals (Review drawer)* — `src/pages/approvals/MyApprovals.jsx:62-74`
+
+- **What happens:** On a slow link the approver clicks Review on PO-101, closes the drawer at once and clicks Review on PO-102. PO-101's history request resolves after PO-102's (or after the reset) and setSelectedHistory writes PO-101's timeline into the PO-102 drawer, so the approver reads the wrong remarks before approving.
+- **Fix:** Ignore a history response whose record is no longer the selected one (compare ids, or an alive token as useRoleDoc does). *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U319 · P2 · rule 1 — Company Profile saves any text as GSTIN, PAN, IFSC, email or state code, and even a blank company name, and every export document prints from it.
+
+*Company Profile* — `src/pages/admin/CompanyProfile.jsx:100-124; erp/masterdata/organisation/OrganisationInfoDTO.java:20-21`
+
+- **What happens:** Admin types GSTIN '33ABCDE1234F1Z' (14 characters) and IFSC 'SBIN00123'; both save without a word and print on every sample/commercial invoice and bank block. A first save on a fresh install with everything empty creates the profile with no company name, which removes the 'not configured' banner.
+- **Fix:** Add format rules (GSTIN 15-char pattern, PAN 10, IFSC 11, email, 2-digit state code) and make Company Name required, in the form and as @Pattern/@NotBlank on the DTO. *(visible: invalid values show an inline error)*
+- **Estimate:** 1.5 h
+- **Note:** No logo upload exists on this screen, so there is no upload type/size check to review.
+
+### P3
+
+#### U324 · P3 · rule 1 — An approval-flow admin without users.view or roles.view gets error toasts on every drawer open and an empty approver list.
+
+*Approval Flows (edit drawer)* — `src/pages/admin/ApprovalFlowForm.jsx:37-49; erp/iam/controller/UserController.java:15-25; erp/iam/controller/RoleController.java`
+
+- **What happens:** Owner gives the Purchase Head approval-flows add/update but not Users or Role & Access. Opening New Flow calls GET /users and GET /roles; under ENFORCE both answer 403, the interceptor toasts twice, and the approver Selects are empty so no level can be configured.
+- **Fix:** Serve approver options from an approval-flows-scoped endpoint (id + name of active roles/users), or document that the screen needs both view rights. *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U325 · P3 · rule 2 — Catch blocks toast again after the interceptor already toasted the server's message.
+
+*Admin screens (User Management, Admin Dashboard, Approval Flows)* — `src/pages/admin/UserManagement.jsx:64; src/pages/admin/UserManagement.jsx:184; src/pages/admin/UserManagement.jsx:220; src/pages/admin/UserManagement.jsx:242; src/pages/admin/AdminDashboard.jsx:63; src/pages/admin/AdminDashboard.jsx:81; src/pages/admin/ApprovalFlowList.jsx:53; src/pages/admin/ApprovalFlowList.jsx:80; src/pages/admin/ApprovalFlowList.jsx:90; src/pages/admin/ApprovalFlowList.jsx:109; src/pages/admin/ApprovalFlowForm.jsx:77; src/pages/admin/ApprovalFlowForm.jsx:120; src/pages/admin/components/FlowLockedBanner.jsx:237; src/components/approval/ApprovalActionBar.jsx:147`
+
+- **What happens:** Deleting a user who has ever logged in fails on the FK to the activity log: the interceptor toasts the server's message and UserManagement toasts 'Failed to delete user' as well.
+- **Fix:** Drop the catch-block message.error calls (or use toastUnlessHandled as CompanyProfile does). *(visible: one toast instead of two)*
+- **Estimate:** 1 h
+
+#### U327 · P3 · rule 30, rule 9 — console.* calls and a locale-less toLocaleString() remain in the admin and approvals screens.
+
+*Admin screens and services* — `src/pages/admin/UserManagement.jsx:63; src/pages/admin/UserManagement.jsx:75; src/pages/admin/AdminDashboard.jsx:62; src/pages/admin/AdminDashboard.jsx:80; src/pages/admin/ApprovalFlowList.jsx:54; src/pages/admin/ApprovalFlowForm.jsx:42; src/pages/admin/ApprovalFlowForm.jsx:48; src/services/admin/organisationService.js:205; src/pages/approvals/MyApprovals.jsx:116`
+
+- **What happens:** The axios error object (request config included) is logged to the console on every failed users load; My Approvals shows 'Submitted At' in the browser's locale instead of the app's DD-MMM-YYYY HH:mm.
+- **Fix:** Route through utils/logger.js and formatDate(ts, 'DD-MMM-YYYY HH:mm'). *(visible: Submitted At uses the app's date format)*
+- **Estimate:** 0.5 h
+
+## Sample requests
+
+### P0
+
+#### U330 · P0 · rule 5 — Saving an edited per-colour draft (PP / Shipment sample) silently erases its colourway on the server.
+
+*Sample Request form (edit)* — `src/pages/sample-request/SampleRequestForm.jsx:95; src/pages/sample-request/SampleRequestForm.jsx:159; src/pages/sample-request/SampleRequestForm.jsx:171; src/pages/sample-request/form/SectionDetails.jsx:181-221; erp/sampling/request/service/SampleRequestService.java:201-223; erp/sampling/request/service/SampleRequestMerger.java:75`
+
+- **What happens:** A PP Sample (scope ORDER_PER_COLOUR) is raised for Navy, Red, Black as a batch of three drafts. The user opens SRQ-Navy from the list, changes the sample qty and presses Save as Draft (or Submit). The form loads colourName via setFieldsValue, but for this scope the only rendered identity field is `colours` (the multi-colour picker), so `colourName` is not a registered Form.Item and form.getFieldsValue() (rc-form returns registered fields only) omits it; buildPayload sends colourName:null. The server rebuilds the identity from the request, keyChanged is true, the uniqueness check passes (no other colourless PP), and applyHeader writes colourName=null. The request loses its colourway, its materials are re-materialised colour-less (largest-across-colours quantities), and the list, dispatch and invoice screens show '—' for colour. Picking a colour again in the empty 'Colourways' box does not help: that field is never read on edit.
+- **Fix:** On edit, render the single-colour field for every colour-naming scope (or read colourName from draft.record when the field is absent) and send bomLineId from the record for a lab dip; never let an edit drop an identity field the user did not change. *(visible: the edit form shows the request's own colourway (one value) instead of an empty multi-colour picker; saving keeps it)*
+- **Estimate:** 3 h
+- **Note:** Lead-verified (antd getFieldsValue() returns mounted fields only; the edit form mounts `colours`, not `colourName`, for a per-colour scope) and reported to the coordinator at once. Fixed together with the lab-dip / revision P1 that follows it.
+
+### P1
+
+#### U331 · P1 · rule 5 — A lab dip / strike off draft cannot be saved from the edit form, and a revision of a PP sample or lab dip can never be saved or submitted, so a rejected sample of those types cannot be re-made.
+
+*Sample Request form (edit)* — `src/pages/sample-request/SampleRequestForm.jsx:158-184; src/pages/sample-request/form/SectionDetails.jsx:158-178; src/pages/sample-request/view/AvailableActionsPanel.jsx:114-120; erp/sampling/request/service/SampleRequestService.java:202-215; erp/sampling/request/service/SampleRequestService.java:411-417; erp/sampling/request/service/SampleSubmitGate.java:47-49`
+
+- **What happens:** (a) Lab dip draft: buildPayload never sends bomLineId, so update() builds an identity with bomLineId=null and requireIdentityComplete answers 400 'SRQ-x is raised against one material - choose which fabric it is for'; picking the fabric in the 'Materials' box does not help because bomLineIds is not read on edit. Every Save as Draft / Submit on an existing lab dip fails. (b) Buyer rejects PP sample SRQ-Navy; user clicks Raise Revision, lands on the edit form of the new draft whose three dates are blank by design. Saving sends colourName:null (see the P0) or bomLineId:null, keyChanged is true and the server refuses with 409 'is a revision of ... and keeps its order, sample type, colour and fabric'. The revision can never receive its dates, and the submit gate requires all three, so it can never be submitted.
+- **Fix:** Same fix as the colour-wipe finding: send the record's colourName and bomLineId on edit (the identity is fixed for a revision anyway). *(visible: Save/Submit on a lab-dip draft or a PP/lab-dip revision succeeds instead of erroring)*
+- **Estimate:** 1 h
+- **Note:** Shares the fix with the P0; estimate is the extra lab-dip/revision verification on top.
+
+#### U332 · P1 · rule 1 — The list's quick 'Mark as Dispatched' ships a hand delivery with no signed challan, bypassing the rule the form enforces.
+
+*Dispatches list* — `src/pages/sample-request/dispatch/DispatchList.jsx:102-121; src/pages/sample-request/dispatch/DispatchList.jsx:242-249; src/pages/sample-request/dispatch/DispatchForm.jsx:177-186; erp/sampling/dispatch/SampleDispatchSendService.java:54-65; erp/sampling/dispatch/SampleDispatchValidator.java:92-102`
+
+- **What happens:** A merchandiser saves a LOCAL_HAND dispatch draft (buying office, handed-over-to filled) without uploading the delivery challan, intending to add it later. Back on the Dispatches list she clicks the send icon on the row and confirms. markDispatched passes server validation (validateComplete has no document rule), the record locks irreversibly and every SR moves to Dispatched with no proof of delivery - the exact outcome DispatchForm's document check exists to prevent.
+- **Fix:** Move the 'hand delivery needs at least one stored document' rule into SampleDispatchValidator.validateComplete (server) so every path enforces it; the list then shows the server's refusal. *(visible: marking a hand delivery with no document from the list is refused with a message)*
+- **Estimate:** 2 h
+
+#### U333 · P1 · rule 28 — Printing an invoice from the view dialog prints the head-office address and GSTIN instead of the exporting branch's.
+
+*Invoices list / view dialog* — `src/pages/sample-request/invoice/SampleInvoiceList.jsx:265; src/pages/sample-request/invoice/SampleInvoiceList.jsx:82; src/pages/sample-request/invoice/SampleInvoiceForm.jsx:387; src/pages/sample-request/invoice/useCompanyProfile.js:79-88`
+
+- **What happens:** On a multi-branch company an EXSG commercial invoice is issued with Exporting Branch = Tiruppur (its own GSTIN). The user opens it from the Invoices list (row click / view icon) and presses Print in the dialog footer. onPrint calls printSampleInvoice(inv, profile) without withExportingBranch, so the exporter block shows the company profile's address and GSTIN; the printed customs/tax document carries the wrong state GST registration. The row Print icon and the wizard's Print Preview use withExportingBranch and print correctly, so the same invoice prints two different exporters depending on the button.
+- **Fix:** Pass withExportingBranch(profile, inv) in the view dialog's onPrint, as the other two print paths already do. *(visible: the dialog's print shows the branch exporter block, same as the row print)*
+- **Estimate:** 0.5 h
+
+#### U334 · P1 · rule 15 — The Customer Comments register only ever sees the newest 100 sample requests, so older dispatched samples awaiting feedback silently drop off it.
+
+*Customer Comments* — `src/pages/sample-request/comments/CustomerCommentsPage.jsx:60-73; src/pages/sample-request/comments/CustomerCommentsPage.jsx:223`
+
+- **What happens:** The register fetches page 0, size 100 of ALL sample requests (any status) and then filters client-side to the five comment statuses. With 140 requests raised since an SR was dispatched three weeks ago, that SR is not in the first 100 and never appears in the register (and the 'Total N' count is wrong), so its buyer feedback is never captured from this screen. Searching its exact SR number finds it, but nothing tells the user to.
+- **Fix:** Send the comment statuses to the server (status list or a 'commentable' flag on SampleRequestSearchRequest) and page server-side like SampleRequestList. *(visible: older dispatched SRs appear; the table pages from the server)*
+- **Estimate:** 3 h
+
+#### U335 · P1 · rule 1 — The register's Feedback column reads 'Awaiting' for every row, including approved and rejected samples and drafts already saved.
+
+*Customer Comments* — `src/pages/sample-request/comments/CustomerCommentsPage.jsx:161-172; erp/sampling/request/service/SampleRequestAssembler.java:36-38; erp/sampling/request/service/SampleRequestAssembler.java:72-85`
+
+- **What happens:** The list rows come from searchSampleRequests, whose summaries deliberately omit `feedback` (assembler comment: 'A list page assembles the same shape minus ... the feedback record - no list column reads them'). This column does read it, so record.feedback is always undefined: an Approved SR shows 'Awaiting', and a Dispatched SR with a saved comment draft also shows 'Awaiting', so the merchandiser cannot see which samples still need comments.
+- **Fix:** Add a light `feedbackState` (NONE/DRAFT/RECORDED) to the summary DTO (one grouped query per page, like applyRefs) and render the column from it. *(visible: the Feedback column shows Recorded / Draft saved / Awaiting correctly)*
+- **Estimate:** 2 h
+
+### P2
+
+#### U336 · P2 · rule 5 — Retrying Submit after a failed status change sends a stale version and gets a spurious conflict.
+
+*Sample Request form* — `src/pages/sample-request/SampleRequestForm.jsx:163; src/pages/sample-request/SampleRequestForm.jsx:195-214; src/pages/sample-request/SampleRequestForm.jsx:227-244`
+
+- **What happens:** User edits an existing draft and clicks Submit. persist() updates the record (server version 3 -> 4) but the update branch never calls setSavedVersion, so savedVersion stays null and the form still holds draft.record.version = 3. changeStatus then fails (network drop, or a server-side refusal). User clicks Submit again: updateSampleRequest is sent version 3 and the server answers 409 OPTIMISTIC_LOCK_CONFLICT against the user's own first save. A new request hits the same thing on the third attempt.
+- **Fix:** Set savedVersion from the update response too (and from the changeStatus response), so the form always adopts the version it just wrote. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U337 · P2 · rule 4, rule 14 — Fast record switching can leave the dialog on a skeleton forever, and the SR view refetches on every list re-render.
+
+*Sample Request view / Customer Comments dialog* — `src/pages/sample-request/SampleRequestView.jsx:49-69; src/pages/sample-request/SampleRequestList.jsx:197-206; src/pages/sample-request/comments/CustomerCommentsPage.jsx:77-104`
+
+- **What happens:** Neither load() nor loadDetail() ignores a superseded response. Open SR A, close, and open SR B within the round-trip (or click the parent-SR link in a revision's hero): B resolves first, A resolves last and overwrites state; `fresh` then fails the id check and the dialog shows the loading skeleton until it is closed. Separately, SampleRequestList passes an inline onClose, so SampleRequestView's load callback changes on every list render and its effect re-fetches the open SR each time the list renders (2-3 extra GETs after every action).
+- **Fix:** Guard the fetch with a cancelled flag / request id as DispatchView and SampleInvoiceView already do, and wrap the list's onClose in useCallback. *(not visible)*
+- **Estimate:** 1 h
+
+#### U338 · P2 · rule 10 — Ctrl+S submits the sample request, and inside the comments dialog records the terminal buyer decision, instead of saving.
+
+*Sample Request form / Comments dialog / SR view* — `src/hooks/useKeyboardShortcuts.js:23-27; src/pages/sample-request/SampleRequestForm.jsx:359-360; src/pages/sample-request/comments/CustomerCommentsPage.jsx:270-271; src/pages/sample-request/SampleRequestList.jsx:150-152; src/pages/sample-request/SampleRequestView.jsx:355-394`
+
+- **What happens:** The shortcut clicks the first enabled .ant-btn-primary in document order. On the SR form 'Save as Draft' is a default button and 'Submit Sample Request' is primary, so Ctrl+S submits the request. On Customer Comments the page has no primary button, so Ctrl+S inside the dialog clicks 'Save Comments', which records the decision and closes the SR irreversibly when a decision is chosen. In the SR view's 'Edit instructions' modal, Ctrl+S hits the page's 'New Sample Request' button behind it and navigates away, discarding the typed instructions.
+- **Fix:** Make the shortcut prefer the topmost open dialog and target an explicit save button (e.g. a data-shortcut='save' marker) rather than any primary button; do not bind it to terminal actions. *(visible: Ctrl+S saves (draft) in the topmost surface instead of submitting or navigating)*
+- **Estimate:** 2 h
+- **Note:** The hook is shared; the fix belongs to the programme's global Ctrl+S item, listed here for the sample-module consequences.
+
+#### U339 · P2 · rule 8 — Leaving the SR form, the dispatch form or the comments dialog by sidebar, browser Back or Close drops unsaved input without a prompt.
+
+*Sample Request form / Dispatch form / Comments dialog* — `src/pages/sample-request/SampleRequestForm.jsx:48; src/pages/sample-request/SampleRequestForm.jsx:246-255; src/pages/sample-request/dispatch/DispatchForm.jsx:57; src/pages/sample-request/dispatch/DispatchForm.jsx:201-210; src/pages/sample-request/comments/CustomerCommentsPage.jsx:96-101`
+
+- **What happens:** The SR form and the dispatch form track isDirty but only consult it in their own Cancel button; neither uses useUnsavedChanges (the invoice wizard does). A user half-way through a sample request (dates, 30 material colour overrides) clicks another sidebar item and everything is lost; a dispatch with staged challan files loses them the same way. In the comments dialog, Close or the X discards typed buyer comments with no confirm.
+- **Fix:** Wire useUnsavedChanges(isDirty) into both forms and confirm Close in the comments dialog when the capture form is touched. *(visible: a discard-changes prompt appears when leaving with unsaved input)*
+- **Estimate:** 2 h
+
+#### U340 · P2 · rule 9 — The printed invoice total and line amounts are float-rounded in the browser and can differ by a paisa/cent from the issued declared value.
+
+*Sample invoice wizard / print* — `src/utils/sampleInvoicePdfGenerator.js:24; src/utils/sampleInvoicePdfGenerator.js:38; src/utils/sampleInvoicePdfGenerator.js:109; src/pages/sample-request/invoice/InvoiceStepLines.jsx:57-70; erp/sampling/invoice/SampleInvoiceAssembler.java:140-146; erp/sampling/invoice/SampleInvoiceLine.java:63-64`
+
+- **What happens:** Rate is stored at scale 4 and the rate input has no precision cap. A line of 1 pc at USD 2.675: the server's declared value is 2.68 (BigDecimal HALF_UP) and the list, view and success toast show 2.68, but the print computes 1*2.675 in floating point and toFixed(2) gives 2.67, so the customs invoice prints 2.67 while the system records 2.68. With several such lines the printed line amounts also stop summing to the printed total.
+- **Fix:** Print the server's line amounts and declaredValue (or round per line with a decimal helper in formatters.js), and cap the rate input's precision. *(visible: printed amounts match the issued declared value)*
+- **Estimate:** 2 h
+
+#### U341 · P2 · rule 1 — An issued commercial invoice can 'cover' a sample request that has no line on it, so the overseas dispatch gate passes for a sample missing from the customs document.
+
+*Sample invoice wizard* — `src/pages/sample-request/invoice/InvoiceStepLines.jsx:76-79; src/pages/sample-request/invoice/InvoiceStepLines.jsx:99-101; erp/sampling/invoice/SampleInvoiceValidator.java:37-49`
+
+- **What happens:** The user ticks SRQ-1 and SRQ-2, then in step 3 deletes SRQ-2's line (the screen says this does not unselect the SR). The invoice is issued with srIds [1,2] and one line. Coverage is by srIds, so the dispatch of SRQ-2 passes the INVOICE_REQUIRED gate although the commercial invoice travelling with the parcel does not list it.
+- **Fix:** Either unselect the SR when its last line is removed, or have the issue validator require at least one line per covered SR. *(visible: removing an SR's only line unticks it (or issue names the uncovered SR))*
+- **Estimate:** 1.5 h
+- **Note:** The behaviour is flagged in the UI text, so it may be a known shortcut; the gate consequence is what makes it worth fixing.
+
+#### U342 · P2 · rule 1 — A dispatch can be marked dispatched with a future date, which pushes the linked order's dispatch date out as a sample slip.
+
+*Dispatch form* — `src/pages/sample-request/dispatch/DispatchFields.jsx:154-156; erp/sampling/dispatch/SampleDispatchValidator.java:92-102; erp/sampling/dispatch/SampleOrderDelayContributor.java:63-68`
+
+- **What happens:** The Dispatched Date picker has no disabledDate and the server only checks it is present. A typo of 14-Oct-2027 instead of 2026 is accepted on Mark as Dispatched; SampleOrderDelayContributor reads that date as the actual ship date and adds a year of slip to the order, moving its dispatch date.
+- **Fix:** Disable future dates in the picker and refuse a dispatchedDate after today in validateComplete. *(visible: future dates are not selectable)*
+- **Estimate:** 1 h
+
+#### U343 · P2 · rule 1 — The style picker lets the user tick sample requests of different customers, which the server only refuses at Issue.
+
+*Sample invoice wizard* — `src/pages/sample-request/invoice/InvoiceStepStyles.jsx:31-37; src/pages/sample-request/invoice/SampleInvoiceForm.jsx:111-118; erp/sampling/invoice/SampleInvoiceValidator.java:65-73`
+
+- **What happens:** Eligible SRs of two buyers are listed together and nothing disables the second buyer's rows once one is ticked (listEligibleSrs supports consigneeBuyerId but the form never passes it). The user builds the invoice across two buyers, fills header and rates, presses Issue and only then gets 'An invoice covers one customer only'.
+- **Fix:** Once one SR is ticked, disable rows of other buyers with a reason, or pass consigneeBuyerId to listEligibleSrs. *(visible: other customers' rows grey out after the first pick)*
+- **Estimate:** 1 h
+
+#### U344 · P2 · rule 34 — The courier cost against an order is never shown because the server still returns a hard-coded 0.
+
+*Order view - Sample Requests card* — `src/pages/sample-request/OrderSampleRequestSummaryCard.jsx:84-88; erp/sampling/request/service/SampleRequestService.java:93-97`
+
+- **What happens:** Dispatches record a courier cost, and the order card is documented to show the total sample courier cost per order, but listByOrderNo returns totalCourierCost: 0 with the comment 'arrives in Stage 4' (Stage 4 shipped). The cost line never renders for any order.
+- **Fix:** Sum courierCost once per sent dispatch of the order's SRs in listByOrderNo (or remove the dead UI line). *(visible: the order card shows the sample courier cost)*
+- **Estimate:** 1.5 h
+
+#### U345 · P2 · rule 5 — Two users saving comment drafts on the same sample overwrite each other without a conflict.
+
+*Customer Comments* — `src/pages/sample-request/comments/useFeedbackSave.js:53-62; erp/sampling/request/service/SampleFeedbackService.java:57-64; erp/sampling/request/service/SampleFeedbackService.java:104-115`
+
+- **What happens:** saveDraft checks the SR's version but writes only the feedback row, so the SR version never moves. User A and B both open SRQ-12's comments; A saves a draft with fit comments, B (still on the old copy) saves a draft with workmanship comments; B's save passes the version check and replaces A's comments entirely.
+- **Fix:** Version the feedback row (or touch the SR) on draft save, and adopt the returned version in the dialog. *(not visible)*
+- **Estimate:** 1.5 h
+
+### P3
+
+#### U346 · P3 · rule 1 — A comment draft with a decision picked is labelled 'Feedback recorded' while the sample is still open.
+
+*Customer Comments dialog* — `src/pages/sample-request/comments/CustomerCommentsPage.jsx:246-248; src/pages/sample-request/comments/useFeedbackSave.js:26; erp/sampling/request/service/SampleFeedbackService.java:109`
+
+- **What happens:** Save as Draft stores the chosen decision on the feedback row without changing status; reopening the dialog shows the green 'Feedback recorded' tag on a Dispatched SR, suggesting the decision was applied when it was not.
+- **Fix:** Label by SR status (or by a recorded flag), not by feedback.decision. *(visible: a draft shows 'Draft saved')*
+- **Estimate:** 0.5 h
+
+#### U347 · P3 · rule 2 — Several catch blocks toast after an axios failure the interceptor has already toasted.
+
+*Module-wide* — `src/pages/sample-request/comments/FeedbackAttachments.jsx:30; src/pages/sample-request/dispatch/DispatchFields.jsx:107; src/pages/sample-request/dispatch/DispatchView.jsx:57; src/pages/sample-request/invoice/SampleInvoiceForm.jsx:287; src/pages/sample-request/comments/FeedbackImportPanel.jsx:52`
+
+- **What happens:** A failed attachment download (axios blob GET) shows the interceptor's toast plus 'Failed to download ...'; a failed eligible-SR load on type switch shows two toasts; the comment-sheet import's 503 AI_NOT_CONFIGURED shows a toast plus the inline 'Import unavailable' alert.
+- **Fix:** Use toastUnlessHandled in the four catch blocks, and pass silent:true on parseCommentSheet for the AI_NOT_CONFIGURED case. *(visible: one error message instead of two)*
+- **Estimate:** 0.5 h
+
+#### U348 · P3 · rule 8 — A brand-new invoice is marked dirty on open, so Close and every type switch ask to discard changes nobody made.
+
+*Sample invoice wizard* — `src/pages/sample-request/invoice/SampleInvoiceForm.jsx:202-212; src/pages/sample-request/invoice/SampleInvoiceForm.jsx:291-294`
+
+- **What happens:** After load, the profile effect applies countryOfOrigin / exporterRef through patch(), which sets isDirty. Opening New Invoice and immediately switching to Sample type (or leaving) triggers the 'Unsaved Changes' confirm.
+- **Fix:** Apply those defaults with setInv directly (not patch) so they do not count as user edits. *(visible: no discard prompt on an untouched invoice)*
+- **Estimate:** 0.5 h
+
+#### U349 · P3 · rule 1 — Dispatch documents are size-checked but not type-checked, and a discarded comment-sheet import is still uploaded as an attachment.
+
+*Dispatch form / Comments dialog* — `src/pages/sample-request/dispatch/DispatchFields.jsx:89-97; src/pages/sample-request/comments/FeedbackImportPanel.jsx:48; src/pages/sample-request/comments/FeedbackImportPanel.jsx:109`
+
+- **What happens:** accept='.pdf,image/*' is advisory, so a .heic or .docx challan is staged and only fails after the dispatch saves ('1 document failed to upload'). Separately, parsing a comment sheet stages the file, and 'Discard extraction' does not unstage it, so the wrong sheet is attached on the next save.
+- **Fix:** Check the extension against the storage allow-list in beforeUpload, as FeedbackAttachments does, and unstage the source file on Discard extraction. *(visible: a wrong file type is refused at pick time)*
+- **Estimate:** 0.5 h
+
+#### U350 · P3 · rule 15, rule 9 — The Customer filter only offers customers on the current page, and costs are formatted with toLocaleString() with no locale.
+
+*Dispatches list* — `src/pages/sample-request/dispatch/DispatchList.jsx:265-268; src/pages/sample-request/dispatch/DispatchList.jsx:204; src/pages/sample-request/dispatch/DispatchView.jsx:130; src/pages/sample-request/OrderSampleRequestSummaryCard.jsx:86`
+
+- **What happens:** With 60 dispatches over three pages, a customer who appears only on page 3 cannot be picked in the filter; once a customer is picked, the options collapse to that one. Courier cost renders in the browser's locale rather than en-IN.
+- **Fix:** Feed the filter from listDispatchableCustomers or a buyers facet, and use formatters.js for money. *(visible: all customers are listed in the filter)*
+- **Estimate:** 1 h
+
+## HR and payroll
+
+### P1
+
+#### U351 · P1 · rule 1 — A double-click on Save in the salary structure drawer can leave an employee with two current salary structures, after which F&F, EL encashment and the next structure all fail for that employee.
+
+*Employee View - Salary Structure drawer* — `src/pages/hr/employee/SalaryStructureDrawer.jsx:38; src/pages/hr/employee/SalaryStructureDrawer.jsx:72; erp/hr/service/SalaryStructureService.java:48-66; erp/hr/repository/SalaryStructureRepository.java:13; erp/hr/service/FnfSettlementService.java:163; erp/hr/service/ElEncashmentService.java:112`
+
+- **What happens:** HR adds the first salary structure for a new joiner and double-clicks Save. The Save button has no loading/disabled state, so two POSTs go out. Both find no current structure (nothing to supersede, so no optimistic-lock collision), and both insert is_current=true rows; idx_hr_salary_current is a plain, non-unique index. From then on findByEmployeeIdAndIsCurrentTrue (Optional) throws IncorrectResultSize: adding the next structure, calculating the leaver's F&F and running EL encashment all fail with a 500 for that employee, and Salary History shows two 'Active' rows.
+- **Fix:** Give the Save button a saving state (loading + disabled while the request runs). On the server, add a partial unique index on hr_salary_structures(employee_id) WHERE is_current, in a new migration, so a race cannot create a second current row. *(visible: Save shows a spinner and cannot be clicked again while saving)*
+- **Estimate:** 2 h
+- **Note:** The superseding path (a structure already exists) is protected by @Version on the superseded row; only the first structure for an employee is exposed.
+
+#### U352 · P1 · rule 15, rule 16 — The New Advance employee picker loads only the first 200 active employees across all units and never searches the server, so an advance cannot be recorded for anyone after them.
+
+*Salary Advances* — `src/pages/hr/loan/AdvanceList.jsx:62-66; src/pages/hr/loan/AdvanceList.jsx:448-455; erp/hr/controller/EmployeeController.java:32-35`
+
+- **What happens:** A factory has 320 active employees. The picker calls searchEmployees({status:'ACTIVE', size:200}), which the API sorts by employeeNo ascending, and filters only that list on the client. A recent joiner with employee number E0301 asks for an advance: typing their name or number finds nothing, so HR concludes the employee does not exist and cannot record the advance.
+- **Fix:** Make the picker search the server as the user types (debounced onSearch with filterOption off, as FnfForm already does), keeping a preloaded first page for the empty dropdown. *(visible: every active employee can be found by typing in the picker)*
+- **Estimate:** 1.5 h
+- **Note:** The same pattern with a 500 or 1000 cap is recorded separately as P2.
+
+#### U353 · P1 · rule 1 — The bulk attendance grid lists only employees who already have a record for the date, so it cannot mark a fresh day for a unit, although the single-entry screen tells users to use it for exactly that.
+
+*Bulk Attendance Entry* — `src/pages/hr/attendance/AttendanceBulkEntry.jsx:284-292; src/pages/hr/attendance/AttendanceBulkEntry.jsx:493; src/pages/hr/attendance/AttendanceEntry.jsx:115-116; erp/hr/service/AttendanceService.java:415-420`
+
+- **What happens:** A supervisor opens Mark Attendance, reads 'For a whole unit use Bulk Grid Entry', opens the grid, picks today's date and the Sewing unit. getAttendanceByDate returns only existing attendance_daily rows (findByAttendanceDateAndEmployeeUnitId), so the table is empty and Save All is disabled. Nothing explains why. On a day where some rows were imported, employees with no row (a new joiner, someone missed in the file) are not in the grid and cannot be marked from it.
+- **Fix:** Build the grid from the unit's active employees (joined on or before the date) merged with the existing rows for that date, leaving status empty where none exists, and skip untouched empty rows on save. *(visible: the grid lists every active employee of the unit for the chosen date, not only those already marked)*
+- **Estimate:** 4 h
+- **Note:** Server change optional: the UI can merge searchEmployees({unitId}) with the by-date rows, but that inherits the 500-employee cap, so a server endpoint is the better fix.
+
+#### U354 · P1 · rule 1 — A manual loan repayment or 'mark recovered' entered while the month's payroll is processed but not yet approved does not stop the payslip deduction, so the employee repays twice.
+
+*Loans / Salary Advances / Payroll Run* — `src/pages/hr/loan/LoanView.jsx:187-206; src/pages/hr/loan/AdvanceList.jsx:356-362; erp/hr/service/LoanService.java:91-129; erp/hr/service/AdvanceService.java:95-107; erp/hr/service/PayrollService.java:423-441; erp/hr/service/PayrollRecoveries.java:21-27`
+
+- **What happens:** Loan balance is 5,000 with an EMI of 1,000. October payroll is processed (the payslip deducts 1,000 and a LoanRecovery row is written for the run) and waits for approval. The employee settles the loan in cash; HR records a 5,000 repayment, which is allowed because it is not more than the balance, and the loan becomes FULLY_RECOVERED. The run is then approved: applyLoanRecovery clamps the balance at zero, but the payslip still deducts 1,000, so the employee is over-recovered by 1,000. The same happens with an advance marked Recovered between processing and approval: the payslip keeps advanceRecovery while nothing remains PENDING to allocate it to.
+- **Fix:** On the server, refuse a manual repayment or 'mark recovered' while a PROCESSED run holds a recovery for that loan or advance, and say to re-process or approve the run first. Alternatively, reduce the manual amount by the pending run recovery. The LoanView hint should name the rule. *(visible: in that window the repayment is refused with a message telling the user to re-process the run first)*
+- **Estimate:** 3 h
+- **Note:** Money is wrong, but only if the repayment falls between processing and approval, hence P1 rather than P0.
+
+### P2
+
+#### U355 · P2 · rule 4, rule 5 — Save All writes back every row as it was loaded, so a miss-punch correction or single-day edit made after the grid opened is silently reverted.
+
+*Bulk Attendance Entry* — `src/pages/hr/attendance/AttendanceBulkEntry.jsx:350-371; erp/hr/service/AttendanceService.java:159-168; erp/hr/service/MissPunchService.java:85-104`
+
+- **What happens:** A supervisor opens the grid for 14-Oct at 10:00. At 10:05 HR approves a miss punch that sets an operator's in time to 09:00, written through applyPunchCorrection. At 10:10 the supervisor changes one other row and clicks Save All. The payload carries all rows with the in/out times loaded at 10:00, so the operator's corrected in time is overwritten with the stale value. The miss punch shows Approved, but attendance no longer reflects it.
+- **Fix:** Send only rows the user changed (track dirty rows), and/or include each row's version so the server refuses a stale overwrite. *(not visible)*
+- **Estimate:** 3 h
+
+#### U356 · P2 · rule 1 — Saving the bulk grid strips the leave type and half-day session from days marked LEAVE or HALF_DAY through Mark Attendance or import.
+
+*Bulk Attendance Entry* — `src/pages/hr/attendance/AttendanceBulkEntry.jsx:360-367; erp/hr/service/AttendanceService.java:122-145; erp/hr/service/AttendanceTally.java:86-89`
+
+- **What happens:** On Mark Attendance a clerk records an operator as LEAVE with type CL, and another as HALF_DAY, SECOND_HALF. A supervisor later opens the bulk grid for that date and saves to fix an unrelated row. The payload has no leaveTypeId or halfDaySession. Because these days are not held by an approved leave application, markAttendance sets leaveType to null and halfDaySession to null. The calendar and summary then report the leave as 'Unspecified' and the half day loses which half was worked. The grid offers no inputs to put them back.
+- **Fix:** Carry halfDaySession and leaveTypeId from the loaded row through to the payload unchanged, and show them read-only in the grid (or as editors when status is LEAVE or HALF_DAY). *(not visible)*
+- **Estimate:** 2 h
+- **Note:** Payable days are unaffected (LEAVE counts as payable whatever the type). The loss is in leave reporting and half-day detail.
+
+#### U357 · P2 · rule 5 — The employee form and the salary structure drawer never send the record's version, so the server's optimistic-lock check is skipped and a concurrent edit is silently overwritten, including the whole nominee and document list.
+
+*Employee Form / Salary Structure drawer* — `src/pages/hr/employee/EmployeeForm.jsx:225-232; src/pages/hr/employee/EmployeeForm.jsx:273-326; src/pages/hr/employee/SalaryStructureDrawer.jsx:29-49; erp/hr/service/EmployeeService.java:151-153; erp/hr/service/EmployeeService.java:221-239; erp/hr/service/SalaryStructureService.java:92-94`
+
+- **What happens:** form.setFieldsValue({...emp}) stores version, but validateFields() returns only fields with a Form.Item, so version is never in the payload, and the server only checks it when it is non-null. HR user A opens employee E1 and adds a nominee; user B opens E1 and corrects the bank IFSC. A saves, then B saves: B's payload replaces the nominee list (delete and re-insert) without A's nominee, and nobody is told. The same applies to two people editing the current salary structure.
+- **Fix:** Hold the loaded record (or its version) in state and send version: loaded.version on update. The screens reload or navigate after save, so the stale-echo trap does not arise (both services use saveAndFlush or reload via getById). *(visible: the second saver gets the existing conflict dialog instead of silently overwriting)*
+- **Estimate:** 1 h
+
+#### U358 · P2 · rule 1 — Editing an employee shows the reporting manager as a bare number, because the manager dropdown has no options until someone types a search.
+
+*Employee Form (edit)* — `src/pages/hr/employee/EmployeeForm.jsx:187; src/pages/hr/employee/EmployeeForm.jsx:241-247; src/pages/hr/employee/EmployeeForm.jsx:572-581`
+
+- **What happens:** HR opens Edit Employee for someone whose manager is employee id 17. managers state is empty, so the antd Select renders the raw value '17' in the Reporting Manager field. Users read it as corrupt data and clear it, which saves the employee with no manager (resolveRelationships sets null). The same raw-id display happens for a unit outside the active branch, or for a department or designation that has since been made inactive, because those option lists are filtered.
+- **Fix:** On load, seed managers with {id: emp.reportingManagerId, employeeNo, fullName: emp.reportingManagerName}. For unit, department and designation, append the record's current value to the options when it is missing from the active list. *(visible: the field shows the manager's name (and the current unit, department or designation name) instead of a number)*
+- **Estimate:** 1 h
+
+#### U359 · P2 · rule 1 — A PT slab cannot be end-dated from the screen, and every edit clears any end date, so after a state revision the old and new slab tables are both in effect and payroll can deduct the wrong PT.
+
+*HR Masters - PT Slabs* — `src/pages/hr/masters/PtSlabMaster.jsx:103-123; src/pages/hr/masters/PtSlabMaster.jsx:155-190; erp/hr/service/PtSlabService.java:40-52; erp/hr/service/StatutoryContributionCalculator.java:84-100`
+
+- **What happens:** The calculator honours effective_from and effective_to (review F028), but the form has no Effective To field, and PtSlabService.update copies dto.effectiveTo, which is null because the field is absent, so any edit re-opens a closed slab. When Tamil Nadu revises PT, HR adds the new slabs from the revision date. The old slabs never stop, so for a given income both an old and a new slab match, and the loop takes the first by from-amount, which may be the old rate. The payslip PT is then wrong for every employee in that band.
+- **Fix:** Add an optional Effective To date to the form (validated to be on or after Effective From) and send it. Server: validate that same-state slabs do not overlap in both income and date range. *(visible: the slab form gains an Effective To date field)*
+- **Estimate:** 2.5 h
+
+#### U360 · P2 · rule 1 — A state code typed in lower case is stored in lower case, because the field only looks upper case, and payroll then ignores that slab.
+
+*HR Masters - PT Slabs* — `src/pages/hr/masters/PtSlabMaster.jsx:155-157; erp/hr/service/StatutoryContributionCalculator.java:32; erp/hr/service/StatutoryContributionCalculator.java:84`
+
+- **What happens:** HR edits a slab and retypes the state as 'tn'. style textTransform:uppercase displays 'TN', but the value saved is 'tn'. The calculator queries findByStateCode('TN'), a case-sensitive match in PostgreSQL, so this slab is never found and employees in that income band pay no PT. Nothing on screen shows the difference.
+- **Fix:** Normalise with getValueFromEvent={(e) => e.target.value.toUpperCase()} (as EmployeeForm does for PAN), and upper-case stateCode in PtSlabService.create and update. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U361 · P2 · rule 1, rule 8 — Recalculate on an F&F settlement throws away the saved manual overrides with no confirmation.
+
+*F&F Settlement form* — `src/pages/hr/fnf/FnfForm.jsx:105-121; src/pages/hr/fnf/FnfForm.jsx:329-336; erp/hr/service/FnfSettlementService.java:118-148`
+
+- **What happens:** HR saves overrides on a settlement: notice-period recovery waived to 0 and 4,000 of other earnings added. A week later they open Edit / Recalculate to pick up a loan instalment and click Recalculate. The server re-derives every amount ('Manual overrides are replaced'), the form is refilled, and the agreed adjustments are gone; the only feedback is 'Recalculated from current data'. If nobody notices before approval, the employee is settled on the wrong figure.
+- **Fix:** Ask for confirmation before recalculating, listing the overridden amounts that will be replaced (comparing fnfData with a fresh derive, or simply whenever any amount differs from the derived value). *(visible: a confirmation dialog appears before Recalculate replaces the amounts)*
+- **Estimate:** 1 h
+
+#### U362 · P2 · rule 8 — Unsaved F&F override amounts and unsaved bulk-grid attendance edits are lost without warning on navigation, or in the grid on a simple date or unit change.
+
+*F&F form / Bulk Attendance / Salary Structure drawer* — `src/pages/hr/fnf/FnfForm.jsx:31; src/pages/hr/fnf/FnfForm.jsx:314-322; src/pages/hr/attendance/AttendanceBulkEntry.jsx:270-303; src/pages/hr/attendance/AttendanceBulkEntry.jsx:503-519`
+
+- **What happens:** A supervisor fills OT hours and remarks for 40 rows in the bulk grid, then changes the date picker to check yesterday: fetchData replaces the rows and every edit is gone with no prompt. On the F&F form the 'Unsaved changes' alert is shown, but clicking Back or a menu item leaves without asking.
+- **Fix:** Use useUnsavedChanges on FnfForm (dirty) and on AttendanceBulkEntry (dirty rows), and in the grid confirm before a date or unit change discards edited rows. *(visible: a 'discard unsaved changes?' prompt when leaving or switching with edits pending)*
+- **Estimate:** 2 h
+
+#### U363 · P2 · rule 7 — The New Advance drawer reopens with the previous, cancelled entry still filled in, so an advance can be saved against the wrong employee.
+
+*Salary Advances / Loan View / Payroll Run* — `src/pages/hr/loan/AdvanceList.jsx:258; src/pages/hr/loan/AdvanceList.jsx:434-447; src/pages/hr/loan/LoanView.jsx:271-286; src/pages/hr/payroll/PayrollRunView.jsx:351-363`
+
+- **What happens:** The form instance lives in AdvanceList and is reset only after a successful save. destroyOnHidden unmounts the fields, but the form store keeps their values (preserve defaults to true), and on remount initialValues do not override stored values. HR starts an advance for employee A, cancels, and an hour later clicks New Advance for employee B: employee A and the old amount are already selected, and a quick Save records the advance against A. LoanView's Record Repayment and PayrollRunView's Mark as Paid modals do the same with amount, reference and remarks.
+- **Fix:** Call form.resetFields() when the drawer or modal opens, or in afterOpenChange or afterClose, as LeaveApplyDrawer and MissPunchList already do. *(visible: the drawer opens empty (defaults only) every time)*
+- **Estimate:** 0.5 h
+- **Note:** Checked in node_modules/@rc-component/form: Form.js:88 calls setInitialValues(init) on remount, and useForm.js:90-105 merges initialValues under the existing store, so the stored values win for preserved fields. destroyForm keeps the store unless clearOnDestroy is set.
+
+#### U364 · P2 · rule 4 — Switching employee or month quickly can show the previous employee's attendance and summary under the newly selected employee.
+
+*Attendance Calendar* — `src/pages/hr/attendance/AttendanceCalendar.jsx:105-130; src/pages/hr/attendance/AttendanceCalendar.jsx:139-162`
+
+- **What happens:** HR selects employee A, then immediately employee B. Both calendar requests are in flight with nothing cancelled or ignored; if A's response arrives last, setCalendarData shows A's days and summary while the picker says B. Someone checking B's absences before payroll reads A's record.
+- **Fix:** Ignore stale responses (a request counter or AbortController in each effect), or move both fetches onto useRecord. *(not visible)*
+- **Estimate:** 1 h
+
+#### U365 · P2 · rule 15, rule 16 — Employee pickers load a fixed first page (500 company-wide, or 500 per unit) and filter on the client, so employees past that page cannot be chosen and the leave balance grid silently omits them.
+
+*Leave apply / Miss punch / Gate pass / Attendance entry / Leave balances / Loans* — `src/pages/hr/leave/LeaveApplyDrawer.jsx:26-30; src/pages/hr/attendance/MissPunchList.jsx:36-38; src/pages/hr/attendance/GatePassList.jsx:36-38; src/pages/hr/attendance/AttendanceEntry.jsx:50; src/pages/hr/attendance/AttendanceCalendar.jsx:96; src/pages/hr/leave/LeaveBalanceView.jsx:348; src/pages/hr/loan/LoanDrawer.jsx:25`
+
+- **What happens:** With more than 500 active employees, Apply Leave, New Miss Punch and New Gate Pass cannot find anyone after the 500th by employee number; these lists are company-wide, not per unit. In a unit of more than 500, Leave Balances shows only the first 500 rows with no sign that any are missing. LoanDrawer's cap is 1000.
+- **Fix:** Use a shared server-searching employee picker (debounced onSearch, as in FnfForm). Leave Balances should page on the server instead of fetching one capped list. *(visible: every active employee can be found, and the balance grid pages through all employees)*
+- **Estimate:** 4 h
+
+#### U366 · P2 · rule 37 — Bank account numbers are shown in full on the employee view, and the employee API returns decrypted Aadhaar, PAN and account number to anyone who can view employees.
+
+*Employee View / Employee Form* — `src/pages/hr/employee/EmployeeView.jsx:213; src/pages/hr/employee/EmployeeForm.jsx:225-232; erp/hr/service/EmployeeService.java:48-75`
+
+- **What happens:** A user with only hr-employees view (for example a unit supervisor) opens an employee and sees the full bank account number. The network tab of GET /hr/employees/{id} carries the decrypted Aadhaar and PAN as well, although the view never displays them. The data is encrypted at rest, but every viewer receives the plaintext.
+- **Fix:** Return masked values (XXXX-XXXX-1234) from getById by default, and plaintext only to callers with update rights (or from a separate audited reveal endpoint). Mask the account number on the view. *(visible: the account number shows masked (last 4 digits) on the view; the edit form is unchanged for users who can update)*
+- **Estimate:** 3 h
+- **Note:** Server RBAC is ENFORCE, so this is hardening, not an open hole.
+
+### P3
+
+#### U367 · P3 · rule 1 — Approve is offered to users who have only the update right, and they get a 403 toast when they click it.
+
+*Payroll Run / Bonus Wizard / Bonus Run* — `src/pages/hr/payroll/PayrollRunView.jsx:236-240; src/pages/hr/bonus/BonusWizard.jsx:203-205; src/pages/hr/bonus/BonusRunView.jsx:33; src/pages/hr/bonus/BonusRunView.jsx:36`
+
+- **What happens:** A payroll clerk with hr-payroll update but not approve opens a PROCESSED run and sees Approve beside Re-process. Clicking it confirms and then fails on the server. BonusWizard shows Approve with no permission check at all, and BonusRunView treats update as approve and cancel.
+- **Fix:** Gate each Approve or Cancel on its own right (canApprove, canCancel) only, and show the 'ready for approval' note as PayrollWizard does. *(visible: users without the approve right no longer see the Approve button)*
+- **Estimate:** 0.5 h
+
+#### U368 · P3 · rule 1 — Inline Approve buttons have no in-flight state, so a double-click sends two approvals and the second shows an 'already approved' error toast.
+
+*Leave / Miss Punch / Gate Pass / EL Encashment lists* — `src/pages/hr/leave/LeaveApplicationList.jsx:64-72; src/pages/hr/leave/LeaveApplicationList.jsx:179-183; src/pages/hr/attendance/MissPunchList.jsx:274-283; src/pages/hr/attendance/GatePassList.jsx:58-67`
+
+- **What happens:** An approver double-clicks Approve on a pending leave. The server's HrRequestStatus guard stops a second balance deduction, but the user sees 'Leave approved' and then a red error, and wonders which one is true.
+- **Fix:** Track the id being acted on and disable or spin that row's buttons until the request settles. *(visible: the Approve link spins and is disabled while the request runs)*
+- **Estimate:** 1 h
+
+#### U369 · P3 · rule 1 — A loan can be saved with an EMI larger than the loan, with instalments × EMI not matching the amount, or with an EMI start before the loan date.
+
+*Loans* — `src/pages/hr/loan/LoanDrawer.jsx:81-95; erp/hr/service/LoanService.java:71-80`
+
+- **What happens:** HR keys a 10,000 loan with EMI 15,000 and 12 instalments by mistake. Nothing stops it; payroll caps the EMI at the balance, so the whole loan comes out of one month's salary, and the 'Total Installments' shown on the loan no longer means anything.
+- **Fix:** Validate in the drawer and in LoanService.create: EMI ≤ amount, dueStartDate ≥ loanDate, and derive or check instalments as ceil(amount / EMI). *(visible: inconsistent entries are refused with an inline message)*
+- **Estimate:** 1 h
+
+#### U370 · P3 · rule 2 — HR catch blocks still add their own error toasts on top of the interceptor's, so the user sees the same failure twice, and on statutory file downloads the first toast is a generic message.
+
+*HR module (all screens)* — `src/pages/hr/employee/EmployeeForm.jsx:236; src/pages/hr/employee/EmployeeForm.jsx:347; src/pages/hr/fnf/FnfForm.jsx:177; src/pages/hr/loan/AdvanceList.jsx:66; src/pages/hr/loan/AdvanceList.jsx:75; src/pages/hr/attendance/AttendanceBulkEntry.jsx:334-337; src/pages/hr/attendance/AttendanceCalendar.jsx:152-153; src/pages/hr/statutory/ElEncashmentRunView.jsx:68-69; src/pages/hr/statutory/ContributionFiling.jsx:107-117; src/pages/hr/payroll/PayrollWizard.jsx:47; src/pages/hr/bonus/BonusWizard.jsx:38`
+
+- **What happens:** Saving an employee with a duplicate employee number shows the server's message twice. FnfForm's save also toasts on a 409, on top of the conflict dialog. On Contribution Filing the ECR download failure first toasts the interceptor's generic text (the body is a Blob it cannot read) and then the real reason that the screen parses out of the Blob.
+- **Fix:** Remove the catch-block message.error calls. For the blob downloads, pass silent:true and keep the screen's parsed message. *(visible: one error toast instead of two)*
+- **Estimate:** 1 h
+
+## Reports (report builder, saved reports, AI chat)
+
+### P0
+
+#### U309 · P0 · rule 37 — The report AI chat runs model-written SQL over the whole live database, so any logged-in user can read password hashes and bank details on api.avarshai.com today
+
+*AI Assistant (AiChatPage)* — `erp/reporting/service/AiReportService.java:45-98; erp/reporting/service/SchemaIntrospectionService.java:45-57; erp/reporting/util/SqlValidator.java:7-24; resources/application.properties:113; resources/application-prod.properties:61; resources/application-dev.properties:32, 72; src/pages/reports/AiChatPage.jsx:280-288`
+
+- **What happens:** erp.reporting.ai-chat.enabled is true in application.properties and false only in the prod profile, but api.avarshai.com runs the dev profile (application-dev.properties:32), whose RBAC is AUDIT and denies nothing. A user asks the AI chat to list user emails with their password hashes: Gemini writes SELECT email, password_hash FROM sys_users, SqlValidator passes it (it only blocks write keywords), and it runs read-only with a 1000-row LIMIT; the rows are also sent to Gemini in the summary prompt. The QA profile inherits enabled=true too.
+- **Fix:** Now: set ERP_REPORTING_AICHAT_ENABLED=false on the live and QA services (an environment variable, no code; relaxed binding drops the dash). Then: run the AI chat only over the curated report catalog with role and branch scoping (review F006) before it is turned back on. *(visible: the AI tab answers that AI is not configured until F006 lands)*
+- **Estimate:** 0.25 h
+- **Note:** P0 pending the owner: it is exploitable only if GEMINI_API_KEY is set on the live Cloud Run service (nothing in the repo sets it). Reported to the coordinator at once; coordinator confirmed and raised it to P0; lane B owns the code fix. The UI field mismatch (separate P1) currently hides the answer text but not the data rows.
+
+### P1
+
+#### U305 · P1 · rule 1 — A report built in the Report Designer never shows a filter, so the Filterable tick does nothing and every run returns all rows.
+
+*Report Builder (run a report)* — `src/pages/reports/ReportBuilderPage.jsx:244; src/pages/reports/components/ReportFilterBar.jsx:166; src/pages/reports/components/ReportColumnPicker.jsx:72; erp/reporting/service/ReportAuthoringService.java:118-145`
+
+- **What happens:** Admin designs 'Pending Orders' on the orders source and ticks Filterable on Status and Order Date. The run screen passes definition.filters (rows of rpt_filters) to ReportFilterBar, but the blueprint path only writes rpt_fields (isFilterable/filterType on the field) and no migration seeds rpt_filters, so filters is [] and ReportFilterBar returns null. The user cannot narrow the report at all.
+- **Fix:** Build the filter bar from definition.fields where isFilterable (fieldCode, displayName, filterType), which is what DynamicQueryBuilder.buildFieldFilter already reads; keep definition.filters for legacy raw definitions. *(visible: the Filters card appears for columns ticked Filterable)*
+- **Estimate:** 3 h
+- **Note:** Fix together with the filter-payload finding below, or the date and number filters will appear but be ignored.
+
+#### U306 · P1 · rule 9 — Date-range, number-range and date filters are sent in a shape the server does not read, so they are silently ignored (or the date is a UTC timestamp).
+
+*Report Builder (run a report)* — `src/pages/reports/components/ReportFilterBar.jsx:83-101; src/pages/reports/components/ReportFilterBar.jsx:134-153; src/pages/reports/ReportBuilderPage.jsx:92; src/pages/reports/ReportBuilderPage.jsx:122; erp/reporting/util/DynamicQueryBuilder.java:170-219; erp/reporting/util/DynamicQueryBuilder.java:232-277`
+
+- **What happens:** User picks Order Date 01-Oct-2026 to 31-Oct-2026. The UI sends filters.order_date = [dayjs, dayjs] (serialised as UTC ISO strings such as '2026-09-30T18:30:00.000Z'); the server only looks for order_date_start / order_date_end, finds neither, adds no condition and returns orders of every month while the badge says one filter is applied. NUMBER_RANGE sends {min,max} where the server wants code_min and code_max (both required); DATE sends a UTC ISO timestamp, which in IST is the previous day, compared as text to a date column.
+- **Fix:** Map values before sending: DATE_RANGE to code_start/code_end as dayjs().format('YYYY-MM-DD'), NUMBER_RANGE to code_min/code_max, DATE to 'YYYY-MM-DD'; on the server CAST the bound strings to date and accept a one-sided range. *(visible: the date and amount filters actually narrow the rows)*
+- **Estimate:** 3 h
+- **Note:** Reachable today only on raw-SQL definitions that carry rpt_filters rows; becomes the main path once the filter bar is built from fields. Not verified on live: the server binds the dates with toString() as varchar, and on PostgreSQL 'date BETWEEN varchar AND varchar' raises 'operator does not exist' unless the JDBC URL sets stringtype=unspecified (none of the committed URLs do).
+
+#### U307 · P1 · rule 9, rule 27 — Every money column in a report is shown with the rupee sign, including USD order values and the column labelled 'Final Price (USD)'.
+
+*Report Builder (results table)* — `src/pages/reports/components/ReportResultsTable.jsx:53-54; src/utils/formatters.js:12; erp/reporting/catalog/SalesDataSources.java:30; erp/reporting/catalog/StyleDataSources.java:72`
+
+- **What happens:** An export order of USD 12,500 is run in an Orders report: the Order Value cell reads '₹ 12,500.00'. On the Cost Sheets source the 'Final Price (USD)' column also prints '₹'. A merchandiser reading the screen (or a screenshot sent to a buyer) gets the currency wrong; the Excel/PDF export has no symbol, so screen and export disagree.
+- **Fix:** Format CURRENCY cells as plain en-IN numbers with two decimals (formatNumber(value, 2)), or use the row's currency column when the source carries one; never default to INR. *(visible: the ₹ prefix disappears from report money cells (or shows the row's own currency))*
+- **Estimate:** 1 h
+
+#### U308 · P1 · rule 1, rule 2 — The AI chat never shows the answer, the SQL or the server's error, because the UI reads answer/sql and the API sends naturalLanguageAnswer/generatedSql/error.
+
+*AI Assistant (AiChatPage)* — `src/pages/reports/components/AiResultsDisplay.jsx:171; src/pages/reports/components/AiResultsDisplay.jsx:178; src/pages/reports/components/AiResultsDisplay.jsx:184; src/pages/reports/AiChatPage.jsx:292; erp/reporting/dto/AiChatResponse.java:17-21; erp/reporting/service/AiReportService.java:57-65`
+
+- **What happens:** On QA a user asks 'Total PO amount by supplier'. The response is {naturalLanguageAnswer:'...', generatedSql:'SELECT ...', data:[...]}; AiResultsDisplay renders response.answer and response.sql, both undefined, so only the raw table shows. When the model's SQL is rejected or fails, the API answers 200 with {error:'The generated query was rejected for safety: ...', data:[]} and the bubble shows only the two generic suggestions, with no message at all.
+- **Fix:** Map the response in reportService.aiChat (answer = naturalLanguageAnswer, sql = generatedSql) and render response.error as an inline Alert in the bubble. *(visible: the written answer, the SQL panel and the error text appear)*
+- **Estimate:** 1.5 h
+- **Note:** Production has erp.reporting.ai-chat.enabled=false (503), so this is QA/dev only until the chat is re-enabled.
+
+### P2
+
+#### U320 · P2 · rule 6 — Paging a report can repeat or skip rows: it sorts on one non-unique column with no id tie-breaker, and on nothing at all when the default sort column is not selected.
+
+*Report Builder (results paging)* — `erp/reporting/util/DynamicQueryBuilder.java:313-340; src/pages/reports/ReportBuilderPage.jsx:108-114`
+
+- **What happens:** User sorts a 300-row PO report by Status and pages through 20 at a time: PostgreSQL's LIMIT/OFFSET over 'ORDER BY status' is not deterministic within a status, so a PO can appear on page 2 and page 3 while another never shows. If the user deselects po_number (the default sort), buildOrderBy returns '' and there is no ORDER BY at all.
+- **Fix:** Append the source's unique key (or the default sort column's expression) as the final ORDER BY term whether or not it is selected. *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U321 · P2 · rule 1 — Exports stop silently at 10,000 rows, and CSV/Excel cells are written raw so a value starting with = runs as a formula.
+
+*Report Builder (export)* — `erp/reporting/service/ReportExportService.java:43; erp/reporting/service/ReportExportService.java:76-87; src/pages/reports/ReportBuilderPage.jsx:116-142`
+
+- **What happens:** A GRN report with 14,200 rows exports 10,000 with the success toast 'EXCEL export downloaded' and no hint that rows are missing. A supplier name entered as '=HYPERLINK("http://x","Click")' becomes a live formula when the CSV is opened in Excel.
+- **Fix:** Return the truncation (header or row count) and warn in the UI when total > 10,000; prefix cells beginning with = + - @ with a quote in CSV/Excel. *(visible: a warning when the export is capped)*
+- **Estimate:** 1.5 h
+
+#### U322 · P2 · rule 10, rule 2 — In production the AI Assistant tab is offered to ai-assistant holders but every question fails with two error toasts, because the API is switched off there.
+
+*AI Assistant (AiChatPage)* — `src/utils/reportConstants.js:123; src/pages/reports/AiChatPage.jsx:294-296; erp/reporting/service/AiReportService.java:45-48`
+
+- **What happens:** A user with the AI Assistant screen opens it on app.avarshai.com, asks a question, sees the 'thinking' pipeline, then gets the interceptor's 503 'The AI report assistant is switched off on this deployment.' plus 'Failed to get AI response. Please try again.' and tries again.
+- **Fix:** On a 503 AI_NOT_CONFIGURED replace the input area with a 'switched off on this deployment' notice and drop the catch-block toast. *(visible: a 'switched off' notice instead of an input that always fails)*
+- **Estimate:** 1 h
+
+#### U323 · P2 · rule 1 — An AI answer with a JSON column crashes the chat page, and true/false values render as blank cells.
+
+*AI Assistant (AiChatPage)* — `src/pages/reports/components/AiResultsDisplay.jsx:156-167`
+
+- **What happens:** On QA the model writes 'SELECT * FROM sys_roles'; the jsonb permissions column arrives as an object ({type,value,null}) and the cell render returns it as a React child, throwing 'Objects are not valid as a React child' and taking the route to the error boundary, losing the conversation. A boolean is_active column returns true/false, which React renders as nothing.
+- **Fix:** In the cell render, String() booleans and JSON.stringify objects/arrays. *(visible: booleans show as true/false; JSON shows as text instead of a crash)*
+- **Estimate:** 0.5 h
+- **Note:** QA/dev only while production has the chat off.
+
+### P3
+
+#### U326 · P3 · rule 2 — Catch blocks toast again after the interceptor, and saving a report configuration shows two success toasts.
+
+*Reports screens (list, builder, saved, designer, AI chat)* — `src/pages/reports/ReportListPage.jsx:57; src/pages/reports/ReportListPage.jsx:86; src/pages/reports/ReportBuilderPage.jsx:69; src/pages/reports/SavedReportsPage.jsx:32; src/pages/reports/AiChatPage.jsx:295; src/pages/reports/components/ReportDesignerDrawer.jsx:48; src/pages/reports/components/ReportDesignerDrawer.jsx:83; src/pages/reports/components/ReportDesignerDrawer.jsx:116; src/pages/reports/components/SaveReportDrawer.jsx:264; src/pages/reports/ReportBuilderPage.jsx:301`
+
+- **What happens:** A designer save refused for a duplicate code shows the server's message twice; Save Report shows 'Report saved successfully' and 'Report configuration saved' together.
+- **Fix:** Drop the catch-block toasts and one of the two success toasts. *(visible: one toast instead of two)*
+- **Estimate:** 0.75 h
+
+#### U328 · P3 · rule 7, rule 31 — Report and AI result tables key rows by index through the deprecated rowKey index argument.
+
+*Report Builder / AI Assistant tables* — `src/pages/reports/components/ReportResultsTable.jsx:101; src/pages/reports/components/AiResultsDisplay.jsx:123`
+
+- **What happens:** antd warns that the rowKey index parameter is deprecated; after a re-sort the index keys are reused across different rows.
+- **Fix:** Stamp a monotonic __key on each row when results arrive and use rowKey="__key". *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U329 · P3 · rule 37 — A failed report run returns the database exception text, which for a grammar error includes the full generated SQL, and dropdown filter options ignore the branch scope.
+
+*Report Builder (server hardening)* — `erp/reporting/service/ReportExecutionService.java:91-92; erp/reporting/service/ReportFilterOptionsService.java:97-98; erp/reporting/service/ReportAuthoringService.java:154-160`
+
+- **What happens:** A malformed number filter makes PostgreSQL fail; the toast reads 'Report execution failed: PreparedStatementCallback; bad SQL grammar [SELECT ... FROM po_purchase_orders p JOIN ...]'. A branch-limited user's Status dropdown lists values found only in other branches.
+- **Fix:** Return a generic message with the traceId and keep the detail in the log; add the branch condition to the distinct-values query. *(visible: a shorter error message)*
+- **Estimate:** 1 h
+
 ## Shared code, as used by these screens
 
 ### P1
@@ -2619,6 +3220,9 @@ Recorded for the scorecard. Each fix was confirmed in the code on `dev` at the c
 2. **Ctrl+S on forms whose first primary button is Submit** (shared finding): what should page-level Ctrl+S press? The safe default is Save Draft.
 3. **Process loss on fabric lines in matrix modes** (BOM finding): apply it, or stop offering matrix modes for fabric.
 4. Product calls raised by the PO findings: the dormant e-way bill UI (delete until scheduled, or wire with the listed fixes); cancel or short-close for a Partially Received PO; the duplicated variant line on the PO view.
+5. **Report AI chat (batch 3 P0):** is `GEMINI_API_KEY` set on the live API (api.avarshai.com, dev profile) or on QA? If it is, set `ERP_REPORTING_AICHAT_ENABLED=false` there now. Either way, keep it off until it runs on the curated report catalog (review F006).
+6. **Prevent Self-Approval** defaults to off on a new approval flow (admin finding): should it default to on?
+7. **Phone on the user form** is never stored (admin finding): add the field to the API, or remove it from the form.
 
 ## Covered by other workstreams (recorded once per module here)
 
@@ -2643,4 +3247,33 @@ POForm line-grid re-render cost, and POForm dead imports.
 - **Version echo:** OrderService.update returns a fresh version because `resyncAfterEdit`'s JPQL `findByIdForUpdate` flushes the order first; BomService, CostSheetService, the production services and the job-work services flush (`saveAndFlush` or `flush`) before mapping.
 - **Print escaping:** `poPdfGenerator.js` and `orderPdfGenerator.js` (gate fix), `workOrderPdfGenerator.js` and `jobWorkPoPrint.js` escape every user-entered value. `costingPdfGenerator.js` and the organisation address in `productionPoPdfGenerator.js` do not (see the findings).
 - **Shared helpers read for this batch:** `useUnsavedChanges`, `useServerList`, `useBusyAction`, `useActionRunner`, `usePaintedWork` (every caller passes synchronous work), `useDebouncedSearch`, `useEditParam`, `formatters`, `inputHelpers`, `IsoDatePicker`, `fileService`, `download.js` (CSV formula guard present), `ViewDialog`, `ApprovalReasonDialog`, the quick-create drawer and forms, `printDoc.js` and `sanitizeRichText.js`.
+- **Reports dynamic SQL (batch 3):** no injectable path. Selected fields are filtered against the definition's own fields, so SELECT and GROUP BY expressions come only from the catalog. Filter values, page and size are bound parameters. The sort column must be a selected field, and the direction maps to ASC or DESC. The blueprint path (`ReportAuthoringService`) accepts only registry source and column keys. Raw-SQL definitions need `is_superuser`, and `SqlValidator` rejects `;`, comments and write keywords. Runs are read-only, use REQUIRES_NEW and have a 30 s timeout.
+- **User and role management (batch 3):**
+  - Only a superuser can grant or remove superuser, or touch a superuser's account.
+  - Nobody can change their own role.
+  - The last active superuser cannot be deleted, demoted or deactivated.
+  - An admin password reset needs `is_superuser` and revokes the target's tokens.
+  - `UserDTO` has no password hash.
+  - Role update uses `saveAndFlush`, and the editor leaves the page after saving.
+  - `isSuperuser` is forced false on create.
+- **Approval flows (batch 3):**
+  - Levels and entity type lock once a flow has history.
+  - Delete is blocked while requests exist.
+  - Conditions are validated server-side.
+  - Amounts compare as BigDecimal.
+  - `ApprovalActionBar` has a submitting guard.
+- **HR (batch 3):**
+  - No version-echo trap: the screens reload after a save, or the services flush.
+  - No create-versus-update decided from the URL.
+  - Every date is sent as `YYYY-MM-DD`, so there is no IST date shift.
+  - No PII in localStorage or the console.
+  - No employee self-service, so payslips are reachable only by HR users.
+- **Sample requests (batch 3):**
+  - Every sampling update and stage move uses `saveAndFlush`, and the dispatch and invoice forms adopt the saved record, so there is no version echo.
+  - `OrderScheduleImpactEvent` is published on deadline revise, mark-dispatched, and return-to-draft with the revision withdrawn.
+  - Stage moves are version-checked commands, and double clicks are blocked by loading buttons and server guards.
+  - Every date is sent as `YYYY-MM-DD`.
+  - Invoice totals are recomputed server-side in BigDecimal.
+  - The invoice generator escapes its values.
+  - SampleRequestForm decides create versus update by `savedId`.
 - **ESLint leads:** 36 `react-hooks/exhaustive-deps` warnings in these modules. Most are the stable `message`/`modal` from `App.useApp()`; the ones with a real consequence are recorded above.
