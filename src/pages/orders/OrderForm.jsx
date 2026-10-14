@@ -47,6 +47,7 @@ import StatusTag from '../../components/StatusTag';
 import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
@@ -1052,13 +1053,13 @@ const OrderForm = () => {
         }
         if (!EDITABLE_STATUSES.includes(order.status)) {
           message.warning('This order cannot be edited in its current status');
-          navigate('/orders/list');
+          navigate(listPath('/orders/list'));
           return;
         }
         populateForm(order);
       } catch {
         message.error('Failed to load order');
-        navigate('/orders/list');
+        navigate(listPath('/orders/list'));
       } finally {
         // Defer so React paints the form with populated values before hiding the skeleton
         requestAnimationFrame(() => setPageLoading(false));
@@ -1647,7 +1648,7 @@ const OrderForm = () => {
       invalidateCache('sampleOrderNos');
       setIsDirty(false);
       clearDirty();
-      navigate('/orders/list');
+      navigate(listPath('/orders/list'));
     } catch {
       message.error('Failed to save order');
     } finally {
@@ -1689,7 +1690,7 @@ const OrderForm = () => {
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
           clearDirty();
-          navigate('/orders/list');
+          navigate(listPath('/orders/list'));
         } catch {
           message.error('Failed to submit order');
         } finally {

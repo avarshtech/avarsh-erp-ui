@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   App,
   Table,
@@ -25,31 +25,50 @@ import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getTablePagination } from '../../utils/paginationConfig';
-import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import useServerList from '../../hooks/useServerList';
 import OrderView from './OrderView';
 import { useBranch } from '../../context/BranchContext';
 
 const { Text } = Typography;
+
+const ORDER_FILTERS = { status: undefined, orderType: undefined, orderDateRange: null };
+const ORDER_LIST_OPTIONS = {
+  defaultSort: { field: 'id', order: 'descend' },
+  urlState: true,
+  filterTypes: { orderDateRange: 'dateRange' },
+};
 
 const OrderList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
   // The header switcher is the branch filter: the list follows it, "all" lifts it
   const { activeBranchId, isMultiBranch, branchName } = useBranch();
-  const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [data, setData] = useState([]);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
-  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [statusFilter, setStatusFilter] = useState(undefined);
-  const [orderTypeFilter, setOrderTypeFilter] = useState(undefined);
-  const [orderDateRange, setOrderDateRange] = useState(null);
-  const [sortField, setSortField] = useState('id');
-  const [sortDirection, setSortDirection] = useState('desc');
+
+  // Page, sort, search and filters live in the URL, so a refresh or the way back from a form keeps them;
+  // with no column sorter the list is newest first (id descending), as it always was.
+  const fetchPage = useCallback(({ page, size, search, sort, direction, status, orderType, orderDateRange }) => {
+    const params = { page: page - 1, size, sort, direction };
+    if (search) params.search = search;
+    if (status) params.status = status;
+    if (orderType) params.orderType = orderType;
+    if (activeBranchId) params.branchId = activeBranchId;
+    if (orderDateRange && orderDateRange.length === 2) {
+      params.orderDateStart = orderDateRange[0].format('YYYY-MM-DD');
+      params.orderDateEnd = orderDateRange[1].format('YYYY-MM-DD');
+    }
+    return searchOrders(params);
+  }, [activeBranchId]);
+  const list = useServerList(fetchPage, ORDER_FILTERS, 'Failed to load orders', ORDER_LIST_OPTIONS);
+  const { load: reload, goToFirstPage, sortOrderFor } = list;
+
+  // The header's branch switch starts the list again from page 1
+  const firstBranch = useRef(activeBranchId);
+  useEffect(() => {
+    if (firstBranch.current === activeBranchId) return;
+    firstBranch.current = activeBranchId;
+    goToFirstPage();
+  }, [activeBranchId, goToFirstPage]);
 
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -89,72 +108,19 @@ const OrderList = () => {
   const canUpdate = hasPermission('orders', 'update');
   const canDelete = hasPermission('orders', 'delete');
 
-  // Fetch data
-  const fetchData = useCallback(
-    async (page, pageSize, sort, direction) => {
-      setLoading(true);
-      try {
-        const params = {
-          page: (page || pagination.current) - 1,
-          size: pageSize || pagination.pageSize,
-          sort: sort || sortField,
-          direction: direction || sortDirection,
-        };
-        if (debouncedSearch) params.search = debouncedSearch;
-        if (statusFilter) params.status = statusFilter;
-        if (orderTypeFilter) params.orderType = orderTypeFilter;
-        if (activeBranchId) params.branchId = activeBranchId;
-        if (orderDateRange && orderDateRange.length === 2) {
-          params.orderDateStart = orderDateRange[0].format('YYYY-MM-DD');
-          params.orderDateEnd = orderDateRange[1].format('YYYY-MM-DD');
-        }
-
-        const response = await searchOrders(params);
-        const rows = response.content || [];
-        setData(rows);
-        setPagination((prev) => ({
-          ...prev,
-          current: page || prev.current,
-          pageSize: pageSize || prev.pageSize,
-          total: response.totalElements || 0,
-        }));
-      } catch {
-        message.error('Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, activeBranchId]
-  );
-
-  // Re-fetch on filter change
-  useEffect(() => {
-    fetchData(1, pagination.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, activeBranchId]);
-
-  // Table change (pagination, sorting)
-  const handleTableChange = (pag, _filters, sorter) => {
-    const newSort = sorter.field || sortField;
-    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
-    setSortField(newSort);
-    setSortDirection(newDirection);
-    fetchData(pag.current, pag.pageSize, newSort, newDirection);
-  };
-
   // Delete
   const handleDelete = useCallback(async (record) => {
     setDeletingId(record.id);
     try {
       await deleteOrder(record.id);
       message.success(`${record.orderNo} deleted successfully`);
-      fetchData(pagination.current, pagination.pageSize);
+      reload();
     } catch {
       message.error('Failed to delete order');
     } finally {
       setDeletingId(null);
     }
-  }, [fetchData, pagination.current, pagination.pageSize]);
+  }, [reload, message]);
 
   // View
   const handleView = useCallback((record) => {
@@ -167,7 +133,7 @@ const OrderList = () => {
     setPendingAction(null);
     setViewModalVisible(false);
     setViewingOrder(null);
-    fetchData(pagination.current, pagination.pageSize);
+    reload();
   };
 
   const columns = useMemo(() => [
@@ -178,6 +144,7 @@ const OrderList = () => {
       fixed: 'left',
       width: 150,
       sorter: true,
+      sortOrder: sortOrderFor('orderNo'),
       render: (text, record) => (
         <span style={{ whiteSpace: 'nowrap' }}>
           <RecordLink text={text} onClick={() => handleView(record)} />
@@ -191,6 +158,7 @@ const OrderList = () => {
       key: 'orderDate',
       width: 120,
       sorter: true,
+      sortOrder: sortOrderFor('orderDate'),
       render: (date) => formatDate(date),
     },
     {
@@ -227,6 +195,7 @@ const OrderList = () => {
       width: 100,
       align: 'right',
       sorter: true,
+      sortOrder: sortOrderFor('totalOrderQty'),
       render: (qty) => <Text strong>{(qty || 0).toLocaleString('en-IN')}</Text>,
     },
     {
@@ -236,6 +205,7 @@ const OrderList = () => {
       width: 140,
       align: 'right',
       sorter: true,
+      sortOrder: sortOrderFor('totalOrderValue'),
       render: (amount, record) => (
         <CurrencyDisplay amount={amount} currency={record.currency} />
       ),
@@ -314,7 +284,7 @@ const OrderList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, isMultiBranch, branchName]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, isMultiBranch, branchName, sortOrderFor]);
 
   // Status filter options
   const statusOptions = useMemo(() =>
@@ -339,8 +309,8 @@ const OrderList = () => {
 
       <Card>
         <SearchFilterBar
-          searchText={searchText}
-          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchText={list.searchText}
+          onSearchChange={(e) => list.setSearchText(e.target.value)}
           searchPlaceholder="Search order no, buyer, style..."
           filters={[
             {
@@ -348,8 +318,8 @@ const OrderList = () => {
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
               props: {
                 placeholder: 'Status',
-                value: statusFilter,
-                onChange: setStatusFilter,
+                value: list.filters.status,
+                onChange: list.setFilter('status'),
                 options: statusOptions,
               },
             },
@@ -358,8 +328,8 @@ const OrderList = () => {
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
               props: {
                 placeholder: 'Type',
-                value: orderTypeFilter,
-                onChange: setOrderTypeFilter,
+                value: list.filters.orderType,
+                onChange: list.setFilter('orderType'),
                 options: [
                   { label: 'Bulk', value: 'BULK' },
                   { label: 'Sample', value: 'SAMPLE' },
@@ -371,23 +341,23 @@ const OrderList = () => {
               span: { xs: 24, sm: 12, md: 6, lg: 5 },
               props: {
                 placeholder: ['Order From', 'Order To'],
-                value: orderDateRange,
-                onChange: setOrderDateRange,
+                value: list.filters.orderDateRange,
+                onChange: list.setFilter('orderDateRange'),
               },
             },
           ]}
-          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          onRefresh={reload}
           style={{ marginBottom: 16 }}
         />
 
         <Table
           columns={columns}
-          dataSource={data}
-          loading={loading}
+          dataSource={list.rows}
+          loading={list.loading}
           rowKey="id"
           scroll={{ x: 1200 }}
-          onChange={handleTableChange}
-          pagination={getTablePagination(pagination, 'orders')}
+          onChange={list.onTableChange}
+          pagination={getTablePagination({ ...list.pagination, total: list.total }, 'orders')}
           locale={{
             emptyText: (
               <EmptyState
