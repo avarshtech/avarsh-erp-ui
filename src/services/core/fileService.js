@@ -1,4 +1,5 @@
 import axiosInstance, { upload } from './axiosInstance';
+import { inertBlob } from '../../utils/inertBlob';
 
 /**
  * File Storage API Service
@@ -70,7 +71,8 @@ export const downloadFileAsBlob = async (fileId) => {
   const response = await axiosInstance.get(`${ENDPOINTS.DOWNLOAD}/${fileId}`, {
     responseType: 'blob',
   });
-  return response.data;
+  // Callers show these blobs or open them in a new window, in this app's origin (review U077).
+  return inertBlob(response.data);
 };
 
 /**

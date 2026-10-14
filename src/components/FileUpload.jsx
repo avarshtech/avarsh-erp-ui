@@ -303,7 +303,7 @@ const FileUpload = ({
                   type="text"
                   size="small"
                   icon={<EyeOutlined />}
-                  onClick={() => window.open(previewUrl, '_blank')}
+                  onClick={() => window.open(previewUrl, '_blank', 'noopener')}
                 />
               </Tooltip>
             )}

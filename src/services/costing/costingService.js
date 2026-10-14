@@ -5,6 +5,7 @@
  */
 
 import axiosInstance, { upload } from '../core/axiosInstance';
+import { inertBlob } from '../../utils/inertBlob';
 
 const ENDPOINTS = {
   COST_SHEETS: '/cost-sheets',
@@ -336,7 +337,8 @@ export const downloadAttachment = async (fileId) => {
     `/files/download/${fileId}`,
     { responseType: 'blob' }
   );
-  return response.data;
+  // The sheet previews this blob in a new window, in this app's origin (review U077).
+  return inertBlob(response.data);
 };
 
 /**

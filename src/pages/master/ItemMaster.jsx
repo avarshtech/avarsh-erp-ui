@@ -2403,7 +2403,7 @@ const ItemMaster = () => {
                               background: 'var(--bg-secondary, #f8fafc)',
                               cursor: 'pointer',
                             }}
-                            onClick={() => window.open(drawerVariantImages[v.id], '_blank')}
+                            onClick={() => window.open(drawerVariantImages[v.id], '_blank', 'noopener')}
                           >
                             <img
                               src={drawerVariantImages[v.id]}
