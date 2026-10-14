@@ -2,6 +2,7 @@ name: CI
 
 # Lint, unit-test, build and audit every push to dev and to release branches, and every pull request into dev.
 # Netlify still builds and deploys dev on its own; this workflow is the check that the build is sound.
+# A push to a release branch also drafts that release on GitHub (the `release` job; see RELEASING.md).
 #
 # Lint ratchet: the errors that existed on 2026-10-12 are recorded in eslint-suppressions.json, so
 # only NEW errors fail, and warnings are capped (`npm run lint`). When you fix a suppressed error,
@@ -25,6 +26,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact: ${{ steps.version.outputs.artifact }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,8 +43,9 @@ jobs:
       - name: Version
         id: version
         run: |
-          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          version="$(node -p "require('./package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "artifact=avarsh-erp-ui-v${version}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Release branch matches package.json
         if: startsWith(github.ref_name, 'avarsh/release/')
@@ -61,6 +66,89 @@ jobs:
       - name: Upload the build
         uses: actions/upload-artifact@v4
         with:
-          name: avarsh-erp-ui-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit }}
+          name: ${{ steps.version.outputs.artifact }}
           path: dist/
           retention-days: 14
+
+  # A release branch also gets a DRAFT GitHub release v<version>: the build the job above checked,
+  # zipped, and a changelog of the commit subjects since the previous release tag. It deploys
+  # nothing; a person reviews the draft and publishes it (RELEASING.md).
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'avarsh/release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # every commit and tag, for the changelog
+
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
+
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+
+          # A published release is never changed; a later fix is a hotfix release of its own.
+          draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          tagged="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" || true)"
+          if [ "$draft" = "false" ]; then
+            if [ "$tagged" = "$GITHUB_SHA" ]; then
+              echo "$tag is already published from this commit; nothing to do."
+              exit 0
+            fi
+            echo "::error::$tag is already published from ${tagged:-another commit}. A fix goes out as a hotfix release (RELEASING.md)."
+            exit 1
+          fi
+
+          # Tag the commit this release is built from: a draft gets no tag of its own until it is
+          # published, and the next release's changelog starts from this tag.
+          if [ -z "$tagged" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" > /dev/null
+          elif [ "$tagged" != "$GITHUB_SHA" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+          fi
+
+          # The changelog: commit subjects since the newest earlier release tag this commit descends from.
+          prev="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude "$tag" HEAD 2>/dev/null || true)"
+          notes="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "Built from \`${GITHUB_SHA::7}\` on \`$GITHUB_REF_NAME\`. The zip is the build CI checked; Netlify builds the deployed copy from the same commit."
+            echo
+            if [ -n "$prev" ]; then
+              echo "## Changes since $prev"
+              echo
+              git log --no-merges --format='- %s (%h)' "$prev..HEAD"
+            else
+              echo "## Latest changes"
+              echo
+              echo "No earlier release is tagged, so this lists the last 50 commits."
+              echo
+              git log --no-merges --format='- %s (%h)' -n 50 HEAD
+            fi
+          } > "$notes"
+
+          asset="$RUNNER_TEMP/avarsh-erp-ui-$tag-${GITHUB_SHA::7}.zip"
+          (cd dist && zip -qr "$asset" .)
+
+          if [ "$draft" = "true" ]; then
+            # The draft carries one zip, of the commit it now names
+            gh release view "$tag" --json assets --jq '.assets[].name' | while read -r old; do
+              if [ -n "$old" ]; then gh release delete-asset "$tag" "$old" --yes; fi
+            done
+            gh release edit "$tag" --notes-file "$notes"
+            gh release upload "$tag" "$asset"
+          else
+            gh release create "$tag" --draft --verify-tag --title "$tag" --notes-file "$notes" "$asset"
+          fi
