@@ -8,11 +8,10 @@ import { gpoLineColumns } from './gpoLineColumns';
 import { gpoLiveBalance } from '../../../utils/garmentProcessPoCalc';
 import { lineAmount } from '../../../utils/jobWorkPoCalc';
 import { gridScroll } from '../../../utils/gridScroll';
+import { formatMoney } from '../../../utils/formatters';
 
 const { Text } = Typography;
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const money = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 /**
  * PO Line Items (PRD §8.2, §19): one line per requirement × colour × size × process and a
  * totals row; more requirements are added from Select Garment Process Requirement. On a draft the lines can be ticked
@@ -59,7 +58,7 @@ const GpoLinesSection = memo(function GpoLinesSection({ doc, ctx, editable, canR
                 <Table.Summary.Cell index={2 + offset} colSpan={9} />
                 <Table.Summary.Cell index={11 + offset}><strong>{n(qty)} pcs</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={12 + offset} colSpan={2} />
-                <Table.Summary.Cell index={14 + offset} align="right"><strong>{money(total)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={14 + offset} align="right"><strong>{formatMoney(total)}</strong></Table.Summary.Cell>
                 {editable && <Table.Summary.Cell index={15 + offset} />}
               </Table.Summary.Row>
             </Table.Summary>

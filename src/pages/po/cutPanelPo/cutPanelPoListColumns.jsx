@@ -4,11 +4,9 @@ import RecordLink from '../../../components/RecordLink';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
-import { formatDate } from '../../../utils/formatters';
+import { formatDate, formatInr } from '../../../utils/formatters';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 /** First value, then "+n" with the rest in a tooltip (PRD §14.2 — consolidated POs). */
 const firstPlus = (list = []) => (list.length ? (
   <Space size={4}>
@@ -31,7 +29,7 @@ export const buildCutPanelPoColumns = ({ onOpen, onEdit, onPrint, onDelete, prin
   { title: 'Job Worker', dataIndex: 'vendorName', width: 180 },
   { title: 'Process', dataIndex: 'processLabel', width: 140 },
   { title: 'PO Qty', dataIndex: 'poQty', width: 100, align: 'right', render: n },
-  { title: 'PO Value', dataIndex: 'poValue', width: 130, align: 'right', render: money },
+  { title: 'PO Value', dataIndex: 'poValue', width: 130, align: 'right', render: formatInr },
   { title: 'Expected delivery', dataIndex: 'requiredDeliveryDate', width: 140, render: (v) => formatDate(v) },
   {
     title: 'Status', key: 'status', width: 170, align: 'center', fixed: 'right',

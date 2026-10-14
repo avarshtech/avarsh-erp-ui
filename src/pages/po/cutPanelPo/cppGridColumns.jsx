@@ -5,10 +5,10 @@ import { QtyCell, RateCell } from './CppGridCells';
 import { billingQty, isKeyedBilling, lineAmount, round2 } from '../../../utils/jobWorkPoCalc';
 import { jobWorkUomOptions } from '../../../utils/jobWorkConstants';
 import { numericInputProps } from '../../../utils/inputHelpers';
+import { formatMoney } from '../../../utils/formatters';
 
 const { Text } = Typography;
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const money = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (title, render, width = 80) => ({ title, key: title, align: 'right', width, render });
 
 /**
@@ -80,8 +80,8 @@ export const cppGridColumns = (h) => [
     title: 'Rate ₹', key: 'rate', width: 140,
     render: (_, r) => (r.isGroup ? null : <RateCell line={r} lastRate={h.lastRateOf(r)} editable={h.editable && Number(r.poQty) > 0} onChange={(p) => h.onPatch(r.key, p)} />),
   },
-  num('Last Rate', (_, r) => (r.isGroup ? null : (h.lastRateOf(r) ? `₹${money(h.lastRateOf(r))}` : '—')), 84),
-  num('Amount ₹', (_, r) => (r.isGroup ? <strong>{money(r.amount)}</strong> : money(lineAmount(r))), 104),
+  num('Last Rate', (_, r) => (r.isGroup ? null : (h.lastRateOf(r) ? `₹${formatMoney(h.lastRateOf(r))}` : '—')), 84),
+  num('Amount ₹', (_, r) => (r.isGroup ? <strong>{formatMoney(r.amount)}</strong> : formatMoney(lineAmount(r))), 104),
   ...(h.onRemove ? [{
     title: '', key: 'remove', width: 40, fixed: 'right',
     render: (_, r) => (r.isGroup ? null : <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Remove ${r.colorName} ${r.size}`} onClick={() => h.onRemove(r.key)} />),

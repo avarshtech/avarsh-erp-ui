@@ -6,9 +6,7 @@ import StatusTag from '../../../components/StatusTag';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { statusAccent } from '../../../utils/statusAccent';
-import { formatDate } from '../../../utils/formatters';
-
-const inr = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+import { formatDate, formatInr } from '../../../utils/formatters';
 
 /**
  * The top of a job-work PO screen in the Supplier PO view's look (DocumentHero): an accent border in the status colour,
@@ -34,7 +32,7 @@ const JobWorkPoHero = memo(function JobWorkPoHero({ doc, typeLabel, subtitle, to
       dueDate && { icon: <FieldTimeOutlined />, text: `Due ${formatDate(dueDate)}` },
       orders.length > 0 && { icon: <TagsOutlined />, text: orders.join(', ') },
     ].filter(Boolean),
-    highlight: doc.lines.length ? { label: totalLabel, value: inr(total) } : null,
+    highlight: doc.lines.length ? { label: totalLabel, value: formatInr(total) } : null,
   };
   return <DocumentHero page hero={hero} onBack={onBack} actions={actions} />;
 });

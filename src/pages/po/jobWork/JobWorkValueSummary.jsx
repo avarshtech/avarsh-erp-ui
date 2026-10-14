@@ -2,10 +2,9 @@ import { memo } from 'react';
 import { InputNumber, Typography } from 'antd';
 import { amountInWordsIndian } from '../../../utils/amountInWords';
 import { numericInputProps } from '../../../utils/inputHelpers';
+import { formatInr } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const inr = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 // The Supplier PO view's totals: a framed list, shaded subtotals, indented taxes, the final figure as the indigo pill
 const ROW = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '8px 14px', borderBottom: '1px solid var(--border-color)' };
 const KIND = {
@@ -34,24 +33,24 @@ const JobWorkValueSummary = memo(function JobWorkValueSummary({ value, qty, sacC
   return (
     <div style={{ maxWidth: 460 }}>
       <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-      <ValueRow label={`${labels.basic} — ${Number(qty || 0).toLocaleString('en-IN')} pcs`}>{inr(value.basic)}</ValueRow>
+      <ValueRow label={`${labels.basic} — ${Number(qty || 0).toLocaleString('en-IN')} pcs`}>{formatInr(value.basic)}</ValueRow>
       <ValueRow label="Other charges">
         {editable ? (
           <InputNumber name="otherCharges" aria-label="Other charges" min={0} precision={2} controls={false} prefix="₹" style={{ width: 192 }}
             value={commercial.otherCharges} onChange={(v) => onChange({ otherCharges: v ?? 0 })} {...numericInputProps} />
-        ) : inr(value.otherCharges)}
+        ) : formatInr(value.otherCharges)}
       </ValueRow>
-      <ValueRow label="Taxable value" kind="subtotal">{inr(value.taxable)}</ValueRow>
+      <ValueRow label="Taxable value" kind="subtotal">{formatInr(value.taxable)}</ValueRow>
       {value.igst
-        ? <ValueRow label={`IGST @ ${value.gstRatePercent}% (SAC ${sacCode || '—'})`} kind="tax">{inr(value.igstAmount)}</ValueRow>
+        ? <ValueRow label={`IGST @ ${value.gstRatePercent}% (SAC ${sacCode || '—'})`} kind="tax">{formatInr(value.igstAmount)}</ValueRow>
         : (
           <>
-            <ValueRow label={`CGST @ ${half}% (SAC ${sacCode || '—'})`} kind="tax">{inr(value.cgst)}</ValueRow>
-            <ValueRow label={`SGST @ ${half}%`} kind="tax">{inr(value.sgst)}</ValueRow>
+            <ValueRow label={`CGST @ ${half}% (SAC ${sacCode || '—'})`} kind="tax">{formatInr(value.cgst)}</ValueRow>
+            <ValueRow label={`SGST @ ${half}%`} kind="tax">{formatInr(value.sgst)}</ValueRow>
           </>
         )}
-      <ValueRow label={labels.total} kind={rounding ? 'subtotal' : 'total'}>{inr(value.total)}</ValueRow>
-      {rounding && <ValueRow label={`Rounded${value.roundOff ? ` (round-off ${value.roundOff > 0 ? '+' : ''}${value.roundOff.toFixed(2)})` : ''}`} kind="total">{inr(value.rounded)}</ValueRow>}
+      <ValueRow label={labels.total} kind={rounding ? 'subtotal' : 'total'}>{formatInr(value.total)}</ValueRow>
+      {rounding && <ValueRow label={`Rounded${value.roundOff ? ` (round-off ${value.roundOff > 0 ? '+' : ''}${value.roundOff.toFixed(2)})` : ''}`} kind="total">{formatInr(value.rounded)}</ValueRow>}
       </div>
       <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>{amountInWordsIndian(rounding ? value.rounded : value.total)}</Text>
     </div>

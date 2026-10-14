@@ -3,9 +3,9 @@ import { DeleteOutlined } from '@ant-design/icons';
 import ColorDot from '../../../components/ColorDot';
 import { GpoQtyCell, GpoRateCell, GpoUomCell } from './GpoLineCells';
 import { lineAmount } from '../../../utils/jobWorkPoCalc';
+import { formatMoney } from '../../../utils/formatters';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const money = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const LOCKED = { style: { background: 'var(--bg-secondary, rgba(0, 0, 0, 0.03))' } };
 const locked = (col) => ({ ...col, onCell: () => LOCKED });
 const num = (title, dataIndex, width = 80) => locked({ title, dataIndex, key: title, align: 'right', width, render: n });
@@ -35,7 +35,7 @@ export const gpoLineColumns = (h) => [
   },
   { title: 'UOM *', key: 'uom', width: 100, render: (_, l) => <GpoUomCell line={l} editable={h.editable} onChange={(p) => h.onPatch(l.key, p)} /> },
   { title: 'Rate ₹ *', key: 'rate', width: 124, render: (_, l) => <GpoRateCell line={l} lastRate={h.lastRateOf(l)} editable={h.editable} onChange={(p) => h.onPatch(l.key, p)} /> },
-  { title: 'Amount ₹', key: 'amount', align: 'right', width: 110, fixed: 'right', render: (_, l) => money(lineAmount(l)) },
+  { title: 'Amount ₹', key: 'amount', align: 'right', width: 110, fixed: 'right', render: (_, l) => formatMoney(lineAmount(l)) },
   ...(h.onRemove ? [{
     title: '', key: 'remove', width: 40, fixed: 'right',
     render: (_, l) => <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Remove ${l.gprNo} ${l.color} ${l.size}`} onClick={() => h.onRemove(l.key)} />,
