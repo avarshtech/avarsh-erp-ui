@@ -4,7 +4,7 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import { createCategory, updateCategory } from '../../../services/asset/assetService';
+import { createCategory, deleteCategory, updateCategory } from '../../../services/asset/assetService';
 import AssetCategoryDrawer from './AssetCategoryDrawer';
 
 /**
@@ -12,7 +12,7 @@ import AssetCategoryDrawer from './AssetCategoryDrawer';
  * because what matters is which category a sub-category belongs to.
  */
 const AssetCategoryTab = ({ lookups }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
 
@@ -33,6 +33,28 @@ const AssetCategoryTab = ({ lookups }) => {
       throw e;
     }
   };
+
+  /**
+   * The server refuses a category anything depends on and says to switch it off
+   * instead, so there is nothing to check here - just ask, then report.
+   */
+  const remove = (row) => modal.confirm({
+    title: `Delete ${row.name}?`,
+    content: row.parentId
+      ? 'The sub-category is removed. Assets already filed under it keep it.'
+      : 'The category is removed. This cannot be undone.',
+    okText: 'Delete',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      try {
+        await deleteCategory(row.id);
+        message.success(`${row.name} deleted`);
+        lookups.reload();
+      } catch (e) {
+        toastUnlessHandled(message, e, 'Could not delete the category');
+      }
+    },
+  });
 
   const columns = [
     { title: 'Name', dataIndex: 'name' },
@@ -82,6 +104,12 @@ const AssetCategoryTab = ({ lookups }) => {
                 onClick={() => start(null, row.id)}
               />
             )}
+            <ActionButton
+              action="delete"
+              size="small"
+              aria-label={`Delete ${row.name}`}
+              onClick={() => remove(row)}
+            />
           </Space>
         </PermissionGuard>
       ),

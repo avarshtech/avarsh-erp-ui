@@ -5,7 +5,7 @@ import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import {
-  createLine, createSection, updateLine, updateSection,
+  createLine, createSection, deleteLine, deleteSection, updateLine, updateSection,
 } from '../../../services/asset/assetService';
 import AssetLocationDrawer from './AssetLocationDrawer';
 
@@ -14,7 +14,7 @@ import AssetLocationDrawer from './AssetLocationDrawer';
  * module owns. Unit and Department are HR's masters, shared on purpose.
  */
 const AssetLocationTab = ({ lookups }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [drawer, setDrawer] = useState(null);
 
   const save = async (values) => {
@@ -33,6 +33,25 @@ const AssetLocationTab = ({ lookups }) => {
       throw e;
     }
   };
+
+  /** Sections and lines delete the same way; the server decides what is allowed. */
+  const remove = (kind, row) => modal.confirm({
+    title: `Delete ${row.name}?`,
+    content: kind === 'section'
+      ? 'The section is removed. Its lines must be gone first.'
+      : 'The line is removed. This cannot be undone.',
+    okText: 'Delete',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      try {
+        await (kind === 'section' ? deleteSection(row.id) : deleteLine(row.id));
+        message.success(`${row.name} deleted`);
+        lookups.reload();
+      } catch (e) {
+        toastUnlessHandled(message, e, 'Could not delete it');
+      }
+    },
+  });
 
   const columns = [
     { title: 'Name', dataIndex: 'name' },
@@ -64,6 +83,12 @@ const AssetLocationTab = ({ lookups }) => {
               aria-label={`Add a line in ${row.name}`}
               onClick={() => setDrawer({ kind: 'line', record: { sectionId: row.id } })}
             />
+            <ActionButton
+              action="delete"
+              size="small"
+              aria-label={`Delete ${row.name}`}
+              onClick={() => remove('section', row)}
+            />
           </Space>
         </PermissionGuard>
       ),
@@ -84,12 +109,20 @@ const AssetLocationTab = ({ lookups }) => {
       width: 90,
       render: (_, row) => (
         <PermissionGuard module="asset-setup" operation="update">
-          <ActionButton
-            action="edit"
-            size="small"
-            aria-label={`Edit ${row.name}`}
-            onClick={() => setDrawer({ kind: 'line', record: row })}
-          />
+          <Space size={0}>
+            <ActionButton
+              action="edit"
+              size="small"
+              aria-label={`Edit ${row.name}`}
+              onClick={() => setDrawer({ kind: 'line', record: row })}
+            />
+            <ActionButton
+              action="delete"
+              size="small"
+              aria-label={`Delete ${row.name}`}
+              onClick={() => remove('line', row)}
+            />
+          </Space>
         </PermissionGuard>
       ),
     },

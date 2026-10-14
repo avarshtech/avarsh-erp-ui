@@ -83,3 +83,15 @@ export const getAssetStatusHistory = async (id) =>
 
 export const getStatusReasons = async () =>
   (await axiosInstance.get(`${ASSETS}/status-reasons`)).data;
+
+// ── Removing setup rows ──
+// The server refuses one that anything depends on and says what to do instead,
+// so these just report what comes back.
+
+export const deleteCategory = async (id) =>
+  (await axiosInstance.delete(`${SETUP}/categories/${id}`)).data;
+
+export const deleteSection = async (id) =>
+  (await axiosInstance.delete(`${SETUP}/sections/${id}`)).data;
+
+export const deleteLine = async (id) => (await axiosInstance.delete(`${SETUP}/lines/${id}`)).data;
