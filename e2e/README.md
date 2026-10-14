@@ -70,8 +70,10 @@ PowerShell: `$env:E2E_BASE_URL = 'http://localhost:3001'; $env:E2E_PASSWORD = 'a
 
 - Run what your change touches: the affected spec files, with their project. Whole projects
   and the full suite are for CI or when they are asked for.
-- Always name the project. Without `--project`, Playwright runs all of them, including
-  `full-flow` (a headed, slowed-down demo with an 8-minute timeout) and the `rbac-soak` projects.
+- Always name the project. Without `--project`, Playwright runs all of them, which is the
+  nightly CI run (well over an hour here).
+- The headed `full-flow` demo and the `rbac-soak` projects live in `playwright.demo.config.js`:
+  `npx playwright test -c playwright.demo.config.js --project=full-flow`.
 - For several projects, pass several `--project` flags to one command: `setup` then runs once,
   and `workers: 1` runs the rest one after another.
 - Headed browser: set `E2E_HEADED=true`, or use `--headed` / `--ui`. The
@@ -112,12 +114,18 @@ Do the same for the vite port.
 
 ## Environment variables
 
+All the E2E_* defaults live in `e2e/config/env.js`. Loading it refuses an `E2E_BASE_URL` or
+`E2E_API_URL` that is not on this machine, and the setup project and `authedPage` stop a UI that
+sends its API calls to another machine (a plain `npm run dev`), so a run cannot touch real data.
+
 | Variable | Default | Used by |
 |---|---|---|
 | `E2E_BASE_URL` | `http://localhost:3000` | `playwright.config.js` (`baseURL`). Always set it. |
-| `E2E_API_URL` | `http://localhost:8088/api/v1` | `helpers/api-client.js`: API logins, seeding and the API-level specs |
-| `E2E_USERNAME` | `superadmin` | `global-setup.js`, `helpers/navigation.js`, `helpers/api-client.js` |
-| `E2E_PASSWORD` | `admin123` (the e2e seed) | the same three files |
+| `E2E_API_URL` | `http://localhost:8088/api/v1` | `helpers/api-client.js` and the fixtures: API logins, seeding and the API-level specs |
+| `E2E_USERNAME` | `superadmin` | `global-setup.js`, `helpers/navigation.js`, `helpers/api-client.js`, `fixtures.js` |
+| `E2E_PASSWORD` | `admin123` (the e2e seed) | the same files |
+| `E2E_ALLOW_REMOTE` | unset | `1` lets a run reach a server that is not this machine. Only on purpose. |
+| `CI` | unset | set by GitHub: headless, one retry with a trace, no `test.only`, junit and GitHub reporters |
 | `E2E_HEADED` | unset | `playwright.config.js`: a visible browser when set |
 | `SWEEP_SECTIONS` | unset, meaning all | `specs/smoke/route-sweep.spec.js`: comma-separated `SECTIONS` keys to sweep |
 | `E2E_LIVE_AI` | unset | `specs/costing/costing-ai-live.spec.js` runs only when it is set, and calls the real AI model |
@@ -126,26 +134,52 @@ Do the same for the vite port.
 
 ## Projects
 
-`playwright.config.js` defines 31 projects. On 2026-10-12, `npx playwright test --list`
-counted 1,049 tests in 141 files.
+On 2026-10-13, `npx playwright test --list` counted 1,058 tests in 140 files in
+`playwright.config.js`, and 7 in 3 files in `playwright.demo.config.js`.
 
 | Project | Specs | Notes |
 |---|---|---|
-| `setup` | `global-setup.js` | Logs in once and saves `e2e/.auth/user.json`. Every browser project depends on it. |
+| `setup` | `global-setup.js` | Logs in once and saves `e2e/.auth/user.json`. Every module project depends on it. |
 | `unit` | `e2e/unit/` | Node only: pure calculators and models. No browser, login or API. |
 | `tna-engine` | `specs/tna/01-engine*.spec.js` | Node only: the T&A engine against the CR-TNA-001 worked example. |
-| `smoke` | `specs/smoke/route-sweep.spec.js` | Every parameter-free route in `SCREENS` (`src/utils/permissions.js`) loads with no page error and no console error or warning. Run it against the dev server: React and antd warnings exist only in development builds. |
+| `smoke` | `specs/smoke/` | What CI runs on every push: the route sweep (every parameter-free route in `SCREENS` loads with no page error, console error or warning), the fixtures' own checks, and each core module's records in the API and on its list. Signs in per test, so it needs no `setup`. On the dev server the sweep also catches React and antd warnings, which production builds strip. |
 | `legacy` | `e2e/costing.spec.js`, `e2e/costing-full-entry.spec.js` | The original costing specs. |
 | `master-data`, `costing`, `orders`, `bom`, `po`, `production-po`, `cutting`, `sewing`, `virtual-factory`, `tna`, `sample-requests`, `hr`, `admin`, `approvals`, `inventory`, `reports`, `validation`, `grn-qc`, `export-docs` | `specs/<project>/` | One folder per module. Where the files are numbered, they run in order and build on each other. |
 | `journey` | `specs/journey/` | Creates every record through the real screens (masters, costing, BOM, order, PO, GRN). Numbered and idempotent; 15-minute test timeout; video on. |
 | `branch` | `specs/branch/` | Makes the company multi-branch, and `99-restore-single-branch` closes the branches again. Declared last: run nothing after it until the restore has run. |
-| `rbac-soak-setup`, `rbac-soak-merch`, `rbac-soak-store`, `rbac-soak-costing` | `rbac-soak-setup.js`, `specs/rbac-soak/` | Non-admin roles that exist only in the e2e seed, with their own setup. Run them by name. |
-| `full-flow` | `specs/full-flow.spec.js` | A headed, slowed-down demo of costing, order, BOM and PO, with its own login. |
+| `rbac-soak-setup`, `rbac-soak-merch`, `rbac-soak-store`, `rbac-soak-costing` (demo config) | `rbac-soak-setup.js`, `specs/rbac-soak/` | Non-admin roles that exist only in the e2e seed, with their own setup. |
+| `full-flow` (demo config) | `specs/full-flow.spec.js` | A headed, slowed-down demo of costing, order, BOM and PO, with its own login. |
+
+Tests tagged `@dev-server` (three export-docs files) import `/src` modules in the browser, which
+only the dev server serves; CI runs them in its dev-server lane.
+
+## Fixtures
+
+New specs import `test` and `expect` from `e2e/fixtures.js`:
+
+```js
+import { test, expect } from '../../fixtures.js';
+
+test('the list shows the seed', async ({ api, authedPage, consoleGuard }) => {
+  const { data } = await api.get('/orders/search', { page: 0, size: 5 });
+  await authedPage.goto('/orders/list');
+});
+```
+
+- `api`: an API client logged in once per worker.
+- `authedPage`: the page, signed in through the API for this test alone. The API rotates the
+  refresh token on every use and revokes a reused one, so a login saved once and shared by many
+  tests goes stale; this cannot. It needs no `setup` project or storage state.
+- `consoleGuard`: fails the test on a page error or console error;
+  `test.use({ consoleGuardLevels: ['error', 'warning'] })` adds warnings. Requesting it is
+  enough. `helpers/console-noise.js` lists what it ignores.
 
 ## Layout
 
 ```
 e2e/
+  config/env.js         URLs, login, and the guard that keeps a run on this machine
+  fixtures.js           api, authedPage, consoleGuard
   global-setup.js       login once, save the storage state (project "setup")
   rbac-soak-setup.js    logins for the rbac-soak projects
   costing*.spec.js      the legacy costing specs
@@ -166,16 +200,14 @@ e2e/
 
 ## Known failures
 
-As of 2026-10-12 these fail on a clean `dev`. Check this list before you blame your change, and
+As of 2026-10-13 these fail on a clean `dev`. Check this list before you blame your change, and
 delete a row in the commit that fixes it.
 
 | Spec | Cause |
 |---|---|
-| `po/po-workflow.spec.js:96` "Approve by a non-approver is refused by the engine (role guard)" | Stale assertion: a superuser now bypasses the approver check on purpose, so the request succeeds. |
-| `master-data/process.spec.js`, the serial "UI Operations" block from `:126` | Stale: the screen now derives Type from the category and has no Cost/Allowance toggle. `:126` fails, so the serial tests after it never run. |
+| `master-data/process.spec.js`, the serial "UI Operations" block | Marked `test.describe.fixme`: the screen now derives Type from the category and has no Cost/Allowance toggle. Needs a rewrite. |
 | `grn-qc` | Spec defects, for example `grn-qc-ui.spec.js:136` "Test 5: Create Accessories GRN via UI", where the sticky header intercepts the checkbox click. |
 | `inventory/bill-passing.spec.js` list tests: `:79` "the list loads from the API and shows its KPI cards", `:127` "a bill is raised, saved, referred back and resubmitted" | Not diagnosed yet. |
-| `master-data/item.spec.js:376` "Create: full cascade enablement, all fields, variant attribute" | Stale: the Active checkbox has been edit-only since 2026-09-11, and the spec still expects it on create. |
 | `export-docs/buyer-templates.spec.js:74`, the font picker step | Flaky: the click can land while the option list re-renders. It passes on a re-run. |
 
 Things that look like failures but come from the environment:
@@ -188,10 +220,13 @@ Things that look like failures but come from the environment:
 ## CI
 
 - `.github/workflows/ci.yml` lints, builds and audits every push to `dev`. It runs no e2e tests.
-- `.github/workflows/e2e.yml` is manual-only and does not work as written: it starts
-  `npm run dev` on port 3000 and waits for `/api/v1/categories`, which needs a login, so the wait
-  never succeeds. It is being replaced by a pipeline that runs the smoke tests on every push and
-  the full suite nightly.
-- `scripts/run-e2e.sh`, `run-e2e.ps1` and `run-e2e.bat` have the same two problems, and
-  `scripts/run-regression.sh` expects the UI on port 3000. Use the steps above; the scripts go
-  when the new pipeline lands.
+- `.github/workflows/e2e.yml` builds the API jar from `avarshtech/erp-purchase@master`, runs it
+  with the e2e profile on 8088, waits on `/actuator/health/readiness`, builds this UI with
+  `--mode e2e` and serves it with `vite preview` on 4173 (the e2e build registers no service
+  worker). Then:
+  - every push to `dev`: `--project=smoke`;
+  - nightly (02:00 IST, checking out `dev`) and `workflow_dispatch` with `suite: full`: the full
+    suite on the preview build (`--grep-invert @dev-server`), and in a parallel job the smoke
+    project and the `@dev-server` specs on `vite --mode e2e`.
+  The report, `test-results/junit.xml`, traces and both servers' logs are uploaded as artifacts.
+  It needs the repository secret `REPO_TOKEN` (read access to erp-purchase).

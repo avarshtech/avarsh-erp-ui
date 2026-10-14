@@ -328,6 +328,6 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
-  // No webServer — start `npm run dev` manually before running tests.
-  // For pipeline execution, use scripts/run-e2e.sh or scripts/run-e2e.ps1.
+  // No webServer: start the e2e stack yourself (API on 8088, `npx vite --mode e2e` on a pinned
+  // port) as e2e/README.md describes. CI starts it in .github/workflows/e2e.yml.
 });
