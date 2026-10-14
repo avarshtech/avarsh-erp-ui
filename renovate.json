@@ -2,6 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "description": "Dependency updates for avarsh-erp-ui. Weekly, grouped, never merged automatically: every update goes through CI, the Playwright suite and a person.",
+  "baseBranches": ["dev"],
   "timezone": "Asia/Kolkata",
   "schedule": ["before 9am on monday"],
   "prConcurrentLimit": 5,
