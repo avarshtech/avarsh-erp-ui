@@ -37,7 +37,7 @@ const decode = (raw, type) => {
 };
 
 /** Page, size, sort, search and filters from the URL, falling back to the defaults. */
-const readUrl = (params, initialFilters, defaultSort, filterTypes) => {
+const readUrl = (params, initialFilters, defaultSort, filterTypes, pageSize) => {
   const page = Number(params.get('page'));
   const size = Number(params.get('size'));
   const filters = { ...initialFilters };
@@ -49,7 +49,7 @@ const readUrl = (params, initialFilters, defaultSort, filterTypes) => {
   const field = params.get('sort');
   const order = params.get('order');
   return {
-    pagination: { current: page > 0 ? page : 1, pageSize: size > 0 ? size : PAGE_SIZE },
+    pagination: { current: page > 0 ? page : 1, pageSize: size > 0 ? size : pageSize },
     sort: field && (order === 'ascend' || order === 'descend') ? { field, order } : defaultSort,
     search: params.get('q') || '',
     filters,
@@ -71,17 +71,18 @@ const readUrl = (params, initialFilters, defaultSort, filterTypes) => {
  *   keeps its bare address), and the list remembers them for its form's way back (utils/listMemory).
  * - `filterTypes` `{ key: 'dateRange' | 'number' | 'array' }`: how a filter reads back from the URL; others are
  *   strings.
+ * - `pageSize`: the rows per page a fresh list shows (10).
  *
  * `replaceRow(saved)` puts a saved record in place of the row with its id, without reloading.
  */
 const useServerList = (fetchPage, initialFilters, errorText = 'Could not load the list', options = {}) => {
-  const { defaultSort = null, urlState = false, filterTypes = {} } = options;
+  const { defaultSort = null, urlState = false, filterTypes = {}, pageSize = PAGE_SIZE } = options;
   const { message } = App.useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const { pathname } = useLocation();
   const [initial] = useState(() => (urlState
-    ? readUrl(searchParams, initialFilters, defaultSort, filterTypes)
-    : { pagination: { current: 1, pageSize: PAGE_SIZE }, sort: defaultSort, search: '', filters: initialFilters }));
+    ? readUrl(searchParams, initialFilters, defaultSort, filterTypes, pageSize)
+    : { pagination: { current: 1, pageSize }, sort: defaultSort, search: '', filters: initialFilters }));
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch(400, initial.search);
   const [filters, setFilters] = useState(initial.filters);
   const [pagination, setPagination] = useState(initial.pagination);
@@ -124,7 +125,7 @@ const useServerList = (fetchPage, initialFilters, errorText = 'Could not load th
     if (!urlState) return;
     const own = new URLSearchParams();
     if (pagination.current !== 1) own.set('page', String(pagination.current));
-    if (pagination.pageSize !== PAGE_SIZE) own.set('size', String(pagination.pageSize));
+    if (pagination.pageSize !== pageSize) own.set('size', String(pagination.pageSize));
     const isDefaultSort = sort?.field === defaultSort?.field && sort?.order === defaultSort?.order;
     if (sort && !isDefaultSort) {
       own.set('sort', sort.field);
@@ -172,6 +173,15 @@ const useServerList = (fetchPage, initialFilters, errorText = 'Could not load th
   /** Back to page 1, for a change outside the list's own filters (the header's branch switch). */
   const goToFirstPage = useCallback(() => setPagination(firstPage), []);
 
+  /** Every filter and the search back to their starting values, on page 1. */
+  const resetFilters = useCallback(() => {
+    setFilters(initialFilters);
+    setSearchText('');
+    setPagination(firstPage);
+    // initialFilters is the caller's constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setSearchText]);
+
   const replaceRow = useCallback((saved) => {
     if (!saved || saved.id == null) return;
     setData((d) => ({ ...d, content: d.content.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)) }));
@@ -180,7 +190,7 @@ const useServerList = (fetchPage, initialFilters, errorText = 'Could not load th
   return {
     rows: data.content, total: data.totalElements, loading, load, filters, setFilter,
     pagination, onTableChange, searchText, setSearchText, debouncedSearch,
-    sort, sortOrderFor, replaceRow, goToFirstPage,
+    sort, sortOrderFor, replaceRow, goToFirstPage, resetFilters,
   };
 };
 

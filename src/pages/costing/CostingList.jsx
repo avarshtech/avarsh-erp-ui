@@ -36,27 +36,38 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 import EmptyState from '../../components/EmptyState';
 import { COSTING_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getTablePagination } from '../../utils/paginationConfig';
-import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import useServerList from '../../hooks/useServerList';
 
 const { Text } = Typography;
+
+const COSTING_FILTERS = { buyerId: undefined, season: undefined, dateRange: null, status: undefined };
+const COSTING_LIST_OPTIONS = {
+  defaultSort: { field: 'id', order: 'descend' },
+  urlState: true,
+  pageSize: 25,
+  filterTypes: { buyerId: 'number', dateRange: 'dateRange' },
+};
+
+const fetchCostingPage = ({ page, size, search, sort, direction, status, buyerId, season, dateRange }) => {
+  const params = { page: page - 1, size, sort, direction };
+  if (search) params.search = search;
+  if (status) params.status = status;
+  if (buyerId) params.buyerId = buyerId;
+  if (season) params.season = season;
+  if (dateRange && dateRange.length === 2) {
+    params.dateFrom = dateRange[0].format('YYYY-MM-DD');
+    params.dateTo = dateRange[1].format('YYYY-MM-DD');
+  }
+  return searchCostSheets(params);
+};
 
 const CostingList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState([]);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 25,
-    total: 0,
-  });
-  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [statusFilter, setStatusFilter] = useState(undefined);
-  const [buyerFilter, setBuyerFilter] = useState(undefined);
-  const [seasonFilter, setSeasonFilter] = useState(undefined);
-  const [dateRange, setDateRange] = useState(null);
-  const [sortField, setSortField] = useState('id');
-  const [sortDirection, setSortDirection] = useState('desc');
+  // Page, sort, search and filters live in the URL, so a refresh or the way back from the sheet keeps them;
+  // with no column sorter the list is newest first (id descending), 25 rows a page, as it always was.
+  const list = useServerList(fetchCostingPage, COSTING_FILTERS, 'Failed to load cost sheets', COSTING_LIST_OPTIONS);
+  const { load: reload, goToFirstPage, sortOrderFor, filters: listFilters, setFilter } = list;
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState(null);
   const [buyerOptions, setBuyerOptions] = useState([]);
@@ -70,43 +81,6 @@ const CostingList = () => {
   const canUpdate = hasPermission('costing', 'update');
   const canDelete = hasPermission('costing', 'delete');
 
-  const fetchData = useCallback(
-    async (page, pageSize, sort, direction) => {
-      setLoading(true);
-      try {
-        const params = {
-          page: (page || pagination.current) - 1,
-          size: pageSize || pagination.pageSize,
-          sort: sort || sortField,
-          direction: direction || sortDirection,
-        };
-
-        if (debouncedSearch) params.search = debouncedSearch;
-        if (statusFilter) params.status = statusFilter;
-        if (buyerFilter) params.buyerId = buyerFilter;
-        if (seasonFilter) params.season = seasonFilter;
-        if (dateRange && dateRange.length === 2) {
-          params.dateFrom = dateRange[0].format('YYYY-MM-DD');
-          params.dateTo = dateRange[1].format('YYYY-MM-DD');
-        }
-
-        const response = await searchCostSheets(params);
-        setData(response.content || []);
-        setPagination((prev) => ({
-          ...prev,
-          current: page || prev.current,
-          pageSize: pageSize || prev.pageSize,
-          total: response.totalElements || 0,
-        }));
-      } catch {
-        message.error('Failed to load cost sheets');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, buyerFilter, seasonFilter, dateRange]
-  );
-
   // Fetch buyer options on mount
   useEffect(() => {
     getBuyers()
@@ -116,53 +90,34 @@ const CostingList = () => {
       .catch(() => {});
   }, []);
 
-  // Re-fetch when filters change
-  useEffect(() => {
-    fetchData(1, pagination.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, buyerFilter, seasonFilter, dateRange]);
-
-  const handleTableChange = (pag, _filters, sorter) => {
-    const newSort = sorter.field || sortField;
-    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
-    setSortField(newSort);
-    setSortDirection(newDirection);
-    fetchData(pag.current, pag.pageSize, newSort, newDirection);
-  };
-
   const handleDelete = useCallback(async (record) => {
     setDeletingId(record.id);
     try {
       await deleteCostSheet(record.id);
       message.success(`${record.costingId} deleted successfully`);
-      fetchData(pagination.current, pagination.pageSize);
+      reload();
     } catch {
       message.error('Failed to delete cost sheet');
     } finally {
       setDeletingId(null);
     }
-  }, [fetchData, pagination.current, pagination.pageSize]);
+  }, [reload, message]);
 
+  // A duplicate is the newest sheet: show page 1, where it lands
+  const onFirstPage = list.pagination.current === 1;
   const handleDuplicate = useCallback(async (record) => {
     setDuplicatingId(record.id);
     try {
       const dup = await duplicateCostSheet(record.id);
       message.success(`Duplicated as ${dup.costingId}`);
-      fetchData(1, pagination.pageSize);
+      if (onFirstPage) reload();
+      else goToFirstPage();
     } catch {
       message.error('Failed to duplicate cost sheet');
     } finally {
       setDuplicatingId(null);
     }
-  }, [fetchData, pagination.pageSize]);
-
-  const handleClearFilters = () => {
-    setSearchText('');
-    setStatusFilter(undefined);
-    setBuyerFilter(undefined);
-    setSeasonFilter(undefined);
-    setDateRange(null);
-  };
+  }, [reload, goToFirstPage, onFirstPage, message]);
 
   const handleViewHistory = useCallback((record) => {
     setHistoryRecord(record);
@@ -187,8 +142,8 @@ const CostingList = () => {
       span: { xs: 12, sm: 8, md: 4, lg: 3 },
       props: {
         placeholder: 'Buyer',
-        value: buyerFilter,
-        onChange: setBuyerFilter,
+        value: listFilters.buyerId,
+        onChange: setFilter('buyerId'),
         options: buyerOptions,
       },
     },
@@ -197,8 +152,8 @@ const CostingList = () => {
       span: { xs: 12, sm: 8, md: 3, lg: 3 },
       props: {
         placeholder: 'Season',
-        value: seasonFilter,
-        onChange: setSeasonFilter,
+        value: listFilters.season,
+        onChange: setFilter('season'),
         options: SEASONS,
         showSearch: false,
       },
@@ -208,8 +163,8 @@ const CostingList = () => {
       span: { xs: 24, sm: 12, md: 5, lg: 4 },
       props: {
         placeholder: ['Date From', 'Date To'],
-        value: dateRange,
-        onChange: setDateRange,
+        value: listFilters.dateRange,
+        onChange: setFilter('dateRange'),
         allowClear: true,
       },
     },
@@ -218,8 +173,8 @@ const CostingList = () => {
       span: { xs: 12, sm: 8, md: 3, lg: 3 },
       props: {
         placeholder: 'Status',
-        value: statusFilter,
-        onChange: setStatusFilter,
+        value: listFilters.status,
+        onChange: setFilter('status'),
         options: Object.values(COSTING_STATUS).map((s) => ({
           label: getStatusLabel(s),
           value: s,
@@ -227,7 +182,7 @@ const CostingList = () => {
         showSearch: false,
       },
     },
-  ], [buyerFilter, buyerOptions, seasonFilter, dateRange, statusFilter]);
+  ], [listFilters, setFilter, buyerOptions]);
 
   const columns = useMemo(() => [
     {
@@ -237,6 +192,7 @@ const CostingList = () => {
       fixed: 'left',
       width: 160,
       sorter: true,
+      sortOrder: sortOrderFor('costingId'),
       render: (text, record) => (
         <RecordLink
           text={text}
@@ -250,6 +206,7 @@ const CostingList = () => {
       key: 'date',
       width: 120,
       sorter: true,
+      sortOrder: sortOrderFor('date'),
       render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
     },
     {
@@ -303,6 +260,7 @@ const CostingList = () => {
       width: 140,
       align: 'right',
       sorter: true,
+      sortOrder: sortOrderFor('totalPrice'),
       render: (amount, record) => (
         <CurrencyDisplay
           amount={amount}
@@ -418,7 +376,7 @@ const CostingList = () => {
         </Space>
       ),
     },
-  ], [navigate, handleDelete, handleDuplicate, handlePrint, handleViewHistory, deletingId, duplicatingId, printingId, canView, canUpdate, canDelete, canAdd]);
+  ], [navigate, handleDelete, handleDuplicate, handlePrint, handleViewHistory, deletingId, duplicatingId, printingId, canView, canUpdate, canDelete, canAdd, sortOrderFor]);
 
   return (
     <div className="animate-fade-in-up">
@@ -434,23 +392,23 @@ const CostingList = () => {
 
       <Card>
         <SearchFilterBar
-          searchText={searchText}
-          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchText={list.searchText}
+          onSearchChange={(e) => list.setSearchText(e.target.value)}
           searchPlaceholder="Search ID, buyer, style..."
           filters={filters}
-          onClear={handleClearFilters}
-          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          onClear={list.resetFilters}
+          onRefresh={reload}
           style={{ marginBottom: 16 }}
         />
 
         <Table
           columns={columns}
-          dataSource={data}
-          loading={loading}
+          dataSource={list.rows}
+          loading={list.loading}
           rowKey="id"
           scroll={{ x: 1400 }}
-          onChange={handleTableChange}
-          pagination={getTablePagination(pagination, 'cost sheets')}
+          onChange={list.onTableChange}
+          pagination={getTablePagination({ ...list.pagination, total: list.total }, 'cost sheets')}
           locale={{
             emptyText: (
               <EmptyState

@@ -20,6 +20,7 @@ import {
 } from 'antd';
 import { RollbackOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import dayjs from 'dayjs';
 import {
   getCostSheetById,
@@ -123,7 +124,7 @@ const CostingView = () => {
       setData(cs);
     } catch {
       message.error('Failed to load cost sheet');
-      navigate('/costing/list');
+      navigate(listPath('/costing/list'));
     } finally {
       setLoading(false);
     }

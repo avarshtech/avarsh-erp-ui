@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { App } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { listPath } from '../../../../utils/listMemory';
 import { COSTING_STATUS } from '../../../../utils/costingConstants';
 import { unlinkedRows } from '../model/payloadMapper';
 
@@ -74,7 +75,7 @@ export default function useSheetSave({ form, persist, meta, dirty, sections, aft
       message.success(isNew ? 'Cost sheet created and submitted' : 'Cost sheet submitted successfully');
       if (saved.status === COSTING_STATUS.APPROVED) message.info('No approval flow is set up for costing, so it was approved straight away.');
       clearDirty();
-      navigate('/costing/list');
+      navigate(listPath('/costing/list'));
     } catch {
       // The axios interceptor has already shown the server's message.
     } finally {

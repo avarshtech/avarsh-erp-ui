@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { App } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { listPath } from '../../../../utils/listMemory';
 import { getCostSheetById } from '../../../../services/costing/costingService';
 import { fromResponse } from '../model/payloadMapper';
 
@@ -29,7 +30,7 @@ export default function useSheetLoader(id, { form, dispatch, meta, setMeta, onLo
       .catch(() => {
         if (cancelled) return;
         message.error('Failed to load cost sheet');
-        navigate('/costing/list');
+        navigate(listPath('/costing/list'));
       });
     return () => { cancelled = true; };
   }, [needsLoad, id, form, dispatch, setMeta, onLoaded, message, navigate]);
