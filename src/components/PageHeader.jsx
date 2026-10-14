@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Button } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { listPath } from '../utils/listMemory';
 
 const PageHeader = memo(function PageHeader({
   title,
@@ -22,7 +23,8 @@ const PageHeader = memo(function PageHeader({
     if (onBack) {
       onBack();
     } else if (backPath) {
-      navigate(backPath);
+      // Back to a list lands on the page, sort and filters it was left with (utils/listMemory)
+      navigate(listPath(backPath));
     }
   };
 
