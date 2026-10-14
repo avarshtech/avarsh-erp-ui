@@ -57,20 +57,30 @@ const CustomerCommentsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Paged on the server over the comment statuses (U334): a client-side filter of the newest 100
+  // requests lost every older sample still awaiting feedback.
+  const [page, setPage] = useState({ current: 1, pageSize: 10 });
+  const [total, setTotal] = useState(0);
+  const [prevQuery, setPrevQuery] = useState({ debouncedSearch, statusFilter });
+  if (prevQuery.debouncedSearch !== debouncedSearch || prevQuery.statusFilter !== statusFilter) {
+    setPrevQuery({ debouncedSearch, statusFilter });
+    setPage((p) => ({ ...p, current: 1 }));
+  }
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page: 0, size: 100 };
+      const params = { page: page.current - 1, size: page.pageSize };
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
+      else params.statuses = COMMENT_STATUSES.join(',');
       const response = await searchSampleRequests(params);
-      let rows = response.content || [];
-      if (!statusFilter) rows = rows.filter((r) => COMMENT_STATUSES.includes(r.status));
-      setData(rows);
+      setData(response.content || []);
+      setTotal(response.totalElements ?? (response.content || []).length);
     } catch (e) {
       toastUnlessHandled(message, e, 'Failed to load sample requests');
     } finally { setLoading(false); }
-  }, [debouncedSearch, statusFilter, message]);
+  }, [debouncedSearch, statusFilter, page, message]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -161,10 +171,13 @@ const CustomerCommentsPage = () => {
     {
       title: 'Feedback', key: 'feedback', width: 115,
       render: (_, record) => {
-        if (record.feedback && record.feedback.decision) {
+        // List rows carry feedbackState, not the feedback record (U335)
+        const state = record.feedbackState
+          ?? (record.feedback ? (record.feedback.decision ? 'RECORDED' : 'DRAFT') : 'NONE');
+        if (state === 'RECORDED') {
           return <Tag color="green" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>Recorded</Tag>;
         }
-        if (record.feedback) {
+        if (state === 'DRAFT') {
           return <Tag color="gold" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>Draft saved</Tag>;
         }
         return <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>Awaiting</Tag>;
@@ -220,7 +233,13 @@ const CustomerCommentsPage = () => {
             onClick: () => openDialog(record),
             style: { cursor: 'pointer' },
           })}
-          pagination={{ pageSize: 10, showTotal: (total) => `Total ${total} sample requests` }}
+          pagination={{
+            current: page.current,
+            pageSize: page.pageSize,
+            total,
+            showTotal: (count) => `Total ${count} sample requests`,
+            onChange: (current, pageSize) => setPage({ current: pageSize !== page.pageSize ? 1 : current, pageSize }),
+          }}
           locale={{
             emptyText: (
               <EmptyState
