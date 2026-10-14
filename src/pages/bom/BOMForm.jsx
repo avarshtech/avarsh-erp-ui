@@ -1272,24 +1272,26 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, overrideBaseQtyColor: _obqc, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    // Every figure below is computed from the line being mapped. Reading lines[idx] here took the
+    // figures of a different line once a PO-generated line had been filtered out ahead of it (U028).
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map((line) => {
+      const { key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, overrideBaseQtyColor: _obqc, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest } = line;
+      return ({
       ...rest,
       // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
       variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
       baseQty: (() => {
-        const line = lines[idx];
         if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
           return computeMatrixTotalQty(line);
         }
         const { qty } = getColorQty(line);
         return qty || 0;
       })(),
-      totalQty: computeTotalQty(lines[idx]),
+      totalQty: computeTotalQty(line),
       // purchaseQty stays in the consumption (secondary) UOM; purchaseQtyPrimary is the
       // converted figure the PO is raised in. The factor is snapshotted onto the line so a
       // later edit to the item master never rewrites this BOM or a PO generated from it.
       ...(() => {
-        const line = lines[idx];
         const qty = calcLinePurchaseQty(
           line,
           computeTotalQty(line),
@@ -1310,7 +1312,8 @@ const BOMForm = () => {
         const proc = processesList.find((p) => p.id === pid);
         return proc ? { id: proc.id, processName: proc.processName } : { id: pid };
       }),
-    }));
+    });
+    });
 
     return {
       version: entityVersion,
