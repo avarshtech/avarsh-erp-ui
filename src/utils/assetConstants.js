@@ -102,3 +102,38 @@ export const TRANSFER_REASON = {
 
 export const transferStatusMeta = (status) =>
   TRANSFER_STATUS[status] ?? { label: status ?? '-', color: 'default' };
+
+/** Mirrors MaintenanceType. */
+export const MAINTENANCE_TYPE = {
+  PREVENTIVE: 'Preventive service',
+  BREAKDOWN_REPAIR: 'Breakdown repair',
+  CALIBRATION: 'Calibration',
+  INSPECTION: 'Inspection',
+};
+
+/** Only a breakdown takes the machine out of service. Mirrors MaintenanceType.stopsTheMachine. */
+export const STOPS_THE_MACHINE = ['BREAKDOWN_REPAIR'];
+
+export const DISPOSAL_STATUS = {
+  DRAFT: { label: 'Draft', color: 'default' },
+  SUBMITTED: { label: 'Awaiting approval', color: 'gold' },
+  APPROVED: { label: 'Disposed', color: 'green' },
+  REJECTED: { label: 'Returned', color: 'red' },
+  CANCELLED: { label: 'Cancelled', color: 'default' },
+};
+
+export const disposalStatusMeta = (status) =>
+  DISPOSAL_STATUS[status] ?? { label: status ?? '-', color: 'default' };
+
+/**
+ * How many days until the next service, as a word.
+ * Null when nothing is scheduled - which is not the same as being up to date.
+ */
+export const maintenanceDue = (nextDueDate, today = new Date()) => {
+  if (!nextDueDate) return null;
+  const due = new Date(nextDueDate);
+  const days = Math.round((due - today) / 86400000);
+  if (days < 0) return { label: `Overdue by ${Math.abs(days)} d`, color: 'red' };
+  if (days <= 7) return { label: `Due in ${days} d`, color: 'orange' };
+  return { label: `Due in ${days} d`, color: 'default' };
+};

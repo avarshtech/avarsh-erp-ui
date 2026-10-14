@@ -12,6 +12,8 @@ import AssetMovementHistory from './components/AssetMovementHistory';
 import AssetStatusHistory from './components/AssetStatusHistory';
 import AssetStatusDialog from './components/AssetStatusDialog';
 import AssetDocuments from './components/AssetDocuments';
+import AssetMaintenancePanel from './components/AssetMaintenancePanel';
+import AssetDisposalDialog from './components/AssetDisposalDialog';
 import { hasPermission } from '../../utils/permissions';
 import AssetSpecList from './components/AssetSpecList';
 
@@ -29,7 +31,12 @@ const AssetView = () => {
   // Bumped when the status is saved, so the history panel reloads rather than
   // sitting on the state from before the change.
   const [statusVersion, setStatusVersion] = useState(0);
+  const [disposeOpen, setDisposeOpen] = useState(false);
   const canUpdate = hasPermission('assets', 'update');
+  const canDispose = hasPermission('asset-disposals', 'add');
+
+  /** Re-reads the asset after maintenance, whose dates and status live on it. */
+  const reloadAsset = () => getAsset(id).then(setAsset).catch(() => {});
 
   // The fetch lives in the effect and the flag is set only in its callbacks:
   // setState in an effect body cascades renders, which the lint rejects. The
@@ -59,6 +66,11 @@ const AssetView = () => {
           <PermissionGuard module="assets" operation="update">
             <ActionButton action="custom" text="Change Status" onClick={() => setStatusOpen(true)} />
             <ActionButton action="edit" text="Edit" onClick={() => navigate(`/assets/${id}/edit`)} />
+          </PermissionGuard>
+        )}
+        {asset?.status !== 'DISPOSED' && canDispose && (
+          <PermissionGuard module="asset-disposals" operation="add">
+            <ActionButton action="delete" text="Dispose" onClick={() => setDisposeOpen(true)} />
           </PermissionGuard>
         )}
       </PageHeader>
@@ -121,10 +133,20 @@ const AssetView = () => {
               </Descriptions>
             </Card>
 
+            <AssetMaintenancePanel asset={asset} canEdit={canUpdate} onAssetChanged={reloadAsset} />
             <AssetDocuments assetId={asset.id} canEdit={canUpdate} />
             <AssetStatusHistory assetId={asset.id} refreshKey={statusVersion} />
             <AssetMovementHistory movements={asset.movements} />
 
+            <AssetDisposalDialog
+              open={disposeOpen}
+              asset={asset}
+              onClose={() => setDisposeOpen(false)}
+              onRaised={(saved) => {
+                setDisposeOpen(false);
+                navigate(`/assets/disposals?highlight=${saved.id}`);
+              }}
+            />
             <AssetStatusDialog
               open={statusOpen}
               asset={asset}

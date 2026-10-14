@@ -152,6 +152,7 @@ const AssetSetup = lazy(() => import('./pages/asset/AssetSetup'));
 const AssetTransferList = lazy(() => import('./pages/asset/AssetTransferList'));
 const AssetTransferForm = lazy(() => import('./pages/asset/AssetTransferForm'));
 const AssetTransferView = lazy(() => import('./pages/asset/AssetTransferView'));
+const AssetDisposalList = lazy(() => import('./pages/asset/AssetDisposalList'));
 // Sample Requests (lazy-loaded — UI mock phase)
 const SampleRequestList = lazy(() => import('./pages/sample-request/SampleRequestList'));
 const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
@@ -495,6 +496,7 @@ const ThemedApp = () => {
             {/* Setup before :id, or "setup" is read as an asset id. */}
             <Route path="assets/setup" element={<PermissionRoute module="asset-setup" operation="view"><Suspense fallback={<PageSkeleton />}><AssetSetup /></Suspense></PermissionRoute>} />
             {/* Transfers before assets/:id, or "transfers" is read as an asset id. */}
+            <Route path="assets/disposals" element={<PermissionRoute module="asset-disposals" operation="view"><Suspense fallback={<PageSkeleton />}><AssetDisposalList /></Suspense></PermissionRoute>} />
             <Route path="assets/transfers" element={<PermissionRoute module="asset-transfers" operation="view"><Suspense fallback={<PageSkeleton />}><AssetTransferList /></Suspense></PermissionRoute>} />
             <Route path="assets/transfers/new" element={<PermissionRoute module="asset-transfers" operation="add"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />
             <Route path="assets/transfers/:id/edit" element={<PermissionRoute module="asset-transfers" operation="update"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />

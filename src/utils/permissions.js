@@ -554,6 +554,12 @@ export const SCREENS = [
     routes: ['/assets/transfers', '/assets/transfers/new', '/assets/transfers/:id', '/assets/transfers/:id/edit'],
     ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel', 'dispatch', 'receive'],
     description: 'Moving assets between units, departments, sections and lines.' },
+  // Approval is Finance's call in the PRD, not the unit admin's - even though
+  // the unit admin is the one who raises the request.
+  { id: 'asset-disposals', name: 'Asset Disposals', section: 'assets', kind: 'screen',
+    path: '/assets/disposals', routes: ['/assets/disposals'],
+    ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel'],
+    description: 'Retiring assets. Approving a request is what marks an asset disposed.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
