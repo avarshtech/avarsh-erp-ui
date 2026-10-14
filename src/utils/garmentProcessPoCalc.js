@@ -11,8 +11,8 @@ import { GPO_EXCESS_CAP_PCT, jobWorkUomLabel } from './jobWorkConstants';
 import { REQUIREMENT_STATUS as R } from './requirementStatus';
 import { gprLineLabel } from './garmentProcessCalc';
 import { deliveryIssues } from './jobWorkDelivery';
+import { formatCount } from './formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
 const dp = (v, places) => Math.abs(Math.round(Number(v) * 10 ** places) - Number(v) * 10 ** places) < 1e-6;
 
@@ -56,7 +56,7 @@ export const gpoRequirementChange = (line, state) => {
   if (!cell) return `${gpoLineLabel(line)} no longer exists on ${line.gprNo}`;
   if (cell.processLabel !== line.processLabel) return `${gpoLineLabel(line)} is now ${cell.processLabel} on ${line.gprNo}, not ${line.processLabel}`;
   if (cell.required !== line.snapshot.required || cell.seqNo !== line.snapshot.seqNo) {
-    return `${gpoLineLabel(line)} changed on ${line.gprNo} since it was added (required ${n(line.snapshot.required)} → ${n(cell.required)}) — re-fetch the line`;
+    return `${gpoLineLabel(line)} changed on ${line.gprNo} since it was added (required ${formatCount(line.snapshot.required)} → ${formatCount(cell.required)}) — re-fetch the line`;
   }
   return null;
 };
@@ -121,7 +121,7 @@ export const validateGpo = (doc, ctx, { today = dayjs() } = {}) => {
     if (change) lineError(l, i, `${change} (V12)`);
     const excess = Number(l.poQty) - gpoLiveBalance(l, ctx, doc.held);
     if (!change && excess > 0 && !approvedExcess(doc, l, excess)) {
-      lineError(l, i, ctx?.stage === 'submit' ? `balance changed; exceeds it by ${n(excess)} — review the line (V15)` : `exceeds balance by ${n(excess)} (V4)`);
+      lineError(l, i, ctx?.stage === 'submit' ? `balance changed; exceeds it by ${formatCount(excess)} — review the line (V15)` : `exceeds balance by ${formatCount(excess)} (V4)`);
     }
   });
   deliveryChecks(doc, blocking, warnings);

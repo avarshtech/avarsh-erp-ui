@@ -12,8 +12,8 @@ import { poValue, isKeyedBilling } from './jobWorkPoCalc';
 import { ZERO_RATE_REASON, RATE_VARIANCE_PCT } from './jobWorkConstants';
 import { processLabel } from './cutPanelCalc';
 import { deliveryIssues } from './jobWorkDelivery';
+import { formatCount } from './formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
 /** At most `places` decimals, tolerant of binary floats (1.1 × 100 is 110.00000000000001). */
 const dp = (v, places) => Math.abs(Math.round(Number(v) * 10 ** places) - Number(v) * 10 ** places) < 1e-6;
@@ -52,7 +52,7 @@ export const requirementChange = (line, state) => {
   const cell = liveCell(line, state);
   if (!cell) return `${lineLabel(line)} no longer exists on ${line.cprNo}`;
   if (cell.required !== line.snapshot.required || cell.sequenceNo !== line.snapshot.sequenceNo) {
-    return `${lineLabel(line)} changed on ${line.cprNo} since it was fetched (required ${n(line.snapshot.required)} → ${n(cell.required)})`;
+    return `${lineLabel(line)} changed on ${line.cprNo} since it was fetched (required ${formatCount(line.snapshot.required)} → ${formatCount(cell.required)})`;
   }
   return null;
 };
@@ -150,14 +150,14 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
     if (change) blocking.push(`${change} — re-fetch the line (VR-20).`);
     const own = ctx.ownAllocation?.[l.key] ?? doc.held?.[l.key]?.allocated ?? 0;
     if (!change && ctx.state?.[l.cprId]?.status === 'CLOSED' && Number(l.poQty) > own) {
-      blocking.push(`${lineLabel(l)}: ${l.cprNo} is closed — the PO can keep what it holds (${n(own)}) but not take more.`);
+      blocking.push(`${lineLabel(l)}: ${l.cprNo} is closed — the PO can keep what it holds (${formatCount(own)}) but not take more.`);
     }
     // An amendment is checked against the balance plus what its own PO already holds (R0).
     const excess = Number(l.poQty) - liveBalance(l, ctx, doc.held);
     if (excess > 0 && !coveringOverride(doc, l, excess)) {
       blocking.push(ctx.stage === 'approve'
-        ? `${lineLabel(l)}: exceeds the balance by ${n(excess)} — another PO has taken it since submission; send the PO back for correction (EC-10).`
-        : `${lineLabel(l)}: exceeds the balance by ${n(excess)} — needs an authorised over-allocation override (VR-11).`);
+        ? `${lineLabel(l)}: exceeds the balance by ${formatCount(excess)} — another PO has taken it since submission; send the PO back for correction (EC-10).`
+        : `${lineLabel(l)}: exceeds the balance by ${formatCount(excess)} — needs an authorised over-allocation override (VR-11).`);
     }
     const last = ctx.lastRates?.[`${l.styleNo}|${l.size}`];
     if (last && Number(l.rate) > last * (1 + RATE_VARIANCE_PCT / 100)) {

@@ -9,10 +9,8 @@ import { downloadCsv } from './download';
 import { lineTotal, processLabel, buildColourSummary, buildProcessRollup, cprTotals } from './cutPanelCalc';
 import { NO_PROCESS_LABEL } from './cutPanelConstants';
 import { getRequirementStatusLabel } from './requirementStatus';
-import { formatDate } from './formatters';
+import { formatCount, formatDate } from './formatters';
 import { PO_PRINT_CSS, companyWatermark, headerBand, detailsGrid, itemsSection, printFooter } from './print/poPrintTheme';
-
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 const sortedLines = (lines) => [...lines].sort((a, b) =>
   a.fabricName.localeCompare(b.fabricName) || a.colorName.localeCompare(b.colorName)
@@ -33,13 +31,13 @@ export const printCprStatement = (cpr, order, org = {}) => {
   const sizeHead = order.sizes.map((s) => `<th>${esc(s)}</th>`).join('');
   const rows = lines.map((l) => `<tr><td class="left">${esc(l.fabricName)}</td><td class="left">${esc(l.colorName)}</td><td class="left">${esc(l.panelName)}</td>
     <td class="left">${esc(processLabel(l))}</td><td class="num">${l.sequenceNo}</td><td class="num">${Number(l.allowancePct).toFixed(2)}</td>
-    ${order.sizes.map((s) => `<td class="num">${n(l.sizes[s]?.requiredQty)}</td>`).join('')}<td class="num">${n(lineTotal(l))}</td></tr>`).join('');
-  const foot = `<tr><td colspan="6" class="left">Total</td>${order.sizes.map((s) => `<td class="num">${n(totals.bySize[s])}</td>`).join('')}<td class="num">${n(totals.totalQty)}</td></tr>`;
+    ${order.sizes.map((s) => `<td class="num">${formatCount(l.sizes[s]?.requiredQty)}</td>`).join('')}<td class="num">${formatCount(lineTotal(l))}</td></tr>`).join('');
+  const foot = `<tr><td colspan="6" class="left">Total</td>${order.sizes.map((s) => `<td class="num">${formatCount(totals.bySize[s])}</td>`).join('')}<td class="num">${formatCount(totals.totalQty)}</td></tr>`;
   const colours = buildColourSummary(lines, order).map(({ color, panels }) => `<tr><td class="left">${esc(color.name)}</td><td class="left">${panels.length
-    ? panels.map((p) => `${esc(p.panelName)} (${esc(p.fabricName)}): ${p.chain.map((c) => `${esc(c.process)} [${n(c.qty)}]`).join(' → ')}`).join('<br/>')
+    ? panels.map((p) => `${esc(p.panelName)} (${esc(p.fabricName)}): ${p.chain.map((c) => `${esc(c.process)} [${formatCount(c.qty)}]`).join(' → ')}`).join('<br/>')
     : `<span class="muted">${NO_PROCESS_LABEL}</span>`}</td></tr>`).join('');
   const rollup = buildProcessRollup(lines).map((r) => `<tr><td class="left">${esc(r.process)}</td><td class="left">${esc(r.colors.join(', '))}</td>
-    <td class="left">${esc(r.panels.join(', '))}</td><td class="num">${n(r.totalQty)}</td></tr>`).join('');
+    <td class="left">${esc(r.panels.join(', '))}</td><td class="num">${formatCount(r.totalQty)}</td></tr>`).join('');
 
   const body = `${companyWatermark(org)}<div class="page-content">
     ${headerBand({ org, docLabel: 'Cut Panel Requirement', docNo: cpr.cprNo || 'Not saved', status: getRequirementStatusLabel(cpr.status) })}

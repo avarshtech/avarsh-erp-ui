@@ -4,9 +4,8 @@
  * print helpers; every value passes through esc().
  */
 import { cell, documentShell, esc } from '../printDoc';
-import { formatDate } from '../formatters';
+import { formatCount, formatDate } from '../formatters';
 
-const qty = (n) => Number(n || 0).toLocaleString('en-IN');
 const CSS = `
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 18px; font-size: 11px; }
@@ -33,10 +32,10 @@ const table = (heads, rows) => `<table class="lines"><thead><tr>${heads.map((h) 
 /** Our challan returning garments, leftovers and waste after job work. */
 export const buildReturnChallanHtml = ({ ret, jobOrder, principal, branch, lotLines, settles }) => {
   const lines = [
-    ...ret.garments.map((g) => [`${jobOrder.styleNo} ${jobOrder.styleName} — ${g.colour} ${g.size} (finished, good)`, qty(g.qty), 'pcs']),
-    ...ret.rejects.map((g) => [`${jobOrder.styleNo} — ${g.colour} ${g.size} (rejected, no job charge)`, qty(g.qty), 'pcs']),
-    ...lotLines.map((l) => [`Your material returned: ${l.itemName}${l.lot.size ? ` ${l.lot.size}` : ''} — lot ${l.lot.lotNo} (your challan ${l.theirDcNo})`, qty(l.qty), l.lot.uom]),
-    ...(ret.wasteKg ? [['Cutting waste from your fabric', qty(ret.wasteKg), 'kg']] : []),
+    ...ret.garments.map((g) => [`${jobOrder.styleNo} ${jobOrder.styleName} — ${g.colour} ${g.size} (finished, good)`, formatCount(g.qty), 'pcs']),
+    ...ret.rejects.map((g) => [`${jobOrder.styleNo} — ${g.colour} ${g.size} (rejected, no job charge)`, formatCount(g.qty), 'pcs']),
+    ...lotLines.map((l) => [`Your material returned: ${l.itemName}${l.lot.size ? ` ${l.lot.size}` : ''} — lot ${l.lot.lotNo} (your challan ${l.theirDcNo})`, formatCount(l.qty), l.lot.uom]),
+    ...(ret.wasteKg ? [['Cutting waste from your fabric', formatCount(ret.wasteKg), 'kg']] : []),
   ].map((r, i) => [i + 1, ...r]);
   const body = `${header(branch, 'JOB WORK RETURN CHALLAN', ret.ourChallanNo, ret.date)}
     <table class="grid"><tr>${cell('To (principal)', party(principal), { bold: true })}${cell('Ship to', ret.shipTo ? `${ret.shipTo.name}\n${ret.shipTo.address}\nTheir invoice: ${ret.shipTo.principalInvoiceNo}` : 'As addressed')}</tr>
@@ -50,7 +49,7 @@ export const buildReturnChallanHtml = ({ ret, jobOrder, principal, branch, lotLi
 
 /** What arrived short against the principal's challan, and what was defective. */
 export const buildShortageReportHtml = ({ doc, jobOrder, principal, branch, lines }) => {
-  const rows = lines.map((l, i) => [i + 1, `${l.itemName}${l.size ? ` ${l.size}` : ''}`, l.lotNo, `${qty(l.challanQty)} ${l.uom}`, `${qty(l.receivedQty)} ${l.uom}`, l.short ? `${qty(l.short)} ${l.uom}` : '—', l.defectiveQty ? `${qty(l.defectiveQty)} ${l.uom}` : '—']);
+  const rows = lines.map((l, i) => [i + 1, `${l.itemName}${l.size ? ` ${l.size}` : ''}`, l.lotNo, `${formatCount(l.challanQty)} ${l.uom}`, `${formatCount(l.receivedQty)} ${l.uom}`, l.short ? `${formatCount(l.short)} ${l.uom}` : '—', l.defectiveQty ? `${formatCount(l.defectiveQty)} ${l.uom}` : '—']);
   const body = `${header(branch, 'SHORTAGE & DEFECT REPORT', doc.inwardNo, doc.date)}
     <table class="grid"><tr>${cell('To', party(principal), { bold: true })}${cell('Your challan', `${doc.theirDcNo} of ${formatDate(doc.theirDcDate)}\nFrom: ${doc.dispatchedFrom}`)}</tr>
     <tr>${cell('Your order / our job order', `${jobOrder.principalRef} / ${jobOrder.orderNo} — ${jobOrder.styleNo}`)}${cell('Weight tolerance', `${principal.weightTolerancePct}% on fabric`)}</tr></table>
@@ -62,14 +61,14 @@ export const buildShortageReportHtml = ({ doc, jobOrder, principal, branch, line
 
 /** Progress of one job order for the principal: per colour, stitched for the order, day by day. */
 export const buildStatusReportHtml = ({ asOf, jobOrder, principal, branch, row, progress, shortLines, stitchedNote }) => {
-  const colourRows = progress.byColour.map((c) => [c.colour, qty(c.orderQty), jobOrder.scope === 'CMT' ? qty(c.cut) : '—', qty(c.packed), qty(c.returned + c.rejectsReturned), qty(Math.max(0, c.orderQty - c.returned - c.rejectsReturned))]);
-  const dayRows = progress.days.map((d) => [formatDate(d.date), qty(d.cut), qty(d.stitched), qty(d.packed), qty(d.returned)]);
+  const colourRows = progress.byColour.map((c) => [c.colour, formatCount(c.orderQty), jobOrder.scope === 'CMT' ? formatCount(c.cut) : '—', formatCount(c.packed), formatCount(c.returned + c.rejectsReturned), formatCount(Math.max(0, c.orderQty - c.returned - c.rejectsReturned))]);
+  const dayRows = progress.days.map((d) => [formatDate(d.date), formatCount(d.cut), formatCount(d.stitched), formatCount(d.packed), formatCount(d.returned)]);
   const body = `${header(branch, 'JOB WORK STATUS REPORT', jobOrder.orderNo, asOf)}
     <table class="grid"><tr>${cell('For', party(principal), { bold: true })}${cell('Your order', `${jobOrder.principalRef} — ${jobOrder.styleNo} ${jobOrder.styleName}`)}</tr>
     <tr>${cell('Due', formatDate(jobOrder.dueDate))}${cell('Expected finish at the current pace', row.projectedDate ? formatDate(row.projectedDate) : 'Not enough packing yet to project')}</tr></table>
     ${table([{ t: 'Colour' }, { t: 'Order', num: true }, { t: 'Cut', num: true }, { t: 'Packed', num: true }, { t: 'Returned', num: true }, { t: 'Balance', num: true }], colourRows)}
-    <div class="note">Stitched so far: <b>${qty(progress.stitched)}</b>. ${esc(stitchedNote)}</div>
-    ${shortLines.length ? `<div class="note"><b>Waiting on your material:</b><br/>${shortLines.map((m) => `${esc(m.itemName)}: ${esc(qty(m.short))} ${esc(m.uom)} short`).join('<br/>')}</div>` : ''}
+    <div class="note">Stitched so far: <b>${formatCount(progress.stitched)}</b>. ${esc(stitchedNote)}</div>
+    ${shortLines.length ? `<div class="note"><b>Waiting on your material:</b><br/>${shortLines.map((m) => `${esc(m.itemName)}: ${esc(formatCount(m.short))} ${esc(m.uom)} short`).join('<br/>')}</div>` : ''}
     <h3 style="font-size:12px">Day by day</h3>
     ${table([{ t: 'Date' }, { t: 'Cut', num: true }, { t: 'Stitched', num: true }, { t: 'Packed', num: true }, { t: 'Returned', num: true }], dayRows)}`;
   return documentShell({ title: `Status ${jobOrder.orderNo}`, bodyCss: CSS, body });
