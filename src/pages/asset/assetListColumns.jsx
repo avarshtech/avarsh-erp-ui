@@ -42,6 +42,8 @@ export const buildAssetListColumns = ({ onOpen, onEdit, canUpdate }) => [
     },
   },
   { title: 'Custodian', dataIndex: 'custodianName', width: 170, render: dash },
+  // Who is holding it, which is a different person from who answers for it.
+  { title: 'Issued to', dataIndex: 'assignedToName', width: 170, render: dash },
   {
     title: 'Status',
     dataIndex: 'status',

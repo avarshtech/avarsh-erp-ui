@@ -560,6 +560,12 @@ export const SCREENS = [
     path: '/assets/disposals', routes: ['/assets/disposals'],
     ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel'],
     description: 'Retiring assets. Approving a request is what marks an asset disposed.' },
+  // HR reads this without any right over the register itself: they need the
+  // exit-clearance list, not the asset master.
+  { id: 'asset-assignments', name: 'Asset Assignments', section: 'assets', kind: 'screen',
+    path: '/assets', routes: [],
+    ops: ['view', 'add', 'update'],
+    description: 'Issuing assets to employees and taking them back. Shown on the asset itself.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

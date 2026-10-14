@@ -13,6 +13,7 @@ import AssetStatusHistory from './components/AssetStatusHistory';
 import AssetStatusDialog from './components/AssetStatusDialog';
 import AssetDocuments from './components/AssetDocuments';
 import AssetMaintenancePanel from './components/AssetMaintenancePanel';
+import AssetAssignmentPanel from './components/AssetAssignmentPanel';
 import AssetDisposalDialog from './components/AssetDisposalDialog';
 import { hasPermission } from '../../utils/permissions';
 import AssetSpecList from './components/AssetSpecList';
@@ -113,6 +114,7 @@ const AssetView = () => {
               <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
                 <Descriptions.Item label="Where it is">{location || '-'}</Descriptions.Item>
                 <Descriptions.Item label="Custodian">{dash(asset.custodianName)}</Descriptions.Item>
+                <Descriptions.Item label="Issued to">{dash(asset.assignedToName)}</Descriptions.Item>
               </Descriptions>
             </Card>
 
@@ -133,6 +135,14 @@ const AssetView = () => {
               </Descriptions>
             </Card>
 
+            {/* Only for a category marked issuable: a compressor bolted to the
+                floor has no business carrying an issue history. */}
+            <AssetAssignmentPanel
+              asset={asset}
+              assignable={asset.categoryAssignable}
+              canEdit={canUpdate}
+              onAssetChanged={reloadAsset}
+            />
             <AssetMaintenancePanel asset={asset} canEdit={canUpdate} onAssetChanged={reloadAsset} />
             <AssetDocuments assetId={asset.id} canEdit={canUpdate} />
             <AssetStatusHistory assetId={asset.id} refreshKey={statusVersion} />
