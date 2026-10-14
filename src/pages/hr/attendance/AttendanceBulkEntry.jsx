@@ -7,6 +7,7 @@ import {
   getAttendanceLock, lockAttendanceMonth, unlockAttendanceMonth,
 } from '../../../services/hr/attendanceService';
 import { getActiveUnits } from '../../../services/master/unitService';
+import { searchEmployees } from '../../../services/hr/employeeService';
 import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
@@ -14,6 +15,17 @@ import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusOptions = ATTENDANCE_STATUS.map((s) => ({ value: s.value, label: s.label }));
+
+/** Every active employee of the unit, page by page, so no cap leaves anyone off the grid. */
+const activeEmployeesOf = async (unitId) => {
+  const all = [];
+  for (let page = 0; page < 50; page += 1) {
+    const result = await searchEmployees({ unitId, status: 'ACTIVE', page, size: 500 });
+    all.push(...result.content);
+    if (result.last !== false || result.content.length < 500) break;
+  }
+  return all;
+};
 
 const AttendanceBulkEntry = () => {
   const { message, modal } = App.useApp();
@@ -40,11 +52,26 @@ const AttendanceBulkEntry = () => {
     if (!selectedDate || !unitId) return;
     setLoading(true);
     try {
-      const result = await getAttendanceByDate(selectedDate.format('YYYY-MM-DD'), unitId);
+      const day = selectedDate.format('YYYY-MM-DD');
+      const [result, roster] = await Promise.all([
+        getAttendanceByDate(day, unitId),
+        // A roster that fails to load leaves the grid as it was: the day's records only
+        activeEmployeesOf(unitId).catch(() => []),
+      ]);
       // The endpoint returns a plain list. This read result.records, which does
       // not exist, so the grid was empty on every load.
       const records = Array.isArray(result) ? result : result?.records || [];
-      setData(records.map((r, i) => ({ ...r, _key: r.id || i })));
+      // The by-date endpoint returns only employees already marked that day, so a fresh day was an
+      // empty grid (U353). Every active employee of the unit who had joined by then is listed too,
+      // with no status until someone marks them.
+      const marked = new Set(records.map((r) => r.employeeId));
+      const unmarked = roster
+        .filter((e) => !marked.has(e.id) && (!e.dateOfJoining || e.dateOfJoining <= day))
+        .map((e) => ({ employeeId: e.id, employeeNo: e.employeeNo, employeeName: e.fullName }));
+      const rows = unmarked.length
+        ? [...records, ...unmarked].sort((a, b) => String(a.employeeNo ?? '').localeCompare(String(b.employeeNo ?? ''), undefined, { numeric: true }))
+        : records;
+      setData(rows.map((r, i) => ({ ...r, _key: r.id || `employee-${r.employeeId}` || i })));
     } catch {
       setData([]);
       // axiosInstance already toasts the server's message; adding another here showed two.
@@ -112,7 +139,8 @@ const AttendanceBulkEntry = () => {
       const payload = {
         date: selectedDate.format('YYYY-MM-DD'),
         unitId,
-        records: data.map((r) => ({
+        // A listed employee nobody marked is not sent: an empty row is not an attendance record
+        records: data.filter((r) => r.status).map((r) => ({
           employeeId: r.employeeId,
           status: r.status,
           inTime: r.inTime || null,
