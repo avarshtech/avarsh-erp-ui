@@ -60,14 +60,17 @@ const AssetIdentityFields = ({ categoryOptions, subCategoryOptions, categoryLock
         <Input maxLength={30} />
       </Form.Item>
     </Col>
+    {/* Only while creating. Afterwards the state is changed through Change
+        Status, which records why - and the server refuses it here, so offering
+        the field would only produce an error the user cannot act on. */}
     <Col xs={24} sm={12} md={8}>
       <Form.Item name="status" label="Status" rules={[{ required: true, message: 'Pick the status' }]}>
-        <Select placeholder="Select status" options={STATUS_OPTIONS} />
+        <Select placeholder="Select status" options={STATUS_OPTIONS} disabled={categoryLocked} />
       </Form.Item>
     </Col>
     <Col xs={24} sm={12} md={8}>
       <Form.Item name="condition" label="Condition" rules={[{ required: true, message: 'Pick the condition' }]}>
-        <Select placeholder="Select condition" options={CONDITION_OPTIONS} />
+        <Select placeholder="Select condition" options={CONDITION_OPTIONS} disabled={categoryLocked} />
       </Form.Item>
     </Col>
     <Col xs={24}>

@@ -37,6 +37,28 @@ export const MOVEMENT_EVENT = {
   DISPOSED: { label: 'Disposed', color: 'default' },
 };
 
+/**
+ * Why an asset is in the state it is in. Mirrors AssetStatusReason; the server
+ * also serves the list at /assets/status-reasons, which is what the dialog
+ * reads, so this map exists only to label a code the register has already got.
+ */
+export const STATUS_REASON = {
+  NO_ORDERS: 'No orders',
+  NO_OPERATOR: 'No operator available',
+  NOT_REQUIRED: 'Not required',
+  SEASONAL: 'Seasonal',
+  AWAITING_PARTS: 'Awaiting parts',
+  BREAKDOWN: 'Breakdown',
+  ACCIDENT: 'Accident damage',
+  WEAR_AND_TEAR: 'Wear and tear',
+  ROUTINE_SERVICE: 'Routine service',
+  VENDOR_SERVICE: 'With vendor',
+  OTHER: 'Other',
+};
+
+/** The states the server insists on a reason for. Mirrors AssetStatusReason.REQUIRES_REASON. */
+export const NEEDS_REASON = ['IDLE', 'DAMAGED', 'UNDER_REPAIR', 'UNDER_MAINTENANCE'];
+
 export const FIELD_TYPES = [
   { value: 'TEXT', label: 'Text' },
   { value: 'NUMBER', label: 'Number' },

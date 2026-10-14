@@ -45,8 +45,17 @@ export const buildAssetListColumns = ({ onOpen, onEdit, canUpdate }) => [
   {
     title: 'Status',
     dataIndex: 'status',
-    width: 150,
-    render: (value) => <Tag color={statusMeta(value).color}>{statusMeta(value).label}</Tag>,
+    width: 190,
+    // The reason under the status, because a column of identical "Idle" tags
+    // is the problem this whole feature exists to solve.
+    render: (value, row) => (
+      <>
+        <Tag color={statusMeta(value).color}>{statusMeta(value).label}</Tag>
+        {row.statusReasonLabel && (
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{row.statusReasonLabel}</div>
+        )}
+      </>
+    ),
   },
   {
     title: 'Condition',

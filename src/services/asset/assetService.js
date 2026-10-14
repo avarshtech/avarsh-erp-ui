@@ -70,3 +70,16 @@ export const getSupplierOptions = async () => (await axiosInstance.get(`${LOOKUP
 
 export const getEmployeeOptions = async (search) =>
   (await axiosInstance.get(`${LOOKUPS}/employees${query({ search })}`)).data;
+
+// ── Status ──
+// Its own call rather than part of the update: the reason is required here and
+// nowhere else, and an edit must not be a way round it.
+
+export const changeAssetStatus = async (id, payload) =>
+  (await axiosInstance.put(`${ASSETS}/${id}/status`, payload)).data;
+
+export const getAssetStatusHistory = async (id) =>
+  (await axiosInstance.get(`${ASSETS}/${id}/status-history`)).data;
+
+export const getStatusReasons = async () =>
+  (await axiosInstance.get(`${ASSETS}/status-reasons`)).data;

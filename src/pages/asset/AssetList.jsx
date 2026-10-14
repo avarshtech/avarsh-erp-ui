@@ -11,7 +11,7 @@ import useAssetLookups from '../../hooks/useAssetLookups';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { hasPermission } from '../../utils/permissions';
 import { getAssets } from '../../services/asset/assetService';
-import { ASSET_STATUS, ASSET_CONDITION, toOptions } from '../../utils/assetConstants';
+import { ASSET_STATUS, ASSET_CONDITION, STATUS_REASON, toOptions } from '../../utils/assetConstants';
 import { buildAssetListColumns } from './assetListColumns';
 
 /** useServerList counts pages from 1; the API counts from 0. */
@@ -19,6 +19,14 @@ const fetchPage = ({ page, ...rest }) => getAssets({ ...rest, page: page - 1 });
 
 const STATUS_OPTIONS = toOptions(ASSET_STATUS);
 const CONDITION_OPTIONS = toOptions(ASSET_CONDITION);
+const REASON_OPTIONS = Object.entries(STATUS_REASON).map(([value, label]) => ({ value, label }));
+
+/** The cover questions people actually ask, as windows rather than dates. */
+const EXPIRY_OPTIONS = [
+  { value: 0, label: 'Already lapsed' },
+  { value: 30, label: 'Lapsing in 30 days' },
+  { value: 90, label: 'Lapsing in 90 days' },
+];
 
 /**
  * The asset register - the module's landing screen.
@@ -31,7 +39,11 @@ const AssetList = () => {
   const lookups = useAssetLookups();
   const list = useServerList(
     fetchPage,
-    { categoryId: undefined, unitId: undefined, departmentId: undefined, status: undefined, condition: undefined },
+    {
+      categoryId: undefined, unitId: undefined, departmentId: undefined,
+      status: undefined, condition: undefined,
+      statusReasonCode: undefined, expiringInDays: undefined,
+    },
     'Could not load the asset register',
   );
   const canUpdate = hasPermission('assets', 'update');
@@ -78,6 +90,10 @@ const AssetList = () => {
             selectFilter('departmentId', 'Department', lookups.departmentsOf(list.filters.unitId)),
             selectFilter('status', 'Status', STATUS_OPTIONS),
             selectFilter('condition', 'Condition', CONDITION_OPTIONS),
+            // "Which machines are standing for want of an operator" is a
+            // question about the reason, not the status - both read Idle.
+            selectFilter('statusReasonCode', 'Reason', REASON_OPTIONS),
+            selectFilter('expiringInDays', 'Warranty / AMC', EXPIRY_OPTIONS),
           ]}
           onRefresh={list.load}
           style={{ marginBottom: 16 }}

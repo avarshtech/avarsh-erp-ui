@@ -9,6 +9,10 @@ import { toastUnlessHandled } from '../../utils/apiError';
 import { getAsset } from '../../services/asset/assetService';
 import { conditionMeta, dash, statusMeta } from '../../utils/assetConstants';
 import AssetMovementHistory from './components/AssetMovementHistory';
+import AssetStatusHistory from './components/AssetStatusHistory';
+import AssetStatusDialog from './components/AssetStatusDialog';
+import AssetDocuments from './components/AssetDocuments';
+import { hasPermission } from '../../utils/permissions';
 import AssetSpecList from './components/AssetSpecList';
 
 const date = (value) => (value ? dayjs(value).format('DD-MM-YYYY') : '-');
@@ -21,6 +25,11 @@ const AssetView = () => {
   const { message } = App.useApp();
   const [asset, setAsset] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [statusOpen, setStatusOpen] = useState(false);
+  // Bumped when the status is saved, so the history panel reloads rather than
+  // sitting on the state from before the change.
+  const [statusVersion, setStatusVersion] = useState(0);
+  const canUpdate = hasPermission('assets', 'update');
 
   // The fetch lives in the effect and the flag is set only in its callbacks:
   // setState in an effect body cascades renders, which the lint rejects. The
@@ -48,6 +57,7 @@ const AssetView = () => {
       >
         {asset?.status !== 'DISPOSED' && (
           <PermissionGuard module="assets" operation="update">
+            <ActionButton action="custom" text="Change Status" onClick={() => setStatusOpen(true)} />
             <ActionButton action="edit" text="Edit" onClick={() => navigate(`/assets/${id}/edit`)} />
           </PermissionGuard>
         )}
@@ -63,6 +73,16 @@ const AssetView = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="Condition">
                   <Tag color={conditionMeta(asset.condition).color}>{conditionMeta(asset.condition).label}</Tag>
+                </Descriptions.Item>
+                {/* The reason sits beside the status it explains. "Idle" on its
+                    own is the half of the answer nobody needs. */}
+                <Descriptions.Item label="Why">
+                  {asset.statusReasonLabel
+                    ? `${asset.statusReasonLabel}${asset.statusReasonText ? ` - ${asset.statusReasonText}` : ''}`
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Since">
+                  {asset.statusChangedAt ? dayjs(asset.statusChangedAt).format('DD-MM-YYYY') : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Category">
                   {asset.subCategoryName ? `${asset.categoryName} / ${asset.subCategoryName}` : dash(asset.categoryName)}
@@ -101,7 +121,16 @@ const AssetView = () => {
               </Descriptions>
             </Card>
 
+            <AssetDocuments assetId={asset.id} canEdit={canUpdate} />
+            <AssetStatusHistory assetId={asset.id} refreshKey={statusVersion} />
             <AssetMovementHistory movements={asset.movements} />
+
+            <AssetStatusDialog
+              open={statusOpen}
+              asset={asset}
+              onClose={() => setStatusOpen(false)}
+              onSaved={(saved) => { setAsset(saved); setStatusVersion((n) => n + 1); }}
+            />
           </>
         )}
       </Spin>
