@@ -74,6 +74,7 @@ export function initSentry() {
  */
 export const rootErrorOptions = () => Object.fromEntries(
   ['onUncaughtError', 'onCaughtError', 'onRecoverableError'].map((kind) => [kind, (error, errorInfo) => {
+    // eslint-disable-next-line no-console -- keeps the console logging React does when no handler is set
     console.error(error);
     if (reactErrorHandler) report(kind, error, errorInfo);
     else if (early.length < EARLY_LIMIT) early.push([kind, error, errorInfo]);

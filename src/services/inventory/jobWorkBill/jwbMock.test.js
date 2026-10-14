@@ -68,7 +68,7 @@ test('a CPPO bill: propose, key the damage rate, confirm, walk the workflow, VDN
 });
 
 test('an unchecked DC blocks sending for approval; a duplicate invoice is refused until overridden (D9)', () => {
-  let bill = mockCreateBill({ source: GPO, vendorId: 1000101, poId: 506 });
+  const bill = mockCreateBill({ source: GPO, vendorId: 1000101, poId: 506 });
   expect(bill.blockers).toContain('Check pending on vendor DCs');
   expect(errorOf(() => transition(bill.id, 'submit'))?.message).toMatch(/invoice no/);
   mockUpdateBill(bill.id, { vendorInvoiceNo: 'SMP/INV/1310', lines: [] });
