@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber, Input } from 'antd';
+import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveProcessReturn } from '../../../services/production/cuttingService';
@@ -88,7 +89,7 @@ const ProcessReturnDrawer = ({ open, issues, onClose, onSaved }) => {
     setSaving(true);
     try {
       const saved = await saveProcessReturn({
-        panelIssueId, returnDate: new Date().toISOString().slice(0, 10), vendorDcNo: dcNo,
+        panelIssueId, returnDate: dayjs().format('YYYY-MM-DD'), vendorDcNo: dcNo,
         lines: rows.map((l) => ({ ...l, returnQty: l.returnQty || 0, rejectedQty: l.rejectedQty || 0 })),
       });
       message.success(`${saved.returnDcNo} saved — returned panels go to Panel Check before bundling`);

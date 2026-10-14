@@ -673,16 +673,6 @@
       "count": 3
     }
   },
-  "src/pages/production/cutting/PanelIssueDrawer.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/production/cutting/ProcessReturnDrawer.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/production/packing/CartonGroupEditor.jsx": {
     "max-lines": {
       "count": 1

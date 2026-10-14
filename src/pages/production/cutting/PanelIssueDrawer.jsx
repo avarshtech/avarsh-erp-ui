@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { App, Drawer, Button, Space, Tag } from 'antd';
+import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { savePanelIssue } from '../../../services/production/cuttingService';
@@ -52,7 +53,7 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
     if (typeof ready === 'string') return message.warning(ready);
     setSaving(true);
     try {
-      const saved = await savePanelIssue({ cuttingPoId: cutPoId, issueDate: new Date().toISOString().slice(0, 10), ...ready });
+      const saved = await savePanelIssue({ cuttingPoId: cutPoId, issueDate: dayjs().format('YYYY-MM-DD'), ...ready });
       message.success(`${saved.panelPoNo} issued to ${saved.processName} — DC ready to print`);
       setFromPo(EMPTY_PO); setFree(EMPTY_FREE);
       onSaved();
