@@ -16,14 +16,14 @@ import UpdateOverlay from './components/UpdateOverlay';
 import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionRoute from './components/PermissionRoute';
-import Login from './pages/auth/Login';
-import Dashboard from './pages/Dashboard';
-import OrderList from './pages/orders/OrderList';
-import OrderForm from './pages/orders/OrderForm';
-import BOMList from './pages/bom/BOMList';
-import BOMForm from './pages/bom/BOMForm';
-import POList from './pages/po/POList';
-import POForm from './pages/po/POForm';
+const Login = lazyRoute(() => import('./pages/auth/Login'));
+const Dashboard = lazyRoute(() => import('./pages/Dashboard'));
+const OrderList = lazyRoute(() => import('./pages/orders/OrderList'));
+const OrderForm = lazyRoute(() => import('./pages/orders/OrderForm'));
+const BOMList = lazyRoute(() => import('./pages/bom/BOMList'));
+const BOMForm = lazyRoute(() => import('./pages/bom/BOMForm'));
+const POList = lazyRoute(() => import('./pages/po/POList'));
+const POForm = lazyRoute(() => import('./pages/po/POForm'));
 // Inventory Module (lazy-loaded)
 const InventoryDashboard = lazyRoute(() => import('./pages/inventory/dashboard/InventoryDashboard'));
 const GRNList = lazyRoute(() => import('./pages/inventory/grn/GRNList'));
@@ -91,18 +91,18 @@ const CartonPackingList = lazyRoute(() => import('./pages/production/packing/Car
 const CartonPackingForm = lazyRoute(() => import('./pages/production/packing/CartonPackingForm'));
 const JobWorkWorkspace = lazyRoute(() => import('./pages/production/jobwork/JobWorkWorkspace'));
 const VirtualFactoryPage = lazyRoute(() => import('./pages/virtual-factory/VirtualFactoryPage'));
-import CostingList from './pages/costing/CostingList';
-import CostingSheetPage from './pages/costing/sheet/CostingSheetPage';
-import CostingView from './pages/costing/CostingView';
-import CostComparison from './pages/costing/CostComparison';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
-import RoleAccess from './pages/admin/RoleAccess';
+const CostingList = lazyRoute(() => import('./pages/costing/CostingList'));
+const CostingSheetPage = lazyRoute(() => import('./pages/costing/sheet/CostingSheetPage'));
+const CostingView = lazyRoute(() => import('./pages/costing/CostingView'));
+const CostComparison = lazyRoute(() => import('./pages/costing/CostComparison'));
+const AdminDashboard = lazyRoute(() => import('./pages/admin/AdminDashboard'));
+const UserManagement = lazyRoute(() => import('./pages/admin/UserManagement'));
+const RoleAccess = lazyRoute(() => import('./pages/admin/RoleAccess'));
 const RoleForm = lazyRoute(() => import('./pages/admin/RoleForm'));
-import ApprovalFlowList from './pages/admin/ApprovalFlowList';
-import CompanyProfile from './pages/admin/CompanyProfile';
-import MasterDashboard from './pages/master/MasterDashboard';
-import Profile from './pages/Profile';
+const ApprovalFlowList = lazyRoute(() => import('./pages/admin/ApprovalFlowList'));
+const CompanyProfile = lazyRoute(() => import('./pages/admin/CompanyProfile'));
+const MasterDashboard = lazyRoute(() => import('./pages/master/MasterDashboard'));
+const Profile = lazyRoute(() => import('./pages/Profile'));
 
 // Lazy-loaded report pages
 const MyApprovals = lazyRoute(() => import('./pages/approvals/MyApprovals'));
@@ -167,6 +167,12 @@ const BuyerTemplateBuilder = lazyRoute(() => import('./pages/expdoc/template/Buy
 const TemplateImportReview = lazyRoute(() => import('./pages/expdoc/template/review/TemplateImportReview'));
 const ExportDocReports = lazyRoute(() => import('./pages/expdoc/reports/ExportDocReports'));
 const ExportDocAudit = lazyRoute(() => import('./pages/expdoc/reports/AuditTrailViewer'));
+// These pages are lazy, but their stylesheets stay in the app's own CSS, in the order they always
+// had: loaded with their page, they would land after overrides.css and only once that page was opened.
+import './pages/costing/sheet/costingSheet.css';
+import './pages/admin/components/roles/accessGrid.css';
+import './pages/admin/components/flowBuilder.css';
+import 'react-quill-new/dist/quill.snow.css';
 import './index.css';
 import './styles/overrides.css';
 
@@ -199,7 +205,7 @@ const useModalScrollReset = () => {
 };
 
 const PageSkeleton = () => (
-  <div style={{ padding: '24px' }}>
+  <div data-route-loading="" style={{ padding: '24px' }}>
     <Skeleton.Input active size="large" style={{ width: 300, marginBottom: 24, height: 48, borderRadius: 12 }} />
     <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
       {[1, 2, 3, 4].map((i) => (
@@ -248,7 +254,7 @@ const ThemedApp = () => {
           <ScrollToTop />
           <Routes>
             {/* Public Route */}
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Suspense fallback={null}><Login /></Suspense>} />
             
             {/* Protected Routes */}
             <Route
@@ -263,18 +269,18 @@ const ThemedApp = () => {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
+            <Route index element={<Suspense fallback={<PageSkeleton />}><Dashboard /></Suspense>} />
             <Route path="virtual-factory" element={<PermissionRoute module="virtual-factory" operation="view"><Suspense fallback={<PageSkeleton />}><VirtualFactoryPage /></Suspense></PermissionRoute>} />
             {/* My Approvals — server-scoped to the current user, no module permission needed */}
             <Route path="approvals" element={<Suspense fallback={<PageSkeleton />}><MyApprovals /></Suspense>} />
             {/* Orders */}
-            <Route path="orders/list" element={<PermissionRoute module="orders" operation="view"><OrderList /></PermissionRoute>} />
-            <Route path="orders/new" element={<PermissionRoute module="orders" operation="add"><OrderForm /></PermissionRoute>} />
-            <Route path="orders/edit/:id" element={<PermissionRoute module="orders" operation="update"><OrderForm /></PermissionRoute>} />
+            <Route path="orders/list" element={<PermissionRoute module="orders" operation="view"><Suspense fallback={<PageSkeleton />}><OrderList /></Suspense></PermissionRoute>} />
+            <Route path="orders/new" element={<PermissionRoute module="orders" operation="add"><Suspense fallback={<PageSkeleton />}><OrderForm /></Suspense></PermissionRoute>} />
+            <Route path="orders/edit/:id" element={<PermissionRoute module="orders" operation="update"><Suspense fallback={<PageSkeleton />}><OrderForm /></Suspense></PermissionRoute>} />
             {/* BOM */}
-            <Route path="bom/list" element={<PermissionRoute module="bom" operation="view"><BOMList /></PermissionRoute>} />
-            <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
-            <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
+            <Route path="bom/list" element={<PermissionRoute module="bom" operation="view"><Suspense fallback={<PageSkeleton />}><BOMList /></Suspense></PermissionRoute>} />
+            <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><Suspense fallback={<PageSkeleton />}><BOMForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><Suspense fallback={<PageSkeleton />}><BOMForm /></Suspense></PermissionRoute>} />
             {/* BOM — Cut Panel / Garment Process Requirement (UI mock phase). :id opens the same screen, editable only in Draft */}
             <Route path="bom/cut-panel/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelList /></Suspense></PermissionRoute>} />
             <Route path="bom/cut-panel/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelForm /></Suspense></PermissionRoute>} />
@@ -294,9 +300,9 @@ const ThemedApp = () => {
             <Route path="sample-requests/invoices/new" element={<PermissionRoute module="sample-invoices" operation="add"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
             <Route path="sample-requests/invoices/edit/:id" element={<PermissionRoute module="sample-invoices" operation="view"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
             {/* Supplier PO */}
-            <Route path="purchase-orders/supplier-po/list" element={<PermissionRoute module="purchase-orders" operation="view"><POList /></PermissionRoute>} />
-            <Route path="purchase-orders/supplier-po/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
-            <Route path="purchase-orders/supplier-po/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><POForm /></PermissionRoute>} />
+            <Route path="purchase-orders/supplier-po/list" element={<PermissionRoute module="purchase-orders" operation="view"><Suspense fallback={<PageSkeleton />}><POList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/supplier-po/new" element={<PermissionRoute module="purchase-orders" operation="add"><Suspense fallback={<PageSkeleton />}><POForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/supplier-po/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><Suspense fallback={<PageSkeleton />}><POForm /></Suspense></PermissionRoute>} />
             {/* Legacy Supplier PO URLs → /supplier-po/* */}
             <Route path="purchase-orders/list" element={<LegacyPORedirect to="/purchase-orders/supplier-po/list" />} />
             <Route path="purchase-orders/new" element={<LegacyPORedirect to="/purchase-orders/supplier-po/new" />} />
@@ -427,25 +433,25 @@ const ThemedApp = () => {
             <Route path="inventory/bill-passing/job-work/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><JobWorkBillForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
-            <Route path="costing/list" element={<PermissionRoute module="costing" operation="view"><CostingList /></PermissionRoute>} />
-            <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingSheetPage /></PermissionRoute>} />
-            <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><CostingSheetPage /></PermissionRoute>} />
-            <Route path="costing/compare" element={<PermissionRoute module="costing" operation="view"><CostComparison /></PermissionRoute>} />
-            <Route path="costing/:id" element={<PermissionRoute module="costing" operation="view"><CostingView /></PermissionRoute>} />
+            <Route path="costing/list" element={<PermissionRoute module="costing" operation="view"><Suspense fallback={<PageSkeleton />}><CostingList /></Suspense></PermissionRoute>} />
+            <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><Suspense fallback={<PageSkeleton />}><CostingSheetPage /></Suspense></PermissionRoute>} />
+            <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><Suspense fallback={<PageSkeleton />}><CostingSheetPage /></Suspense></PermissionRoute>} />
+            <Route path="costing/compare" element={<PermissionRoute module="costing" operation="view"><Suspense fallback={<PageSkeleton />}><CostComparison /></Suspense></PermissionRoute>} />
+            <Route path="costing/:id" element={<PermissionRoute module="costing" operation="view"><Suspense fallback={<PageSkeleton />}><CostingView /></Suspense></PermissionRoute>} />
             {/* Admin — the sidebar hides these by module access, but without a route
                 guard any user could still deep-link straight in (found by the RBAC
                 regression suite). Gate them on the same module keys the menu uses. */}
-            <Route path="admin/dashboard" element={<PermissionRoute module={['users', 'roles', 'approval-flows', 'company-profile']} operation="view"><AdminDashboard /></PermissionRoute>} />
-            <Route path="admin/users" element={<PermissionRoute module="users" operation="view"><UserManagement /></PermissionRoute>} />
-            <Route path="admin/roles" element={<PermissionRoute module="roles" operation="view"><RoleAccess /></PermissionRoute>} />
+            <Route path="admin/dashboard" element={<PermissionRoute module={['users', 'roles', 'approval-flows', 'company-profile']} operation="view"><Suspense fallback={<PageSkeleton />}><AdminDashboard /></Suspense></PermissionRoute>} />
+            <Route path="admin/users" element={<PermissionRoute module="users" operation="view"><Suspense fallback={<PageSkeleton />}><UserManagement /></Suspense></PermissionRoute>} />
+            <Route path="admin/roles" element={<PermissionRoute module="roles" operation="view"><Suspense fallback={<PageSkeleton />}><RoleAccess /></Suspense></PermissionRoute>} />
             <Route path="admin/roles/new" element={<PermissionRoute module="roles" operation="add"><Suspense fallback={<PageSkeleton />}><RoleForm /></Suspense></PermissionRoute>} />
             <Route path="admin/roles/edit/:id" element={<PermissionRoute module="roles" operation="update"><Suspense fallback={<PageSkeleton />}><RoleForm /></Suspense></PermissionRoute>} />
-            <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows" operation="view"><ApprovalFlowList /></PermissionRoute>} />
-            <Route path="admin/company-profile" element={<PermissionRoute module="company-profile" operation="view"><CompanyProfile /></PermissionRoute>} />
+            <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows" operation="view"><Suspense fallback={<PageSkeleton />}><ApprovalFlowList /></Suspense></PermissionRoute>} />
+            <Route path="admin/company-profile" element={<PermissionRoute module="company-profile" operation="view"><Suspense fallback={<PageSkeleton />}><CompanyProfile /></Suspense></PermissionRoute>} />
             {/* Master Data — one shell screen shared by every master key; opens if any of them grants access */}
-            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'vendor-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'branches', 'inventory-qc', 'inventory-bill-passing-masters']} operation="view"><MasterDashboard /></PermissionRoute>} />
+            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'vendor-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'branches', 'inventory-qc', 'inventory-bill-passing-masters']} operation="view"><Suspense fallback={<PageSkeleton />}><MasterDashboard /></Suspense></PermissionRoute>} />
             {/* Profile */}
-            <Route path="profile" element={<Profile />} />
+            <Route path="profile" element={<Suspense fallback={<PageSkeleton />}><Profile /></Suspense>} />
             {/* HR & Payroll */}
             <Route path="hr/masters" element={<PermissionRoute module="hr-masters" operation="view"><Suspense fallback={<PageSkeleton />}><HrDashboard /></Suspense></PermissionRoute>} />
             <Route path="hr/employees" element={<PermissionRoute module="hr-employees" operation="view"><Suspense fallback={<PageSkeleton />}><EmployeeList /></Suspense></PermissionRoute>} />
