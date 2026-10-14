@@ -105,7 +105,9 @@ const findInRegister = async (page, shipmentNo) => {
   return page.locator('.ant-table-row').filter({ hasText: shipmentNo });
 };
 
-test.describe('Shipments', () => {
+// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
+// so CI runs this file in its dev-server lane, not against the preview build.
+test.describe('Shipments', { tag: '@dev-server' }, () => {
   test('notifying the bank asks for the consignee address; the save keeps its version', async ({ page }) => {
     await goTo(page, '/export-docs/shipments/new');
     await pickOption(page, selectFor(page, 'Consignee'), 'Zara (Inditex)');

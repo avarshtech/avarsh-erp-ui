@@ -3,6 +3,10 @@ import process from 'process';
 // Loading env.js refuses a base or API URL that is not on this machine (E2E_ALLOW_REMOTE=1 to override).
 import { E2E_BASE_URL as baseURL } from './e2e/config/env.js';
 
+// On a CI runner (GitHub sets CI=true): headless, one retry with a trace, no test.only, and junit
+// and GitHub annotations beside the HTML report. Without CI a run behaves as it always has.
+const CI = !!process.env.CI;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
@@ -10,18 +14,26 @@ export default defineConfig({
     timeout: 10000,
   },
   fullyParallel: false,
-  retries: 0,
+  retries: CI ? 1 : 0,
+  forbidOnly: CI,
   workers: 1,
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: 'e2e-report', open: 'never' }],
-  ],
+  reporter: CI
+    ? [
+      ['list'],
+      ['html', { outputFolder: 'e2e-report', open: 'never' }],
+      ['junit', { outputFile: 'test-results/junit.xml' }],
+      ['github'],
+    ]
+    : [
+      ['list'],
+      ['html', { outputFolder: 'e2e-report', open: 'never' }],
+    ],
   use: {
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    headless: !process.env.E2E_HEADED,
+    headless: CI || !process.env.E2E_HEADED,
   },
   projects: [
     // ── Auth Setup ──────────────────────────────────────────
@@ -49,15 +61,17 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // ── Smoke: every screen's landing route loads cleanly (dev server; e2e/specs/smoke) ──
+    // ── Smoke: what CI runs on every push to dev (e2e/specs/smoke) ──
+    // The route sweep (every screen's landing route loads cleanly; on the dev server it also
+    // catches React and antd warnings), the fixtures' own checks, and each core module's records
+    // in the API and on its list. Every test signs in through the API (fixtures.js authedPage),
+    // so this project needs neither the setup project nor a saved login.
     {
       name: 'smoke',
       testDir: './e2e/specs/smoke',
       use: {
         browserName: 'chromium',
-        storageState: './e2e/.auth/user.json',
       },
-      dependencies: ['setup'],
     },
 
     // ── Module-Wise Test Suites ────────────────────────────
@@ -294,42 +308,8 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // ── RBAC AUDIT soak (non-admin roles) ──────────────────
-    // Its OWN setup, not the shared `setup` project: these three users exist only in the
-    // e2e seed, so folding them into the shared setup would fail every other project on
-    // any database that lacks that seed. Not part of a default run — invoke explicitly
-    // with `--project=rbac-soak-*`.
-    {
-      name: 'rbac-soak-setup',
-      testMatch: /rbac-soak-setup\.js/,
-    },
-    {
-      name: 'rbac-soak-merch',
-      testDir: './e2e/specs/rbac-soak',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/e2e-merch.json',
-      },
-      dependencies: ['rbac-soak-setup'],
-    },
-    {
-      name: 'rbac-soak-store',
-      testDir: './e2e/specs/rbac-soak',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/e2e-store.json',
-      },
-      dependencies: ['rbac-soak-setup'],
-    },
-    {
-      name: 'rbac-soak-costing',
-      testDir: './e2e/specs/rbac-soak',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/e2e-costing.json',
-      },
-      dependencies: ['rbac-soak-setup'],
-    },
+    // The RBAC soak and the headed full-flow demo are in playwright.demo.config.js: a plain run
+    // here never opens a visible browser, and the soak is only ever run on purpose.
 
     // ── Branch / Unit hierarchy ─────────────────────────────
     // Declared last on purpose: the specs make the company multi-branch to
@@ -346,20 +326,6 @@ export default defineConfig({
         storageState: './e2e/.auth/user.json',
       },
       dependencies: ['setup'],
-    },
-
-    // ── Full Business Flow (Costing → Order → BOM → PO) ─────
-    // Single browser window, handles its own login, no setup dependency
-    {
-      name: 'full-flow',
-      testMatch: /full-flow\.spec\.js/,
-      timeout: 480000,              // 8 minutes for the full flow
-      use: {
-        browserName: 'chromium',
-        headless: false,
-        launchOptions: { slowMo: 800 },
-        video: 'on',
-      },
     },
   ],
   // No webServer — start `npm run dev` manually before running tests.

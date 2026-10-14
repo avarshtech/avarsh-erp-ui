@@ -86,7 +86,9 @@ const printedOf = (page, plId) => page.evaluate(async (id) => {
   };
 }, plId);
 
-test.describe('Packing lists by buyer PO', () => {
+// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
+// so CI runs this file in its dev-server lane, not against the preview build.
+test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
   test('one packing day feeds two shipments, each list taking only its own PO', async ({ page }) => {
     const entry = await createEntry(api, { orderId, groups: [ctn(1, 10, PO1), ctn(11, 15, PO2)] });
     const first = await zaraShipment([PO1]);

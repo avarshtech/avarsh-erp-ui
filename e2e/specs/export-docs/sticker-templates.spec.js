@@ -57,7 +57,9 @@ const pickLayout = async (page, name) => {
     .filter({ hasText: name }).first().click();
 };
 
-test.describe('Carton-sticker templates', () => {
+// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
+// so CI runs this file in its dev-server lane, not against the preview build.
+test.describe('Carton-sticker templates', { tag: '@dev-server' }, () => {
   test.beforeEach(async ({ page }) => {
     await ensureSessionActive(page);
   });
