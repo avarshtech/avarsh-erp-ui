@@ -20,12 +20,20 @@ import { toastUnlessHandled } from '../utils/apiError';
  * The newest PHOTO wins. Replacing one uploads the new file and removes the old
  * only once the new is safely stored, so a failed upload cannot leave the
  * record with no photo at all.
+ *
+ * On a new employee there is no id yet, so there is nothing to attach a file
+ * to. The photo is held instead: picked, previewed and handed to the form
+ * through onPendingChange, and the form uploads it once the employee has been
+ * created and has an id. Nothing is sent until the employee is saved, so
+ * abandoning the form leaves no orphaned file behind.
  */
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 }) => {
+const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96, onPendingChange }) => {
+  // No id means the employee does not exist yet: hold the file, upload later.
+  const staging = !employeeId;
   const { message, modal } = App.useApp();
   const [photo, setPhoto] = useState(null);
   const [src, setSrc] = useState(null);
@@ -71,6 +79,14 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
       message.error(`That photo is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 3 MB.`);
       return Upload.LIST_IGNORE;
     }
+    // Nothing to upload against yet - show it and let the form send it on save.
+    if (staging) {
+      setPhoto({ staged: true, name: file.name });
+      show(file);
+      onPendingChange?.(file);
+      return Upload.LIST_IGNORE;
+    }
+
     setBusy(true);
     const previous = photo;
     try {
@@ -91,7 +107,13 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
     return Upload.LIST_IGNORE;
   };
 
-  const remove = () => modal.confirm({
+  const removeStaged = () => {
+    setPhoto(null);
+    show(null);
+    onPendingChange?.(null);
+  };
+
+  const remove = () => (staging ? removeStaged() : modal.confirm({
     title: 'Remove this photo?',
     content: 'The employee record keeps everything else. You can upload another at any time.',
     okText: 'Remove',
@@ -106,7 +128,7 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
         toastUnlessHandled(message, e, 'Could not remove the photo');
       }
     },
-  });
+  }));
 
   // The frame's colours live in the stylesheet, not here: this app has no antd
   // CSS variables, so an inline var(--ant-*) resolves to its light fallback and
@@ -137,7 +159,7 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
               onClick={() => setPreview(true)} />
           </Tooltip>
         )}
-        {photo && (
+        {photo && !photo.staged && (
           <Tooltip title="Download">
             <Button type="text" size="small" icon={<DownloadOutlined />} aria-label="Download photo"
               onClick={() => downloadStoredFile(photo)
