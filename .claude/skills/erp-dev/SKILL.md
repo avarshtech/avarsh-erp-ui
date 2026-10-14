@@ -95,6 +95,18 @@ These are cross-cutting integrity traps that corrupt data silently. Before editi
 
 ---
 
+## The UI standard (avarsh-erp-ui)
+
+[`docs/engineering/ui-standards.md`](../../../docs/engineering/ui-standards.md) is the rulebook for UI code, approved by the owner on 2026-10-12. Read the rules that touch your change before writing it; where this skill and the standard disagree, the standard wins. Three of its rules come up on every task:
+
+- **UX parity (owner's rule):** nothing may break, and nothing may change today's look or behaviour unless the task calls for it. Prove parity (a build compared file by file, before/after screenshots, the affected spec before and after), never assume it, and name every visible change in the commit and the report.
+- **The lint ratchet:** `eslint.config.js` enforces many of the rules (`eqeqeq`, `no-console` in `src/`, `max-lines` 400, no static `message`/`notification`, no raw `dangerouslySetInnerHTML` or `document.write`, no `toISOString().slice(0, 10)` or locale-less `toLocaleString()`, no `.ant-*` DOM queries, one selector per deprecated antd API). Existing violations sit in `eslint-suppressions.json`; new code must not add any, and a commit that fixes one runs `npm run lint:prune`.
+- **Lists keep their order:** a refresh after a save never reorders the rows on screen (rule 6).
+
+How the code measures against the standard: [`quality-scorecard.md`](../../../docs/engineering/quality-scorecard.md). Known defects by module: [`ui-review-2026-10.md`](../../../docs/engineering/ui-review-2026-10.md). Contributing flow and commit conventions: `CONTRIBUTING.md`.
+
+---
+
 ## Prompt Triage & Token Discipline
 
 The `erp_prompt_enhancer` UserPromptSubmit hook (`.claude/hooks/erp_prompt_enhancer.py`) already checks every qualifying prompt for target, outcome, scope, dependencies, done-criteria and constraints, and asks the user to approve a rewrite when they are missing. Do not run a second triage here. For Large/XL work the plan-mode gate below is the only approval gate; for anything smaller, if the prompt leaves the target or the done-criteria unanswerable, ask one question, then proceed.
@@ -303,6 +315,8 @@ When entering plan mode, present this structure:
 
 | Task type | Read |
 |-----------|------|
+| Any UI change: the rules, the browser and device matrix, the UX-parity rule | `docs/engineering/ui-standards.md` |
+| End-to-end tests: the local e2e stack, fixtures, projects, known failures, CI | `e2e/README.md` (and the `playwright-test` skill) |
 | Where anything lives, canonical exemplars to copy, the real request lifecycle, which modules still run on mocks | `references/codebase-map.md` |
 | Anything touching a shared seam (permission key, route, StoreContext key, status/enum, DTO field, event, migration, shared component) | `references/impact-map.md` |
 | Approval flows, delete protection, FK vs snapshot rules | `references/referential-integrity-patterns.md` |
@@ -441,7 +455,7 @@ Implemented in `src/utils/statusConfig.js`; new statuses go there, not into scre
 | Repository | 60 |
 | Mapper | 60 |
 
-**If exceeded → split before delivering.** (This table is the single copy; the subagent prompts refer to it.)
+**If exceeded → split before delivering.** (This table is the single copy; the subagent prompts refer to it.) The table is the design target; the hard gate in the UI is the standard's rule 32, which lint enforces: a new file in `src/` over 400 lines (blank lines and comments not counted) fails `npm run lint`.
 
 ### Backend Patterns (Non-Negotiable — as the codebase already does them)
 - Concrete `@Service` classes with constructor injection via Lombok `@RequiredArgsConstructor` — no new `@Autowired`, and no interface + `Impl` pairs (the codebase has one in 187 services; do not add more)
