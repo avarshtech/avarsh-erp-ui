@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App, Button, Card, Select, Space, Table, Tag, Upload } from 'antd';
-import { DeleteOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { App, Button, Card, Input, Select, Space, Table, Tooltip, Upload } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
 import EmptyState from '../../../components/EmptyState';
 import PermissionGuard from '../../../components/PermissionGuard';
 import {
   deleteFile, downloadStoredFile, getFilesByEntity, uploadFile,
 } from '../../../services/core/fileService';
 import { toastUnlessHandled } from '../../../utils/apiError';
+import { buildDocumentColumns } from './assetDocumentColumns';
+import AssetDocumentViewer from './AssetDocumentViewer';
 
 /**
  * The paper that comes with a machine: its purchase bill, its warranty card,
@@ -28,6 +29,9 @@ const DOC_TYPES = [
 ];
 const TYPE_LABEL = Object.fromEntries(DOC_TYPES.map((t) => [t.value, t.label]));
 
+/** The one kind whose own name says nothing, so it has to be named by hand. */
+const NEEDS_NAMING = 'DOCUMENT';
+
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp';
 
@@ -36,6 +40,8 @@ const AssetDocuments = ({ assetId, canEdit }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [docType, setDocType] = useState('INVOICE');
+  const [label, setLabel] = useState('');
+  const [viewing, setViewing] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,17 +57,23 @@ const AssetDocuments = ({ assetId, canEdit }) => {
 
   useEffect(() => { load(); }, [load]);
 
+  const needsLabel = docType === NEEDS_NAMING;
+  const named = needsLabel ? label.trim() : TYPE_LABEL[docType];
+
   const beforeUpload = async (file) => {
     if (file.size > MAX_BYTES) {
       message.error(`${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 10 MB.`);
       return Upload.LIST_IGNORE;
     }
     try {
+      // "Other document" is named by whoever attaches it; the other three are
+      // named by their own kind, which already says what they are.
       await uploadFile(file, {
         module: 'ASSET', entity: 'ASSET', entityId: assetId,
-        fileCategory: docType, description: TYPE_LABEL[docType],
+        fileCategory: docType, description: named,
       });
-      message.success(`${TYPE_LABEL[docType]} attached`);
+      message.success(`${named} attached`);
+      setLabel('');
       load();
     } catch (e) {
       toastUnlessHandled(message, e, 'Could not attach the document');
@@ -71,7 +83,7 @@ const AssetDocuments = ({ assetId, canEdit }) => {
 
   const remove = (file) => modal.confirm({
     title: 'Remove this document?',
-    content: `${file.fileName} will no longer be attached to this asset.`,
+    content: `${file.description || file.originalFilename} will no longer be attached to this asset.`,
     okText: 'Remove',
     okButtonProps: { danger: true },
     onOk: async () => {
@@ -85,48 +97,14 @@ const AssetDocuments = ({ assetId, canEdit }) => {
     },
   });
 
-  const columns = [
-    {
-      title: 'Type',
-      dataIndex: 'fileCategory',
-      width: 150,
-      render: (value) => <Tag>{TYPE_LABEL[value] ?? value}</Tag>,
-    },
-    { title: 'File', dataIndex: 'fileName' },
-    {
-      title: 'Size',
-      dataIndex: 'fileSize',
-      width: 100,
-      render: (value) => (value ? `${(value / 1024).toFixed(0)} KB` : '-'),
-    },
-    {
-      title: 'Added',
-      dataIndex: 'createdAt',
-      width: 150,
-      render: (value) => (value ? dayjs(value).format('DD-MM-YYYY') : '-'),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 110,
-      render: (_, row) => (
-        <Space size={0}>
-          <Button
-            type="text"
-            size="small"
-            icon={<DownloadOutlined />}
-            aria-label={`Download ${row.fileName}`}
-            onClick={() => downloadStoredFile(row)
-              .catch((e) => toastUnlessHandled(message, e, 'Could not download the document'))}
-          />
-          {canEdit && (
-            <Button type="text" size="small" danger icon={<DeleteOutlined />}
-              aria-label={`Remove ${row.fileName}`} onClick={() => remove(row)} />
-          )}
-        </Space>
-      ),
-    },
-  ];
+  const columns = buildDocumentColumns({
+    typeLabel: TYPE_LABEL,
+    canEdit,
+    onView: setViewing,
+    onDownload: (row) => downloadStoredFile(row)
+      .catch((e) => toastUnlessHandled(message, e, 'Could not download the document')),
+    onRemove: remove,
+  });
 
   return (
     <Card
@@ -138,9 +116,21 @@ const AssetDocuments = ({ assetId, canEdit }) => {
             {/* The kind is picked before the file, so one upload button serves
                 all four rather than four buttons that each open the same dialog. */}
             <Select value={docType} onChange={setDocType} options={DOC_TYPES} style={{ width: 160 }} />
-            <Upload beforeUpload={beforeUpload} showUploadList={false} accept={ACCEPT}>
-              <Button icon={<UploadOutlined />}>Attach</Button>
-            </Upload>
+            {needsLabel && (
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="What is it? e.g. Service contract"
+                maxLength={100}
+                style={{ width: 220 }}
+                aria-label="What this document is"
+              />
+            )}
+            <Tooltip title={needsLabel && !named ? 'Say what the document is first' : ''}>
+              <Upload beforeUpload={beforeUpload} showUploadList={false} accept={ACCEPT}>
+                <Button icon={<UploadOutlined />} disabled={needsLabel && !named}>Attach</Button>
+              </Upload>
+            </Tooltip>
           </Space>
         </PermissionGuard>
       )}
@@ -162,6 +152,8 @@ const AssetDocuments = ({ assetId, canEdit }) => {
           ),
         }}
       />
+
+      <AssetDocumentViewer file={viewing} onClose={() => setViewing(null)} />
     </Card>
   );
 };
