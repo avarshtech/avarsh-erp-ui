@@ -1,4 +1,5 @@
 import { Col, DatePicker, Form, Input, InputNumber, Row, Select, Switch } from 'antd';
+import { notBeforeRule } from '../../../utils/dateRules';
 
 /**
  * Purchase, warranty and AMC.
@@ -7,7 +8,14 @@ import { Col, DatePicker, Form, Input, InputNumber, Row, Select, Switch } from '
  * when the switch is off, so the dates on the detail screen always belong to a
  * contract that is actually live.
  */
-const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => (
+const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => {
+  // Both date pairs are checked on the field itself. The server and the
+  // database enforce the same rule, but only after a save - and when the
+  // database answered first the message named a constraint, which is no help
+  // to somebody filling in a warranty date.
+  const form = Form.useFormInstance();
+
+  return (
   <Row gutter={16}>
     <Col xs={24} sm={12} md={8}>
       <Form.Item name="purchaseDate" label="Purchase date">
@@ -49,7 +57,13 @@ const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => (
       </Form.Item>
     </Col>
     <Col xs={24} sm={12} md={8}>
-      <Form.Item name="warrantyEnd" label="Warranty to">
+      <Form.Item
+        name="warrantyEnd"
+        label="Warranty to"
+        dependencies={['warrantyStart']}
+        rules={[notBeforeRule(() => form.getFieldValue('warrantyStart'),
+          { earlier: 'warranty start', later: 'warranty end' })]}
+      >
         <DatePicker style={{ width: '100%' }} format="DD-MM-YYYY" />
       </Form.Item>
     </Col>
@@ -88,7 +102,12 @@ const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => (
           <Form.Item
             name="amcEnd"
             label="AMC to"
-            rules={[{ required: true, message: 'An AMC needs an end date, or nothing can warn you before it lapses' }]}
+            dependencies={['amcStart']}
+            rules={[
+              { required: true, message: 'An AMC needs an end date, or nothing can warn you before it lapses' },
+              notBeforeRule(() => form.getFieldValue('amcStart'),
+                { earlier: 'AMC start', later: 'AMC end' }),
+            ]}
           >
             <DatePicker style={{ width: '100%' }} format="DD-MM-YYYY" />
           </Form.Item>
@@ -96,6 +115,7 @@ const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => (
       </>
     )}
   </Row>
-);
+  );
+};
 
 export default AssetPurchaseFields;
