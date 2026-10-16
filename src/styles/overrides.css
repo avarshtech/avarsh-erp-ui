@@ -2221,3 +2221,60 @@ textarea.ant-input:active {
 [data-theme="dark"] .asset-report-group > td {
   background: rgba(255, 255, 255, 0.06) !important;
 }
+
+/* ============================================================
+   ASSET SETUP — the two-level tables (Category › Sub-category,
+   Section › Lines)
+   ============================================================ */
+
+/* The expanded area is the inside of the row above it, so it drops the card
+   tint and carries a rule down its left edge instead of a border all round.
+   A nested table bordered like the parent reads as a second, unrelated table. */
+.asset-setup-table .ant-table-expanded-row > td {
+  padding: 0 !important;
+}
+.asset-sublist,
+.asset-subtable {
+  border-left: 2px solid var(--primary-color, #6366f1);
+  padding-block: 8px;
+}
+/* A free-form list, so the indent is purely visual. */
+.asset-sublist {
+  margin-left: 46px;
+  padding-left: 14px;
+}
+/* The sub-category table reuses the parent's columns and has no expand column
+   of its own, so its total indent matches that column's width — the child
+   cells then land in the same tracks as the parent's instead of staggering. */
+.asset-subtable {
+  margin-left: 32px;
+  padding-left: 14px;
+}
+
+/* Names the parent, so an expanded block is never ambiguous once two are open. */
+.asset-sublist-head {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 0 0 6px 2px;
+}
+[data-theme='dark'] .asset-sublist-head { color: rgba(255, 255, 255, 0.45); }
+
+/* One line inside a section: name on the left, actions pinned right. */
+.asset-subrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px 5px 2px;
+  border-radius: 4px;
+}
+.asset-subrow + .asset-subrow { margin-top: 2px; }
+.asset-subrow:hover { background: rgba(99, 102, 241, 0.07); }
+[data-theme='dark'] .asset-subrow:hover { background: rgba(255, 255, 255, 0.06); }
+.asset-subrow-name { flex: 1 1 auto; min-width: 0; }
+
+/* The sub-category table keeps the parent's column tracks but none of its
+   chrome — no outer border, no header, no row striping of its own. */
+.asset-subtable .ant-table { background: transparent !important; }
+.asset-subtable .ant-table-tbody > tr > td { border-bottom-color: transparent; }

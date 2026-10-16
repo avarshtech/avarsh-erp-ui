@@ -57,39 +57,53 @@ const AssetCategoryTab = ({ lookups }) => {
   });
 
   const columns = [
-    { title: 'Name', dataIndex: 'name' },
+    // Name is the only flexible column; the rest are sized, so no header drifts
+    // away from the value beneath it the way it did under scroll.x 'max-content'.
+    {
+      title: 'Category',
+      dataIndex: 'name',
+      render: (v, row) => (row.parentId ? v : <strong>{v}</strong>),
+    },
     {
       title: 'Issuable',
       dataIndex: 'assignable',
       width: 110,
       // Only an issuable category can be handed to a person - a laptop can, a
       // compressor bolted to the floor cannot.
-      render: (value) => (value ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>),
+      align: 'center',
+      render: (value) => (value ? <Tag color="blue">Yes</Tag> : <span style={{ opacity: 0.4 }}>&mdash;</span>),
     },
     {
       title: 'Service every',
       dataIndex: 'maintIntervalDays',
       width: 130,
-      render: (value) => (value ? `${value} days` : '-'),
+      align: 'center',
+      render: (value) => (value ? `${value} days` : <span style={{ opacity: 0.4 }}>&mdash;</span>),
     },
     {
       title: 'Extra fields',
       dataIndex: 'fieldDefs',
       width: 120,
+      align: 'center',
       render: (value) => {
-        try { return JSON.parse(value || '[]').length || '-'; } catch { return '-'; }
+        let count = 0;
+        try { count = JSON.parse(value || '[]').length; } catch { count = 0; }
+        return count || <span style={{ opacity: 0.4 }}>&mdash;</span>;
       },
     },
     {
       title: 'Active',
       dataIndex: 'active',
-      width: 90,
-      render: (value) => (value ? <Tag color="green">Yes</Tag> : <Tag color="red">No</Tag>),
+      width: 110,
+      align: 'center',
+      // Inactive is a state, not an error.
+      render: (value) => (value ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>),
     },
     {
       title: 'Actions',
       key: 'actions',
       width: 150,
+      align: 'right',
       render: (_, row) => (
         <PermissionGuard module="asset-setup" operation="update">
           <Space size={0}>
@@ -127,20 +141,31 @@ const AssetCategoryTab = ({ lookups }) => {
         dataSource={lookups.categories}
         loading={lookups.loading}
         rowKey="id"
-        size="small"
+        size="middle"
         pagination={false}
-        scroll={{ x: 'max-content' }}
+        className="asset-setup-table"
+        scroll={{ x: 860 }}
         expandable={{
           rowExpandable: (row) => (row.subCategories?.length ?? 0) > 0,
+          // Sub-categories hold the same fields as their parent, so they reuse
+          // its columns and stay in the same tracks. The header is not repeated
+          // and the block is indented, so they read as the inside of the row
+          // above rather than as a second table.
           expandedRowRender: (row) => (
-            <Table
-              columns={columns}
-              dataSource={row.subCategories}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              showHeader={false}
-            />
+            <div className="asset-subtable">
+              <div className="asset-sublist-head">
+                {row.subCategories.length} sub-categor
+                {row.subCategories.length === 1 ? 'y' : 'ies'} under {row.name}
+              </div>
+              <Table
+                columns={columns}
+                dataSource={row.subCategories}
+                rowKey="id"
+                size="small"
+                pagination={false}
+                showHeader={false}
+              />
+            </div>
           ),
         }}
         locale={{

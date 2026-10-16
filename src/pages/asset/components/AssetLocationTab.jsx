@@ -8,6 +8,7 @@ import {
   createLine, createSection, deleteLine, deleteSection, updateLine, updateSection,
 } from '../../../services/asset/assetService';
 import AssetLocationDrawer from './AssetLocationDrawer';
+import AssetLineList from './AssetLineList';
 
 /**
  * Sections and the lines inside them - the only two location levels this
@@ -54,19 +55,34 @@ const AssetLocationTab = ({ lookups }) => {
   });
 
   const columns = [
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Department', dataIndex: 'departmentName', width: 180 },
-    { title: 'Lines', key: 'lines', width: 90, render: (_, row) => row.lines?.length ?? 0 },
+    // Only Department is left flexible. With every column unsized and
+    // scroll.x 'max-content', Name absorbed all the slack and its header sat
+    // centred half a screen from the name under it.
+    { title: 'Section', dataIndex: 'name', width: 260, render: (v) => <strong>{v}</strong> },
+    { title: 'Department', dataIndex: 'departmentName' },
+    {
+      title: 'Lines',
+      key: 'lines',
+      width: 90,
+      align: 'center',
+      render: (_, row) => (row.lines?.length
+        ? row.lines.length
+        : <span style={{ opacity: 0.4 }}>&mdash;</span>),
+    },
     {
       title: 'Active',
       dataIndex: 'active',
-      width: 90,
-      render: (value) => (value ? <Tag color="green">Yes</Tag> : <Tag color="red">No</Tag>),
+      width: 110,
+      align: 'center',
+      // Inactive is a state, not an error: a red tag made every switched-off
+      // row look like something had gone wrong.
+      render: (value) => (value ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>),
     },
     {
       title: 'Actions',
       key: 'actions',
       width: 150,
+      align: 'right',
       render: (_, row) => (
         <PermissionGuard module="asset-setup" operation="update">
           <Space size={0}>
@@ -88,39 +104,6 @@ const AssetLocationTab = ({ lookups }) => {
               size="small"
               aria-label={`Delete ${row.name}`}
               onClick={() => remove('section', row)}
-            />
-          </Space>
-        </PermissionGuard>
-      ),
-    },
-  ];
-
-  const lineColumns = [
-    { title: 'Name', dataIndex: 'name' },
-    {
-      title: 'Active',
-      dataIndex: 'active',
-      width: 90,
-      render: (value) => (value ? <Tag color="green">Yes</Tag> : <Tag color="red">No</Tag>),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 90,
-      render: (_, row) => (
-        <PermissionGuard module="asset-setup" operation="update">
-          <Space size={0}>
-            <ActionButton
-              action="edit"
-              size="small"
-              aria-label={`Edit ${row.name}`}
-              onClick={() => setDrawer({ kind: 'line', record: row })}
-            />
-            <ActionButton
-              action="delete"
-              size="small"
-              aria-label={`Delete ${row.name}`}
-              onClick={() => remove('line', row)}
             />
           </Space>
         </PermissionGuard>
@@ -152,13 +135,18 @@ const AssetLocationTab = ({ lookups }) => {
         dataSource={lookups.sections}
         loading={lookups.loading}
         rowKey="id"
-        size="small"
+        size="middle"
         pagination={false}
-        scroll={{ x: 'max-content' }}
+        className="asset-setup-table"
+        scroll={{ x: 760 }}
         expandable={{
           rowExpandable: (row) => (row.lines?.length ?? 0) > 0,
           expandedRowRender: (row) => (
-            <Table columns={lineColumns} dataSource={row.lines} rowKey="id" size="small" pagination={false} />
+            <AssetLineList
+              section={row}
+              onEdit={(line) => setDrawer({ kind: 'line', record: line })}
+              onDelete={(line) => remove('line', line)}
+            />
           ),
         }}
         locale={{
