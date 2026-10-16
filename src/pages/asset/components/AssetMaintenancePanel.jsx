@@ -8,6 +8,7 @@ import { getMaintenance } from '../../../services/asset/maintenanceService';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { MAINTENANCE_TYPE, maintenanceDue } from '../../../utils/assetConstants';
 import AssetMaintenanceDialog from './AssetMaintenanceDialog';
+import AssetMaintenanceDetail from './AssetMaintenanceDetail';
 
 /**
  * Everything that has ever been done to this machine, and when it is next due.
@@ -56,10 +57,28 @@ const AssetMaintenancePanel = ({ asset, canEdit, onAssetChanged }) => {
     {
       title: 'Done by',
       key: 'by',
-      width: 180,
-      render: (_, r) => r.doneByName || r.vendorName || r.vendorText || '-',
+      width: 200,
+      // Whether the work was in-house or bought in changes what the cost means,
+      // so the row says which rather than printing a bare name.
+      render: (_, r) => {
+        const name = r.doneByName || r.vendorName || r.vendorText;
+        if (!name) return <span style={{ opacity: 0.45 }}>&mdash;</span>;
+        return (
+          <>
+            {name}
+            <Tag style={{ marginInlineStart: 6 }}>{r.doneByName ? 'In-house' : 'Vendor'}</Tag>
+          </>
+        );
+      },
     },
-    { title: 'Description', dataIndex: 'description', render: (v) => v || '-' },
+    {
+      title: 'What was done',
+      dataIndex: 'description',
+      ellipsis: true,
+      // A preview only. The row opens to the whole of it, plus the remarks,
+      // which had no column at all.
+      render: (v) => v || <span style={{ opacity: 0.45 }}>&mdash;</span>,
+    },
     { title: 'Cost', dataIndex: 'cost', width: 110, align: 'right', render: money },
     { title: 'Next due', dataIndex: 'nextDueDate', width: 120, render: date },
     {
@@ -71,7 +90,14 @@ const AssetMaintenancePanel = ({ asset, canEdit, onAssetChanged }) => {
           <Space>
             <Tag color="orange">Open</Tag>
             {canEdit && (
-              <Button size="small" onClick={() => setDialog({ mode: 'close', entry: r })}>Close</Button>
+              <Button
+                size="small"
+                // The row expands on click, so the button has to keep its own
+                // click to itself or closing a job also opens the detail behind it.
+                onClick={(e) => { e.stopPropagation(); setDialog({ mode: 'close', entry: r }); }}
+              >
+                Close
+              </Button>
             )}
           </Space>
         )
@@ -118,6 +144,11 @@ const AssetMaintenancePanel = ({ asset, canEdit, onAssetChanged }) => {
         size="small"
         pagination={false}
         scroll={{ x: 'max-content' }}
+        className="asset-log-table"
+        expandable={{
+          expandedRowRender: (row) => <AssetMaintenanceDetail row={row} />,
+          expandRowByClick: true,
+        }}
         locale={{
           emptyText: (
             <EmptyState

@@ -2298,3 +2298,37 @@ textarea.ant-input:active {
   height: 70vh;
   border: 0;
 }
+
+/* One maintenance job opened out. The prose sits on the left with room to
+   wrap; the dates and who did the work sit in a narrow column beside it, since
+   each is a few characters and a table row has no room for either. */
+.asset-log-table .ant-table-expanded-row > td { padding: 0 !important; }
+.asset-log-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-left: 46px;
+  border-left: 2px solid var(--primary-color, #6366f1);
+  padding: 12px 0 12px 14px;
+}
+.asset-log-main { flex: 1 1 320px; min-width: 0; display: grid; gap: 12px; }
+.asset-log-block p { margin: 2px 0 0; white-space: pre-wrap; }
+.asset-log-block em { opacity: 0.5; }
+.asset-log-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+}
+[data-theme='dark'] .asset-log-label { color: rgba(255, 255, 255, 0.45); }
+
+.asset-log-facts {
+  flex: 0 1 300px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  align-content: start;
+}
+.asset-log-facts dt { font-size: 12px; opacity: 0.6; }
+.asset-log-facts dd { margin: 0; font-size: 13px; }
