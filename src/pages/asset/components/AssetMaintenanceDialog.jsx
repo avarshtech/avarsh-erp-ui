@@ -40,16 +40,27 @@ const AssetMaintenanceDialog = ({ dialog, asset, onClose, onSaved }) => {
   const submit = async (values) => {
     setSaving(true);
     try {
-      const payload = {
-        ...values,
-        maintDate: values.maintDate ? values.maintDate.format('YYYY-MM-DD') : null,
-        nextDueDate: values.nextDueDate ? values.nextDueDate.format('YYYY-MM-DD') : null,
-        // The server wants one of the two, so the unchosen side is cleared.
-        doneByEmpId: values.workerType === 'EMPLOYEE' ? values.doneByEmpId : null,
-        vendorId: values.workerType === 'VENDOR' ? values.vendorId : null,
-        vendorText: values.workerType === 'VENDOR' ? values.vendorText : null,
-        version: entry?.version,
-      };
+      // Closing and logging take different things. Closing used to send the
+      // logging shape, which carries a type and a date that the close form
+      // never asks for - so every close was refused before it reached the
+      // server's own rules.
+      const payload = mode === 'close'
+        ? {
+          cost: values.cost ?? null,
+          description: values.description ?? null,
+          remarks: values.remarks ?? null,
+          version: entry?.version,
+        }
+        : {
+          ...values,
+          maintDate: values.maintDate ? values.maintDate.format('YYYY-MM-DD') : null,
+          nextDueDate: values.nextDueDate ? values.nextDueDate.format('YYYY-MM-DD') : null,
+          // The server wants one of the two, so the unchosen side is cleared.
+          doneByEmpId: values.workerType === 'EMPLOYEE' ? values.doneByEmpId : null,
+          vendorId: values.workerType === 'VENDOR' ? values.vendorId : null,
+          vendorText: values.workerType === 'VENDOR' ? values.vendorText : null,
+          version: entry?.version,
+        };
       if (mode === 'close') await closeMaintenance(asset.id, entry.id, payload);
       else await logMaintenance(asset.id, payload);
       message.success(mode === 'close' ? 'Job closed' : 'Maintenance logged');
