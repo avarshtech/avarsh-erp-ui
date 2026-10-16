@@ -43,10 +43,17 @@ const AssetForm = () => {
   const sectionId = Form.useWatch('sectionId', form);
   const amcAvailable = Form.useWatch('amcAvailable', form);
 
-  const subCategoryOptions = useMemo(() => lookups.subCategoriesOf(categoryId), [lookups, categoryId]);
+  // Named individually rather than through `lookups`, so these do not rebuild
+  // whenever anything else on the hook changes - and so a future regression in
+  // the hook's own memoisation cannot restart the render loop this screen hit.
+  const { loading: lookupsLoading, subCategoriesOf, fieldDefsFor } = lookups;
+  const subCategoryOptions = useMemo(
+    () => subCategoriesOf(categoryId),
+    [subCategoriesOf, categoryId],
+  );
   const fieldDefs = useMemo(
-    () => lookups.fieldDefsFor(categoryId, subCategoryId),
-    [lookups, categoryId, subCategoryId],
+    () => fieldDefsFor(categoryId, subCategoryId),
+    [fieldDefsFor, categoryId, subCategoryId],
   );
 
   const searchEmployees = useCallback(async (search) => {
@@ -63,12 +70,12 @@ const AssetForm = () => {
   // The asset is loaded once the definitions are known, so a DATE spec field
   // can be turned into a dayjs value rather than arriving as a bare string.
   useEffect(() => {
-    if (!id || lookups.loading) return;
+    if (!id || lookupsLoading) return;
     setLoading(true);
     getAsset(id)
       .then((loaded) => {
         setAsset(loaded);
-        const defs = lookups.fieldDefsFor(loaded.categoryId, loaded.subCategoryId);
+        const defs = fieldDefsFor(loaded.categoryId, loaded.subCategoryId);
         form.setFieldsValue(toFormValues(loaded, defs));
         if (loaded.custodianEmpId) {
           setEmployees((current) => (current.some((o) => o.id === loaded.custodianEmpId) ? current
@@ -77,7 +84,7 @@ const AssetForm = () => {
       })
       .catch((e) => toastUnlessHandled(message, e, 'Could not load the asset'))
       .finally(() => setLoading(false));
-  }, [id, lookups.loading, lookups, form, message]);
+  }, [id, lookupsLoading, fieldDefsFor, form, message]);
 
   // Changing a parent clears what hung off it, so a stale child cannot be saved.
   // Only on a real change: the first value a watch reports is the one the loaded

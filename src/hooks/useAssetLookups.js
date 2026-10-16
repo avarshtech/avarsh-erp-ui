@@ -70,7 +70,20 @@ const useAssetLookups = () => {
     return subDefs.length ? subDefs : pick(parent?.fieldDefs);
   }, [data.categories]);
 
-  return { ...data, options, loading, reload: load, subCategoriesOf, departmentsOf, sectionsOf, linesOf, fieldDefsFor };
+  /**
+   * Memoised as a whole, not just field by field.
+   *
+   * Everything inside was already stable, but the object wrapping them was
+   * rebuilt on every render - so a screen that listed this hook's result as an
+   * effect dependency re-ran that effect every render. On the asset edit form
+   * that meant setLoading(true) on every pass: an infinite render loop that
+   * also re-fetched the asset each time round.
+   */
+  return useMemo(() => ({
+    ...data, options, loading, reload: load,
+    subCategoriesOf, departmentsOf, sectionsOf, linesOf, fieldDefsFor,
+  }), [data, options, loading, load,
+    subCategoriesOf, departmentsOf, sectionsOf, linesOf, fieldDefsFor]);
 };
 
 export default useAssetLookups;

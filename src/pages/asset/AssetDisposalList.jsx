@@ -40,11 +40,15 @@ const AssetDisposalList = () => {
   const [selected, setSelected] = useState(null);
   const [dialog, setDialog] = useState(null);
 
+  // Destructured so the dependency is the loader itself: useServerList returns a
+  // fresh object each render, and depending on the whole of it would rebuild
+  // this callback every time for nothing.
+  const { load: reloadList } = list;
   const refresh = useCallback((saved) => {
     setSelected(saved);
     setDialog(null);
-    list.load();
-  }, [list]);
+    reloadList();
+  }, [reloadList]);
 
   const submit = useCallback((row) => modal.confirm({
     title: `Submit ${row.disposalNo} for approval?`,
