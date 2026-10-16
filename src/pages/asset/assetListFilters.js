@@ -4,7 +4,15 @@ const STATUS_OPTIONS = toOptions(ASSET_STATUS);
 const CONDITION_OPTIONS = toOptions(ASSET_CONDITION);
 const REASON_OPTIONS = Object.entries(STATUS_REASON).map(([value, label]) => ({ value, label }));
 
-/** The cover questions people actually ask, as windows rather than dates. */
+/**
+ * The cover questions people actually ask, as windows rather than dates.
+ *
+ * The three are separate questions and the server keeps them from overlapping:
+ * 0 means everything that lapsed up to yesterday, and any other number means
+ * the next that many days starting today. They used to share an upper bound and
+ * no lower one, so all three returned nearly the same list and a warranty that
+ * ended in March showed under "lapsing in 30 days" in October.
+ */
 const EXPIRY_OPTIONS = [
   { value: 0, label: 'Already lapsed' },
   { value: 30, label: 'Lapsing in 30 days' },
