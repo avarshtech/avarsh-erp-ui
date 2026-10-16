@@ -45,6 +45,7 @@ export const toPayload = (values, version) => {
   DATE_FIELDS.forEach((field) => { payload[field] = toApiDate(values[field]); });
   if (!payload.amcAvailable) {
     payload.amcVendorId = null;
+    payload.amcVendorText = null;
     payload.amcStart = null;
     payload.amcEnd = null;
   }

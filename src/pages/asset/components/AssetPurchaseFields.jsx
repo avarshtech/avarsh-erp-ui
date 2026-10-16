@@ -62,8 +62,21 @@ const AssetPurchaseFields = ({ supplierOptions, amcAvailable }) => (
     {amcAvailable && (
       <>
         <Col xs={24} sm={12} md={8}>
-          <Form.Item name="amcVendorId" label="AMC vendor">
+          <Form.Item
+            name="amcVendorId"
+            label="AMC vendor"
+            tooltip="From the supplier master. Leave it blank and type the name below if the service company is not in it."
+          >
             <Select allowClear showSearch optionFilterProp="label" placeholder="Select vendor" options={supplierOptions} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <Form.Item
+            name="amcVendorText"
+            label="Or AMC vendor name"
+            tooltip="For a service company that is not in the supplier master. Ignored if a vendor is picked above."
+          >
+            <Input maxLength={150} placeholder="e.g. Coimbatore Service Co" />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={8}>

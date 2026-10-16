@@ -136,7 +136,9 @@ const AssetView = () => {
                 <Descriptions.Item label="AMC">
                   {asset.amcAvailable ? `${date(asset.amcStart)} to ${date(asset.amcEnd)}` : 'No'}
                 </Descriptions.Item>
-                <Descriptions.Item label="AMC vendor">{dash(asset.amcVendorName)}</Descriptions.Item>
+                <Descriptions.Item label="AMC vendor">
+                  {dash(asset.amcVendorName ?? asset.amcVendorText)}
+                </Descriptions.Item>
               </Descriptions>
             </Card>
 
