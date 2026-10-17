@@ -8,6 +8,7 @@ import { FormSelect } from '../../../components/form';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { allowancePerSize, plannedPerSize, sizeJumps, totalAllowanceQty } from '../../../utils/cuttingCalc';
 import { getMarkerPlan, saveMarkerPlan, relaxedCutPos, setSizeSetStatus } from '../../../services/production/cuttingService';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import CuttingStatusTag from './CuttingStatusTag';
 import MarkerMatrix from './MarkerMatrix';
 import SizeJumpAlert from './SizeJumpAlert';
@@ -133,7 +134,7 @@ const MarkerPlanForm = () => {
       message.success(`${saved.planNo} saved`);
       navigate('/production/cutting?tab=planning');
     } catch (e) {
-      message.error(e?.response?.data?.message || 'Failed to save marker plan');
+      toastUnlessHandled(message, e, 'Failed to save marker plan');
     } finally { setSaving(false); }
   };
 

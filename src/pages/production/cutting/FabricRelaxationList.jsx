@@ -5,6 +5,7 @@ import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { listRelaxations, listReceipts, generateRelaxationReport } from '../../../services/production/cuttingService';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import CuttingStatusTag from './CuttingStatusTag';
 import FabricRelaxationDrawer from './FabricRelaxationDrawer';
 
@@ -46,7 +47,7 @@ const FabricRelaxationList = () => {
       message.success(`Relaxation report generated for ${record.relaxationNo}`);
       load();
     } catch (e) {
-      message.error(e?.response?.data?.message || 'Failed to generate the relaxation report');
+      toastUnlessHandled(message, e, 'Failed to generate the relaxation report');
     }
   }, [message, load]);
 
@@ -75,7 +76,7 @@ const FabricRelaxationList = () => {
               onClick={() => setDrawer({ open: true, record: r, readOnly: false })} />
           )}
           {r.status === 'COMPLETED' && (
-            <Tooltip title="Generate Relaxation Report (required before Lay Audit)">
+            <Tooltip title="Generate Relaxation Report">
               <ActionButton action="print" size="small" onClick={() => handleReport(r)} />
             </Tooltip>
           )}

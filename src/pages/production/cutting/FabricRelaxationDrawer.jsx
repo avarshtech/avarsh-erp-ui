@@ -4,6 +4,26 @@ import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveRelaxation } from '../../../services/production/cuttingService';
+import { toastUnlessHandled } from '../../../utils/apiError';
+
+/**
+ * What a save did to the Cut PO's release: a completed cycle with its post-relaxation shrinkage and
+ * its minimum hours passed releases it for marker planning on the spot (the server reports it).
+ */
+const savedMessage = (saved, isNew) => {
+  const po = saved.cuttingPoNo || 'the Cut PO';
+  if (saved.status === 'REPORT_GENERATED') {
+    return { released: true, text: `${saved.relaxationNo} completed — ${po} is released for marker planning` };
+  }
+  if (saved.status !== 'COMPLETED') return { released: true, text: isNew ? 'Relaxation started' : `${saved.relaxationNo} saved` };
+  if (saved.shrinkagePostPct == null) {
+    return { released: false, text: `${saved.relaxationNo} completed — enter the post-relaxation shrinkage to release ${po} for marker planning` };
+  }
+  return {
+    released: false,
+    text: `${saved.relaxationNo} completed — ${po} is released once its ${saved.minRelaxHours}h minimum has passed (${saved.remainingHours}h to go)`,
+  };
+};
 
 /**
  * FR-02 drawer - start, complete or edit a relaxation; warns when ended before
@@ -52,7 +72,7 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
     try {
       const values = await form.validateFields();
       setSaving(true);
-      await saveRelaxation({
+      const saved = await saveRelaxation({
         id: record?.id,
         version: record?.version,
         receiptId: values.receiptId,
@@ -63,11 +83,13 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
         shrinkagePrePct: values.shrinkagePrePct ?? null,
         shrinkagePostPct: values.shrinkagePostPct ?? null,
       });
-      message.success(record ? `${record.relaxationNo} saved` : 'Relaxation started');
+      const { text, released } = savedMessage(saved, !record);
+      if (released) message.success(text);
+      else message.info(text);
       onSaved();
     } catch (e) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.message || 'Failed to save relaxation');
+      toastUnlessHandled(message, e, 'Failed to save relaxation');
     } finally { setSaving(false); }
   };
 
