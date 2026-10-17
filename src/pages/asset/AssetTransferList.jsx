@@ -20,8 +20,13 @@ const fetchPage = ({ page, view, ...rest }) => getTransfers({
   ...rest,
   page: page - 1,
   // The three questions people actually open this screen with.
+  //   open     - anything still unfinished, wherever it is going
+  //   incoming - approved or on a lorry, so it is on its way and not yet here
+  //   all      - everything, finished included
+  // "Coming to a unit" used to carry the Arriving-at filter's value, so with no
+  // unit chosen the whole view collapsed into "All" without saying so.
   ...(view === 'open' ? { openOnly: true } : {}),
-  ...(view === 'incoming' ? { incomingToUnitId: rest.toUnitId } : {}),
+  ...(view === 'incoming' ? { incomingOnly: true } : {}),
 });
 
 const STATUS_OPTIONS = Object.entries(TRANSFER_STATUS).map(([value, m]) => ({ value, label: m.label }));
