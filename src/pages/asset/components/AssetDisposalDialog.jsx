@@ -1,31 +1,51 @@
 import { useEffect, useState } from 'react';
 import { Alert, App, Col, Form, Input, InputNumber, Modal, Row, Select } from 'antd';
+import dayjs from 'dayjs';
 import DateInput from '../../../components/DateInput';
-import { createDisposal, getDisposalOptions } from '../../../services/asset/disposalService';
+import {
+  createDisposal, getDisposalOptions, updateDisposal,
+} from '../../../services/asset/disposalService';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { ASSET_CONDITION, toOptions } from '../../../utils/assetConstants';
 
 const CONDITION_OPTIONS = toOptions(ASSET_CONDITION);
 
 /**
- * Raise a disposal request against one asset.
+ * Raise a disposal request against one asset, or correct one that was sent back.
  *
  * <p>It only raises a request. The asset is not retired until somebody else
  * approves it, which is the point of the whole workflow - and the dialog says
  * so, because "Dispose" on a button reads like it happens now.</p>
+ *
+ * <p>Correcting one is the same form over the same fields, so it is the same
+ * dialog. Without it a request that was sent back had nowhere to go: the only
+ * way on from there is to change what was wrong and send it again, and there
+ * was no screen that could change anything.</p>
  */
-const AssetDisposalDialog = ({ open, asset, onClose, onRaised }) => {
+const AssetDisposalDialog = ({ open, asset, disposal, onClose, onRaised }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState({ reasons: [], methods: [] });
   const method = Form.useWatch('method', form);
 
+  const editing = !!disposal?.id;
+
   useEffect(() => {
     if (!open) return;
     getDisposalOptions().then(setOptions).catch(() => setOptions({ reasons: [], methods: [] }));
-    form.setFieldsValue({ assetCondition: asset?.condition, disposalDate: undefined });
-  }, [open, asset, form]);
+    form.setFieldsValue(editing
+      ? {
+        reasonCode: disposal.reasonCode,
+        assetCondition: disposal.assetCondition,
+        method: disposal.method,
+        disposalDate: disposal.disposalDate ? dayjs(disposal.disposalDate) : undefined,
+        value: disposal.value ?? undefined,
+        buyerText: disposal.buyerText ?? undefined,
+        remarks: disposal.remarks ?? undefined,
+      }
+      : { assetCondition: asset?.condition, disposalDate: undefined });
+  }, [open, asset, disposal, editing, form]);
 
   // Scrap and sale put money somewhere, so the amount is required - the server
   // says the same, and the form mirrors it rather than letting the save fail.
@@ -35,16 +55,23 @@ const AssetDisposalDialog = ({ open, asset, onClose, onRaised }) => {
   const submit = async (values) => {
     setSaving(true);
     try {
-      const saved = await createDisposal({
+      const payload = {
         ...values,
-        assetId: asset.id,
+        assetId: editing ? disposal.assetId : asset.id,
         disposalDate: values.disposalDate ? values.disposalDate.format('YYYY-MM-DD') : null,
-      });
-      message.success(`Disposal request ${saved.disposalNo} raised`);
+      };
+      const saved = editing
+        ? await updateDisposal(disposal.id, { ...payload, version: disposal.version })
+        : await createDisposal(payload);
+      message.success(editing
+        // Saving a corrected request puts it back to Draft; the server does that,
+        // and saying so here stops it looking as though nothing happened.
+        ? `${saved.disposalNo} saved as a draft - submit it when you are ready`
+        : `Disposal request ${saved.disposalNo} raised`);
       onRaised(saved);
       form.resetFields();
     } catch (e) {
-      toastUnlessHandled(message, e, 'Could not raise the request');
+      toastUnlessHandled(message, e, editing ? 'Could not save the request' : 'Could not raise the request');
     } finally {
       setSaving(false);
     }
@@ -52,11 +79,11 @@ const AssetDisposalDialog = ({ open, asset, onClose, onRaised }) => {
 
   return (
     <Modal
-      title={`Dispose ${asset?.assetId ?? ''}`}
+      title={editing ? `Correct ${disposal.disposalNo}` : `Dispose ${asset?.assetId ?? ''}`}
       open={open}
       onCancel={onClose}
       onOk={() => form.submit()}
-      okText="Raise request"
+      okText={editing ? 'Save changes' : 'Raise request'}
       confirmLoading={saving}
       width={680}
       destroyOnHidden
@@ -64,8 +91,12 @@ const AssetDisposalDialog = ({ open, asset, onClose, onRaised }) => {
       <Alert
         type="info"
         showIcon
-        title="This raises a request, it does not retire the asset"
-        description="The machine stays exactly as it is until somebody else approves the request. Only then does it become Disposed."
+        title={editing
+          ? 'Saving puts this back to Draft'
+          : 'This raises a request, it does not retire the asset'}
+        description={editing
+          ? 'It was sent back for correction. Change what was wrong, save it, and it returns to Draft so you can submit it again.'
+          : 'The machine stays exactly as it is until somebody else approves the request. Only then does it become Disposed.'}
         style={{ marginBottom: 16 }}
       />
       <Form form={form} layout="vertical" onFinish={submit}>

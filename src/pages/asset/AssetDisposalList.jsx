@@ -16,6 +16,7 @@ import {
 import { toastUnlessHandled } from '../../utils/apiError';
 import { conditionMeta, DISPOSAL_STATUS, disposalStatusMeta } from '../../utils/assetConstants';
 import TransferDecisionDialog from './components/TransferDecisionDialog';
+import AssetDisposalDialog from './components/AssetDisposalDialog';
 
 const fetchPage = ({ page, ...rest }) => getDisposals({ ...rest, page: page - 1 });
 
@@ -46,6 +47,8 @@ const AssetDisposalList = () => {
     'Could not load the disposal requests');
   const [selected, setSelected] = useState(null);
   const [dialog, setDialog] = useState(null);
+  /** The request being corrected, which is the only way on from one sent back. */
+  const [editing, setEditing] = useState(null);
 
   const highlighted = !highlightSeen && highlight
     ? list.rows.find((row) => row.id === highlight)
@@ -114,6 +117,13 @@ const AssetDisposalList = () => {
       render: (_, row) => (
         <Space size={0}>
           <ActionButton action="view" size="small" aria-label={`Open ${row.disposalNo}`} onClick={() => setSelected(row)} />
+          {/* The server offers edit and cancel on a request that was sent back.
+              Neither was ever drawn, so such a request had nothing but the eye
+              icon and no way forward at all. */}
+          {row.allowedActions?.includes('edit') && (
+            <ActionButton action="edit" size="small" aria-label={`Correct ${row.disposalNo}`}
+              onClick={() => setEditing(row)} />
+          )}
           {row.allowedActions?.includes('submit') && (
             <ActionButton action="custom" size="small" text="Submit" onClick={() => submit(row)} />
           )}
@@ -122,6 +132,10 @@ const AssetDisposalList = () => {
           )}
           {row.allowedActions?.includes('reject') && (
             <ActionButton action="reject" size="small" aria-label="Reject" onClick={() => { setSelected(row); setDialog('reject'); }} />
+          )}
+          {row.allowedActions?.includes('cancel') && (
+            <ActionButton action="cancel" size="small" aria-label={`Cancel ${row.disposalNo}`}
+              onClick={() => { setSelected(row); setDialog('cancel'); }} />
           )}
         </Space>
       ),
@@ -208,6 +222,13 @@ const AssetDisposalList = () => {
           </Descriptions>
         )}
       </Drawer>
+
+      <AssetDisposalDialog
+        open={!!editing}
+        disposal={editing}
+        onClose={() => setEditing(null)}
+        onRaised={(saved) => { setEditing(null); refresh(saved); }}
+      />
 
       <TransferDecisionDialog
         action={dialog}

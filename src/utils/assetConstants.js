@@ -118,7 +118,10 @@ export const DISPOSAL_STATUS = {
   DRAFT: { label: 'Draft', color: 'default' },
   SUBMITTED: { label: 'Awaiting approval', color: 'gold' },
   APPROVED: { label: 'Disposed', color: 'green' },
-  REJECTED: { label: 'Returned', color: 'red' },
+  // Not "Returned": an assignment uses that word for an asset coming back from
+  // a person, in this same module. This is the REQUEST going back to whoever
+  // raised it, and the two were read as the same thing.
+  REJECTED: { label: 'Sent back', color: 'red' },
   CANCELLED: { label: 'Cancelled', color: 'default' },
 };
 
