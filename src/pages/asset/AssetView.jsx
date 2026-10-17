@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { App, Card, Descriptions, Spin, Tag } from 'antd';
+import { Alert, App, Card, Descriptions, Spin, Tag } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
@@ -37,6 +37,13 @@ const AssetView = () => {
   const [labelOpen, setLabelOpen] = useState(false);
   const canUpdate = hasPermission('assets', 'update');
   const canDispose = hasPermission('asset-disposals', 'add');
+  // Only once the asset is actually here. `asset?.status !== 'DISPOSED'` is TRUE
+  // while it is still loading, so every asset briefly offered Change Status,
+  // Edit and Dispose - a disposed one included - and the buttons then changed
+  // under the reader. Nothing that depends on what the asset is may render
+  // before it is known.
+  const loaded = !!asset;
+  const disposed = asset?.status === 'DISPOSED';
 
   /** Re-reads the asset after maintenance, whose dates and status live on it. */
   const reloadAsset = () => getAsset(id).then(setAsset).catch(() => {});
@@ -68,13 +75,13 @@ const AssetView = () => {
         <PermissionGuard module="assets" operation="view">
           <ActionButton action="print" text="Print Label" onClick={() => setLabelOpen(true)} />
         </PermissionGuard>
-        {asset?.status !== 'DISPOSED' && (
+        {loaded && !disposed && (
           <PermissionGuard module="assets" operation="update">
             <ActionButton action="custom" text="Change Status" onClick={() => setStatusOpen(true)} />
             <ActionButton action="edit" text="Edit" onClick={() => navigate(`/assets/${id}/edit`)} />
           </PermissionGuard>
         )}
-        {asset?.status !== 'DISPOSED' && canDispose && (
+        {loaded && !disposed && canDispose && (
           <PermissionGuard module="asset-disposals" operation="add">
             {/* A second request is refused while one is open, so the button
                 leads to the one that exists rather than taking a whole form
@@ -83,8 +90,11 @@ const AssetView = () => {
               ? (
                 <ActionButton
                   action="view"
-                  text={`Disposal ${asset.openDisposal.disposalNo}`}
-                  tooltip={`${asset.openDisposal.statusLabel} - open it to carry on`}
+                  // The state first. "Disposal DR/26-27/1001" reads as though the
+                  // machine has already gone, when the request may only have been
+                  // raised - or returned for correction.
+                  text={`Disposal ${asset.openDisposal.statusLabel}`}
+                  tooltip={`${asset.openDisposal.disposalNo} - open it to carry on`}
                   onClick={() => navigate(`/assets/disposals?highlight=${asset.openDisposal.id}`)}
                 />
               )
@@ -92,6 +102,17 @@ const AssetView = () => {
           </PermissionGuard>
         )}
       </PageHeader>
+
+      {disposed && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`This asset was disposed on ${date(asset.statusChangedAt)}`}
+          description={`${asset.statusReasonText ?? 'It has left the company.'} The record is kept for the auditor and nothing more can be done to it `
+            + '- it cannot be edited, moved, serviced or issued. The status history below carries the disposal request it went out on.'}
+        />
+      )}
 
       <Spin spinning={loading}>
         {asset && (

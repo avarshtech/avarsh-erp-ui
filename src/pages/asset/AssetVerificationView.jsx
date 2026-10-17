@@ -141,6 +141,9 @@ const AssetVerificationView = () => {
     { title: 'Checked', dataIndex: 'verifiedAt', width: 150, render: stamp },
   ];
 
+  // Both halves of this pair depend on which state the run is in, so neither
+  // may render before the run is here: until then it showed Reopen, then
+  // changed to Close run under the reader.
   const isOpen = run?.status === 'OPEN';
   const counts = run?.counts ?? {};
 
@@ -154,11 +157,13 @@ const AssetVerificationView = () => {
         )}
         onBack={() => navigate('/assets/verification')}
       >
-        <PermissionGuard module="asset-verification" operation="lock">
-          {isOpen
-            ? <ActionButton action="lock" text="Close run" onClick={close} />
-            : <ActionButton action="undo" text="Reopen" onClick={reopen} />}
-        </PermissionGuard>
+        {run && (
+          <PermissionGuard module="asset-verification" operation="lock">
+            {isOpen
+              ? <ActionButton action="lock" text="Close run" onClick={close} />
+              : <ActionButton action="undo" text="Reopen" onClick={reopen} />}
+          </PermissionGuard>
+        )}
       </PageHeader>
 
       <Spin spinning={loading}>
