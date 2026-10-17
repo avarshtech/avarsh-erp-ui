@@ -35,10 +35,24 @@ const AssetDisposalList = () => {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const fromUrl = useUrlFilters(['status']);
+  // Arriving with ?highlight=<id> opens that request straight away - from the
+  // asset that is already on it, and from the toast after raising one. It is
+  // derived during render rather than set from an effect, so a row that has
+  // not loaded yet simply does not match and matches once it has.
+  const { highlight } = useUrlFilters(['highlight'], { numeric: ['highlight'] });
+  const [highlightSeen, setHighlightSeen] = useState(false);
+
   const list = useServerList(fetchPage, { status: undefined, ...fromUrl },
     'Could not load the disposal requests');
   const [selected, setSelected] = useState(null);
   const [dialog, setDialog] = useState(null);
+
+  const highlighted = !highlightSeen && highlight
+    ? list.rows.find((row) => row.id === highlight)
+    : null;
+  /** Whatever the drawer is showing: a row that was clicked, or the one linked to. */
+  const shown = selected ?? highlighted ?? null;
+
 
   // Destructured so the dependency is the loader itself: useServerList returns a
   // fresh object each render, and depending on the whole of it would rebuild
@@ -164,40 +178,40 @@ const AssetDisposalList = () => {
       </Card>
 
       <Drawer
-        title={selected?.disposalNo}
-        open={!!selected && !dialog}
-        onClose={() => setSelected(null)}
+        title={shown?.disposalNo}
+        open={!!shown && !dialog}
+        onClose={() => { setSelected(null); setHighlightSeen(true); }}
         size={520}
       >
-        {selected && (
+        {shown && (
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="Status">
-              <Tag color={disposalStatusMeta(selected.status).color}>{disposalStatusMeta(selected.status).label}</Tag>
+              <Tag color={disposalStatusMeta(shown.status).color}>{disposalStatusMeta(shown.status).label}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Asset">{selected.assetCode} — {selected.assetName}</Descriptions.Item>
-            <Descriptions.Item label="Category">{selected.categoryName ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Was at">{selected.locationText ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Bought">{date(selected.purchaseDate)}</Descriptions.Item>
-            <Descriptions.Item label="Cost when bought">{money(selected.purchaseCost)}</Descriptions.Item>
-            <Descriptions.Item label="Reason">{selected.reasonLabel ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Asset">{shown.assetCode} — {shown.assetName}</Descriptions.Item>
+            <Descriptions.Item label="Category">{shown.categoryName ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Was at">{shown.locationText ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Bought">{date(shown.purchaseDate)}</Descriptions.Item>
+            <Descriptions.Item label="Cost when bought">{money(shown.purchaseCost)}</Descriptions.Item>
+            <Descriptions.Item label="Reason">{shown.reasonLabel ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="Condition">
-              <Tag color={conditionMeta(selected.assetCondition).color}>
-                {conditionMeta(selected.assetCondition).label}
+              <Tag color={conditionMeta(shown.assetCondition).color}>
+                {conditionMeta(shown.assetCondition).label}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Method">{selected.methodLabel ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Amount">{money(selected.value)}</Descriptions.Item>
-            <Descriptions.Item label="Buyer">{selected.buyerText ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Disposed on">{date(selected.disposalDate)}</Descriptions.Item>
-            <Descriptions.Item label="Decision note">{selected.decisionReason ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Remarks">{selected.remarks ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Method">{shown.methodLabel ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Amount">{money(shown.value)}</Descriptions.Item>
+            <Descriptions.Item label="Buyer">{shown.buyerText ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Disposed on">{date(shown.disposalDate)}</Descriptions.Item>
+            <Descriptions.Item label="Decision note">{shown.decisionReason ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="Remarks">{shown.remarks ?? '-'}</Descriptions.Item>
           </Descriptions>
         )}
       </Drawer>
 
       <TransferDecisionDialog
         action={dialog}
-        transfer={selected ? { ...selected, transferNo: selected.disposalNo, interUnit: false } : null}
+        transfer={shown ? { ...shown, transferNo: shown.disposalNo, interUnit: false } : null}
         onClose={() => setDialog(null)}
         onDone={refresh}
         handlers={{ approve: approveDisposal, reject: rejectDisposal, cancel: cancelDisposal }}

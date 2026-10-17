@@ -76,7 +76,19 @@ const AssetView = () => {
         )}
         {asset?.status !== 'DISPOSED' && canDispose && (
           <PermissionGuard module="asset-disposals" operation="add">
-            <ActionButton action="delete" text="Dispose" onClick={() => setDisposeOpen(true)} />
+            {/* A second request is refused while one is open, so the button
+                leads to the one that exists rather than taking a whole form
+                and failing at the end of it. */}
+            {asset?.openDisposal
+              ? (
+                <ActionButton
+                  action="view"
+                  text={`Disposal ${asset.openDisposal.disposalNo}`}
+                  tooltip={`${asset.openDisposal.statusLabel} - open it to carry on`}
+                  onClick={() => navigate(`/assets/disposals?highlight=${asset.openDisposal.id}`)}
+                />
+              )
+              : <ActionButton action="delete" text="Dispose" onClick={() => setDisposeOpen(true)} />}
           </PermissionGuard>
         )}
       </PageHeader>
