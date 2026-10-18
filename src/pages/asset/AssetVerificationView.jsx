@@ -156,8 +156,17 @@ const AssetVerificationView = () => {
     {
       title: 'Result',
       dataIndex: 'result',
-      width: 170,
-      render: (v) => <Tag color={verificationResultMeta(v).color}>{verificationResultMeta(v).label}</Tag>,
+      width: 220,
+      // The row's result is one value, so a machine that moved AND is damaged
+      // showed only the move. The second finding is named beside it.
+      render: (v, r) => (
+        <>
+          <Tag color={verificationResultMeta(v).color}>{verificationResultMeta(v).label}</Tag>
+          {r.conditionDiffers && v !== 'CONDITION_CHANGED' && (
+            <Tag color="orange">condition differs too</Tag>
+          )}
+        </>
+      ),
     },
     { title: 'Checked', dataIndex: 'verifiedAt', width: 150, render: stamp },
     {
@@ -264,12 +273,19 @@ const AssetVerificationView = () => {
 
             <Card style={{ marginBottom: 16 }}>
               <Space size="large" wrap>
-                <Statistic title="Expected" value={run.total} />
+                {/* What the run froze at the start. A surprise is a row too,
+                    so counting rows here would say the scope expected one more
+                    machine every time somebody found one it never listed. */}
+                <Statistic title="Expected" value={run.total - (counts.EXTRA ?? 0)} />
                 <Statistic title="Still to find" value={counts.PENDING ?? 0} />
                 <Statistic title="As expected" value={counts.OK ?? 0} />
-                <Statistic title="Elsewhere" value={counts.LOCATION_MISMATCH ?? 0}
-                  styles={{ content: { color: (counts.LOCATION_MISMATCH ?? 0) > 0 ? '#d46b08' : undefined } }} />
-                <Statistic title="Condition differs" value={counts.CONDITION_CHANGED ?? 0} />
+                {/* These two count findings, not rows: a machine both moved and
+                    damaged is in both, where before the damage was in neither
+                    because its row could only carry one result. */}
+                <Statistic title="Elsewhere" value={counts.FOUND_ELSEWHERE ?? 0}
+                  styles={{ content: { color: (counts.FOUND_ELSEWHERE ?? 0) > 0 ? '#d46b08' : undefined } }} />
+                <Statistic title="Condition differs" value={counts.CONDITION_DIFFERS ?? 0}
+                  styles={{ content: { color: (counts.CONDITION_DIFFERS ?? 0) > 0 ? '#d46b08' : undefined } }} />
                 <Statistic title="Not found" value={counts.NOT_FOUND ?? 0}
                   styles={{ content: { color: (counts.NOT_FOUND ?? 0) > 0 ? '#cf1322' : undefined } }} />
                 <Statistic title="Surprises" value={counts.EXTRA ?? 0} />

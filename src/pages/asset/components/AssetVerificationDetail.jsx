@@ -19,8 +19,12 @@ const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : null);
 const AssetVerificationDetail = ({ row }) => {
   const result = verificationResultMeta(row.result);
   const checked = stamp(row.verifiedAt);
-  const movedAway = row.actualLocationText && row.actualLocationText !== row.expectedLocationText;
-  const conditionChanged = row.actualCondition && row.actualCondition !== row.expectedCondition;
+  // Both answers come from the server rather than being worked out again here.
+  // It compares places, not strings - trimmed, spacing collapsed, case set
+  // aside - and a browser recomputing it with !== would disagree on exactly the
+  // invisible differences the rule exists to absorb.
+  const movedAway = row.locationDiffers;
+  const conditionChanged = row.conditionDiffers;
 
   return (
     <div className="asset-log-detail">
@@ -34,7 +38,14 @@ const AssetVerificationDetail = ({ row }) => {
           <p>
             {row.result === 'PENDING'
               ? <em>Nobody has reached this one yet.</em>
-              : <>{result.label}. Nothing on the asset itself was changed.</>}
+              : (
+                <>
+                  {result.label}
+                  {conditionChanged && row.result !== 'CONDITION_CHANGED'
+                    && ', and its condition differs as well'}
+                  . Nothing on the asset itself was changed.
+                </>
+              )}
           </p>
         </div>
       </div>
