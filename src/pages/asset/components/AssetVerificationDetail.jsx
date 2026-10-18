@@ -16,6 +16,18 @@ const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : null);
  * <p>It also states the comparison the result came from, side by side. "Found
  * elsewhere" means nothing without both places in view.</p>
  */
+/** Where it turned up, or why there is no answer to that. */
+const foundAt = (row, movedAway) => {
+  if (row.result === 'PENDING') return <span style={{ opacity: 0.5 }}>Not checked yet</span>;
+  if (row.result === 'NOT_FOUND') return <span style={{ opacity: 0.5 }}>Nobody found it</span>;
+  return (
+    <>
+      {row.actualLocationText || '-'}
+      {movedAway && <Tag color="orange" style={{ marginInlineStart: 6 }}>Different</Tag>}
+    </>
+  );
+};
+
 const AssetVerificationDetail = ({ row }) => {
   const result = verificationResultMeta(row.result);
   const checked = stamp(row.verifiedAt);
@@ -56,14 +68,7 @@ const AssetVerificationDetail = ({ row }) => {
 
         <dt>Found at</dt>
         <dd>
-          {row.result === 'PENDING'
-            ? <span style={{ opacity: 0.5 }}>Not checked yet</span>
-            : (
-              <>
-                {row.actualLocationText || '-'}
-                {movedAway && <Tag color="orange" style={{ marginInlineStart: 6 }}>Different</Tag>}
-              </>
-            )}
+          {foundAt(row, movedAway)}
         </dd>
 
         <dt>Condition</dt>

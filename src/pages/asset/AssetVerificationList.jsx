@@ -81,7 +81,10 @@ const AssetVerificationList = () => {
               <Progress
                 percent={percent}
                 size="small"
-                status={r.status === 'CLOSED' && pending > 0 ? 'exception' : undefined}
+                // Closing turns everything unchecked into Not found, so a
+                // finished run never has pending rows - it is the missing ones
+                // that make it an unhappy ending.
+                status={r.status === 'CLOSED' && (r.counts?.NOT_FOUND ?? 0) > 0 ? 'exception' : undefined}
                 showInfo={false}
               />
               <span style={{ fontSize: 12, opacity: 0.7 }}>

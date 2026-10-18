@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, App, Card, Col, Input, Modal, Row, Select, Space, Spin, Statistic, Table, Tag,
+  Alert, App, Card, Col, Input, Modal, Row, Select, Space, Spin, Statistic, Table, Tag, Tooltip,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -19,6 +19,17 @@ import {
 
 const CONDITION_OPTIONS = toOptions(ASSET_CONDITION);
 const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : '-');
+
+/** One number in the strip, with the sentence that says what it counts. */
+const Tally = ({ title, help, value, danger, warn }) => (
+  <Tooltip title={help}>
+    <Statistic
+      title={<span style={{ borderBottom: '1px dotted currentColor', cursor: 'help' }}>{title}</span>}
+      value={value}
+      styles={{ content: { color: value > 0 ? (danger && '#cf1322') || (warn && '#d46b08') || undefined : undefined } }}
+    />
+  </Tooltip>
+);
 
 /**
  * Walking the floor with the list.
@@ -137,7 +148,13 @@ const AssetVerificationView = () => {
       title: 'Found at',
       dataIndex: 'actualLocationText',
       width: 220,
-      render: (v, r) => (r.result === 'PENDING' ? <span style={{ opacity: 0.45 }}>—</span> : v || '-'),
+      // A machine nobody found has no "found at", and a dash reads as missing
+      // data rather than as the finding it is.
+      render: (v, r) => {
+        if (r.result === 'PENDING') return <span style={{ opacity: 0.45 }}>not reached yet</span>;
+        if (r.result === 'NOT_FOUND') return <span style={{ opacity: 0.45 }}>nobody found it</span>;
+        return v || '-';
+      },
     },
     {
       title: 'Condition',
@@ -272,23 +289,29 @@ const AssetVerificationView = () => {
             )}
 
             <Card style={{ marginBottom: 16 }}>
+              {/* Two kinds of number live here and they behave differently.
+                  The first group gives every row exactly one heading and adds
+                  up to the run. The second counts facts that can both be true
+                  of one machine, so it does not add up to anything - which is
+                  why each says what it counts rather than leaving it to be
+                  guessed from a one-word label. */}
               <Space size="large" wrap>
-                {/* What the run froze at the start. A surprise is a row too,
-                    so counting rows here would say the scope expected one more
-                    machine every time somebody found one it never listed. */}
-                <Statistic title="Expected" value={run.total - (counts.EXTRA ?? 0)} />
-                <Statistic title="Still to find" value={counts.PENDING ?? 0} />
-                <Statistic title="As expected" value={counts.OK ?? 0} />
-                {/* These two count findings, not rows: a machine both moved and
-                    damaged is in both, where before the damage was in neither
-                    because its row could only carry one result. */}
-                <Statistic title="Elsewhere" value={counts.FOUND_ELSEWHERE ?? 0}
-                  styles={{ content: { color: (counts.FOUND_ELSEWHERE ?? 0) > 0 ? '#d46b08' : undefined } }} />
-                <Statistic title="Condition differs" value={counts.CONDITION_DIFFERS ?? 0}
-                  styles={{ content: { color: (counts.CONDITION_DIFFERS ?? 0) > 0 ? '#d46b08' : undefined } }} />
-                <Statistic title="Not found" value={counts.NOT_FOUND ?? 0}
-                  styles={{ content: { color: (counts.NOT_FOUND ?? 0) > 0 ? '#cf1322' : undefined } }} />
-                <Statistic title="Surprises" value={counts.EXTRA ?? 0} />
+                <Tally title="Expected" help="Machines the scope listed when the run started. Surprises are not in this."
+                  value={run.total - (counts.EXTRA ?? 0)} />
+                <Tally title="Still to find" help="Listed, and nobody has reached them yet."
+                  value={counts.PENDING ?? 0} />
+                <Tally title="As expected" help="Found in their place, in the condition the register claims."
+                  value={counts.OK ?? 0} />
+                <Tally title="Not found" help="The run closed without anybody finding them. Reopening puts them back to Still to find."
+                  value={counts.NOT_FOUND ?? 0} danger />
+                <Tally title="Surprises" help="Scanned here but never listed in this scope - the register has them somewhere else."
+                  value={counts.EXTRA ?? 0} />
+                <Tally title="Elsewhere"
+                  help="Listed machines that turned up somewhere other than their place. A surprise is counted under Surprises, not here."
+                  value={counts.FOUND_ELSEWHERE ?? 0} warn />
+                <Tally title="Condition differs"
+                  help="Machines not in the state the register claims - counted even when they had also moved."
+                  value={counts.CONDITION_DIFFERS ?? 0} warn />
               </Space>
             </Card>
 
