@@ -43,7 +43,7 @@ const CuttingWorkspace = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Cutting"
-        subtitle="Cutting room — fabric receipt to bundle issue (design preview on sample data)"
+        subtitle="Cutting room — fabric receipt to bundle issue"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       />
       <Tabs

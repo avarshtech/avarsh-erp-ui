@@ -6,8 +6,8 @@ import EmptyState from '../../../components/EmptyState';
 import { FormSelect } from '../../../components/form';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { SEWING_LINES } from '../../../utils/cuttingConstants';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
+import { getProductionLines } from '../../../services/production/sewingMasterService';
 import { formatNumber } from '../../../utils/formatters';
 import { getActiveParts } from '../../../services/master/partsService';
 import { listReCutEntries, addReCutEntry, getCutPos, getRolls } from '../../../services/production/cuttingService';
@@ -32,6 +32,10 @@ const ReCutRegisterTab = () => {
   const [parts, setParts] = useState([]);
   useEffect(() => { getActiveParts().then(setParts).catch(() => setParts([])); }, []);
   const partOptions = useMemo(() => parts.map((p) => ({ value: p.partName, label: p.partName })), [parts]);
+  // Sewing lines come from the Production Lines master; the filter still offers a name an older entry carries
+  const [lines, setLines] = useState([]);
+  useEffect(() => { getProductionLines().then((rows) => setLines(rows || [])).catch(() => setLines([])); }, []);
+  const lineOptions = useMemo(() => lines.map((l) => ({ value: l.name, label: l.name })), [lines]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +53,8 @@ const ReCutRegisterTab = () => {
   }, [draft.cuttingPoId]);
 
   const filtered = useMemo(() => entries.filter((e) => !lineFilter || e.lineName === lineFilter), [entries, lineFilter]);
+  const filterLineOptions = useMemo(() => [...new Set([...lines.map((l) => l.name), ...entries.map((e) => e.lineName)].filter(Boolean))]
+    .map((name) => ({ value: name, label: name })), [lines, entries]);
 
   const reCutStats = useMemo(() => {
     const totalOrder = cutPos.reduce((s, p) => s + p.orderQty, 0);
@@ -90,7 +96,7 @@ const ReCutRegisterTab = () => {
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <Space size="middle">
           <FormSelect value={lineFilter} style={{ width: 140 }} placeholder="All lines" allowClear
-            options={SEWING_LINES.map((l) => ({ value: l, label: l }))} onChange={setLineFilter} />
+            options={filterLineOptions} onChange={setLineFilter} />
           <span style={{ color: 'var(--text-secondary)' }}>
             Total re-cut: <strong>{reCutStats.totalReCut} pcs</strong> ({reCutStats.pct}% of order qty)
           </span>
@@ -111,7 +117,7 @@ const ReCutRegisterTab = () => {
                 setDraft((x) => ({ ...x, cuttingPoId: v, rollNo: null }));
               }} />
             <FormSelect size="small" value={draft.lineName} style={{ width: 110 }} placeholder="Line"
-              options={SEWING_LINES.map((l) => ({ value: l, label: l }))} onChange={(v) => setDraft((x) => ({ ...x, lineName: v }))} />
+              options={lineOptions} onChange={(v) => setDraft((x) => ({ ...x, lineName: v }))} />
             <FormSelect size="small" value={draft.part} style={{ width: 120 }} placeholder="Part"
               options={partOptions} onChange={(v) => setDraft((x) => ({ ...x, part: v }))} />
           </Space>

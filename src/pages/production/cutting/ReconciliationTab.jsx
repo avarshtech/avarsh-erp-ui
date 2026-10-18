@@ -9,6 +9,23 @@ import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getReconciliation, saveEndBit, returnToInventory, getCutPos } from '../../../services/production/cuttingService';
 
 /**
+ * A roll's end-bit weight, typed and then saved once, on blur or Enter. Saving on every keystroke sent a
+ * PUT per digit, and the replies could land out of order and leave an earlier weight behind. The parent
+ * re-keys it on the saved weight, so a reply resets what it shows.
+ */
+const EndBitInput = ({ value, onCommit }) => {
+  const [draft, setDraft] = useState(value);
+  const commit = () => {
+    const next = draft ?? 0;
+    if (next !== value) onCommit(next);
+  };
+  return (
+    <InputNumber size="small" min={0} step={0.05} value={draft} style={{ width: 100 }}
+      onChange={setDraft} onBlur={commit} onPressEnter={commit} />
+  );
+};
+
+/**
  * ENH-03 — fabric accountability: received vs used vs end-bits vs re-cut vs
  * waste, with a per-roll end-bit register (editable, with reuse flag — SME
  * practice: reusable end-bits go back for re-cutting / small parts).
@@ -76,7 +93,7 @@ const ReconciliationTab = () => {
       title: 'End-Bit (kg)', dataIndex: 'endBit', width: 130, align: 'center',
       render: (v, r) => (
         r.status === 'USED'
-          ? <InputNumber size="small" min={0} step={0.05} value={v} style={{ width: 100 }} onChange={(val) => handleEndBit(r.rollNo, { weight: val || 0 })} />
+          ? <EndBitInput key={`${r.rollNo}-${v}`} value={v} onCommit={(weight) => handleEndBit(r.rollNo, { weight })} />
           : '—'
       ),
     },
