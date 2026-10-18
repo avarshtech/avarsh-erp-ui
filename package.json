@@ -35,6 +35,8 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@react-three/fiber": "^9.8.1",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "antd": "^6.2.2",
     "axios": "^1.13.4",
     "dayjs": "^1.11.19",

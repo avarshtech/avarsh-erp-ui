@@ -38,7 +38,14 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // The Virtual Factory page carries three.js (only it imports it), so only the people who open
         // that screen download it.
-        globIgnores: ['**/node_modules/**/*', '**/VirtualFactoryPage-*.{js,css}'],
+        // The QR decoder is 400 KB and only the verification screen loads it,
+        // so it is left out for the same reason three.js is: precaching it
+        // would make every install pay for a camera nobody else opens.
+        globIgnores: [
+          '**/node_modules/**/*',
+          '**/VirtualFactoryPage-*.{js,css}',
+          '**/qr-scanner-*.js',
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
       },
       manifest: {
@@ -91,6 +98,15 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Named so the service worker can recognise it and skip precaching it.
+        // Everything else keeps Rollup's own chunking.
+        manualChunks: (id) => (id.includes('@zxing') ? 'qr-scanner' : undefined),
+      },
+    },
+  },
   server: {
     port: 3000,
   },

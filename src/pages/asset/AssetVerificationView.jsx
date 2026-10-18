@@ -9,6 +9,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
 import AssetVerificationDetail from './components/AssetVerificationDetail';
+import QrScanDialog from './components/QrScanDialog';
 import { assetCodeFrom } from '../../utils/qrSvg';
 import { toastUnlessHandled } from '../../utils/apiError';
 import { closeRun, getRun, reopenRun, scanAsset } from '../../services/asset/verificationService';
@@ -27,6 +28,9 @@ const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : '-');
  * person holding it is looking at the machine, not the screen. Anything that
  * steals focus between scans turns a two-minute job into a twenty-minute one.</p>
  *
+ * <p>The camera is the third way in, and on a phone the usual one: the labels
+ * this module prints are QR codes, which a laser wedge scanner cannot read.</p>
+ *
  * <p>Nothing here changes the register. Every difference is a finding for
  * somebody to act on afterwards - so each row opens to what was written down,
  * and links to the asset, which is where acting on it happens.</p>
@@ -40,6 +44,7 @@ const AssetVerificationView = () => {
   const [code, setCode] = useState('');
   const [scanning, setScanning] = useState(false);
   const [adjust, setAdjust] = useState(null);
+  const [camera, setCamera] = useState(false);
   const scanBox = useRef(null);
 
   useEffect(() => {
@@ -228,18 +233,29 @@ const AssetVerificationView = () => {
                     </Col>
                     <Col xs={24} md={14}>
                       <div style={{ opacity: 0.65, fontSize: 12, paddingBottom: 6 }}>
-                        A barcode scanner types the code and presses Enter. Scan each machine as you reach it —
-                        use <strong>Record a difference</strong> only when what you see is not what the list says.
+                        Scan each machine as you reach it — with the camera, with a scanner (which types the
+                        code and presses Enter), or by typing the ID off the label. Use
+                        <strong> Record a difference</strong> only when what you see is not what the list says.
                       </div>
-                      <ActionButton
-                        action="custom"
-                        text="Record a difference"
-                        disabled={!code.trim()}
-                        onClick={() => {
-                          const scanned = assetCodeFrom(code);
-                          setAdjust({ assetCode: scanned, expected: expectedFor(scanned) });
-                        }}
-                      />
+                      <Space wrap>
+                        {/* A printed label is a QR, which a laser wedge scanner
+                            cannot read at all. The camera is the way in for
+                            anybody walking the floor with a phone. */}
+                        <ActionButton
+                          action="custom"
+                          text="Scan with camera"
+                          onClick={() => setCamera(true)}
+                        />
+                        <ActionButton
+                          action="custom"
+                          text="Record a difference"
+                          disabled={!code.trim()}
+                          onClick={() => {
+                            const scanned = assetCodeFrom(code);
+                            setAdjust({ assetCode: scanned, expected: expectedFor(scanned) });
+                          }}
+                        />
+                      </Space>
                     </Col>
                   </Row>
                 </PermissionGuard>
@@ -285,6 +301,18 @@ const AssetVerificationView = () => {
                 }}
               />
             </Card>
+
+            <QrScanDialog
+              open={camera}
+              onClose={() => { setCamera(false); refocus(); }}
+              onRead={(scanned) => {
+                // Straight through: a scan that has to be confirmed is not a
+                // scan. The usual refusals still raise their own dialogs.
+                setCamera(false);
+                setCode(scanned);
+                send({ assetCode: scanned, addIfOutsideScope: false });
+              }}
+            />
 
             <Modal
               title={`Record a difference — ${adjust?.assetCode ?? ''}`}
