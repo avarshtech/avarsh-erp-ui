@@ -57,7 +57,12 @@ export default function useFloatingPanel(ref) {
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e) => {
-    if (drag.current) setPos(clamp({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy }));
+    if (!drag.current) return;
+    // Into the ref at once: a release right after the last move must save where the panel was let go,
+    // not where the last finished render had it (the effect above runs only after that render)
+    const next = clamp({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy });
+    posRef.current = next;
+    setPos(next);
   };
   const onPointerUp = (e) => {
     if (!drag.current) return;
