@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { App, Card, Col, Form, Input, Modal, Progress, Row, Select, Table, Tag } from 'antd';
+import { App, Card, Col, Form, Input, Modal, Progress, Row, Select, Table, Tag, Tooltip } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
@@ -57,14 +57,31 @@ const AssetVerificationList = () => {
     { title: 'Name', dataIndex: 'name' },
     { title: 'Scope', dataIndex: 'scopeText', width: 240 },
     {
-      title: 'Progress',
+      title: 'Checked',
       key: 'progress',
-      width: 180,
+      width: 190,
       // Checked against expected: the number somebody walking the floor wants.
+      // A bare percentage did not say what it was counting, so the count says
+      // it - "7 / 12 machines" reads without a legend.
       render: (_, r) => {
         const pending = r.counts?.PENDING ?? 0;
         const done = Math.max(r.total - pending, 0);
-        return <Progress percent={r.total ? Math.round((done / r.total) * 100) : 0} size="small" />;
+        const percent = r.total ? Math.round((done / r.total) * 100) : 0;
+        return (
+          <Tooltip title={`${done} of ${r.total} checked, ${pending} still to find`}>
+            <div>
+              <Progress
+                percent={percent}
+                size="small"
+                status={r.status === 'CLOSED' && pending > 0 ? 'exception' : undefined}
+                showInfo={false}
+              />
+              <span style={{ fontSize: 12, opacity: 0.7 }}>
+                {r.total ? `${done} / ${r.total}` : 'nothing in scope'}
+              </span>
+            </div>
+          </Tooltip>
+        );
       },
     },
     {

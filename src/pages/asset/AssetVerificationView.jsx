@@ -6,7 +6,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import PermissionGuard from '../../components/PermissionGuard';
+import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
+import AssetVerificationDetail from './components/AssetVerificationDetail';
+import { assetCodeFrom } from '../../utils/qrSvg';
 import { toastUnlessHandled } from '../../utils/apiError';
 import { closeRun, getRun, reopenRun, scanAsset } from '../../services/asset/verificationService';
 import {
@@ -25,7 +28,8 @@ const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : '-');
  * steals focus between scans turns a two-minute job into a twenty-minute one.</p>
  *
  * <p>Nothing here changes the register. Every difference is a finding for
- * somebody to act on afterwards.</p>
+ * somebody to act on afterwards - so each row opens to what was written down,
+ * and links to the asset, which is where acting on it happens.</p>
  */
 const AssetVerificationView = () => {
   const { id } = useParams();
@@ -109,7 +113,19 @@ const AssetVerificationView = () => {
   };
 
   const columns = [
-    { title: 'Asset ID', dataIndex: 'assetCode', width: 180 },
+    {
+      title: 'Asset ID',
+      dataIndex: 'assetCode',
+      width: 190,
+      // A finding is only useful if you can get to the machine it is about.
+      // Raising the transfer or the disposal it calls for happens over there.
+      render: (v, r) => (
+        <RecordLink
+          text={v}
+          onClick={(e) => { e?.stopPropagation?.(); navigate(`/assets/${r.assetId}`); }}
+        />
+      ),
+    },
     { title: 'Name', dataIndex: 'assetName' },
     { title: 'Expected at', dataIndex: 'expectedLocationText', width: 220 },
     {
@@ -139,6 +155,15 @@ const AssetVerificationView = () => {
       render: (v) => <Tag color={verificationResultMeta(v).color}>{verificationResultMeta(v).label}</Tag>,
     },
     { title: 'Checked', dataIndex: 'verifiedAt', width: 150, render: stamp },
+    {
+      title: 'Remarks',
+      dataIndex: 'remarks',
+      width: 220,
+      ellipsis: true,
+      // A preview only - the row opens to the whole of it. This column had no
+      // existence at all, so what the verifier wrote was stored and never read.
+      render: (v) => v || <span style={{ opacity: 0.45 }}>&mdash;</span>,
+    },
   ];
 
   // Both halves of this pair depend on which state the run is in, so neither
@@ -146,6 +171,16 @@ const AssetVerificationView = () => {
   // changed to Close run under the reader.
   const isOpen = run?.status === 'OPEN';
   const counts = run?.counts ?? {};
+
+  /**
+   * What the register claims about the code in the box.
+   *
+   * Recording a difference without it is recording a difference from something
+   * you cannot see: the dialog asked "where it actually is" against a list the
+   * verifier had to scroll back to. Undefined for a surprise, which is itself
+   * worth saying out loud.
+   */
+  const expectedFor = (assetCode) => run?.items?.find((i) => i.assetCode === assetCode) ?? null;
 
   return (
     <div className="animate-fade-in-up">
@@ -183,7 +218,12 @@ const AssetVerificationView = () => {
                         enterButton="Found it"
                         placeholder="SEWINGMACH-U1-01001"
                         onChange={(e) => setCode(e.target.value)}
-                        onSearch={(v) => v.trim() && send({ assetCode: v.trim(), addIfOutsideScope: false })}
+                        onSearch={(v) => {
+                          // Our own labels carry a URL; a 2D scanner types the
+                          // whole of it. Take the code out of whatever arrives.
+                          const scanned = assetCodeFrom(v);
+                          if (scanned) send({ assetCode: scanned, addIfOutsideScope: false });
+                        }}
                       />
                     </Col>
                     <Col xs={24} md={14}>
@@ -195,7 +235,10 @@ const AssetVerificationView = () => {
                         action="custom"
                         text="Record a difference"
                         disabled={!code.trim()}
-                        onClick={() => setAdjust({ assetCode: code.trim() })}
+                        onClick={() => {
+                          const scanned = assetCodeFrom(code);
+                          setAdjust({ assetCode: scanned, expected: expectedFor(scanned) });
+                        }}
                       />
                     </Col>
                   </Row>
@@ -236,6 +279,10 @@ const AssetVerificationView = () => {
                 pagination={false}
                 scroll={{ x: 'max-content', y: 520 }}
                 rowClassName={(r) => (r.needsAttention ? 'row-needs-attention' : '')}
+                expandable={{
+                  expandedRowRender: (row) => <AssetVerificationDetail row={row} />,
+                  expandRowByClick: true,
+                }}
               />
             </Card>
 
@@ -244,7 +291,9 @@ const AssetVerificationView = () => {
               open={!!adjust}
               onCancel={() => { setAdjust(null); refocus(); }}
               onOk={() => {
-                send({ ...adjust, addIfOutsideScope: false });
+                // `expected` is what the dialog shows, not something to send.
+                const { expected, ...payload } = adjust;
+                send({ ...payload, addIfOutsideScope: false });
                 setAdjust(null);
               }}
               okText="Record it"
@@ -253,6 +302,27 @@ const AssetVerificationView = () => {
               <p style={{ marginTop: 0, opacity: 0.7 }}>
                 This records what you found. It does not change the asset — somebody decides that afterwards.
               </p>
+              {adjust?.expected ? (
+                <Alert
+                  type="info"
+                  style={{ marginBottom: 12 }}
+                  title={adjust.expected.assetName}
+                  description={(
+                    <>
+                      The register has it at <strong>{adjust.expected.expectedLocationText}</strong>,
+                      in <strong>{conditionMeta(adjust.expected.expectedCondition).label}</strong> condition.
+                      Fill in only what differs.
+                    </>
+                  )}
+                />
+              ) : (
+                <Alert
+                  type="warning"
+                  style={{ marginBottom: 12 }}
+                  title="Not on this run's list"
+                  description="Nothing with that ID is expected in this scope, so recording it will ask you to confirm it as a surprise."
+                />
+              )}
               <div style={{ marginBottom: 12 }}>
                 <div style={{ marginBottom: 4 }}>Where it actually is</div>
                 <Input
