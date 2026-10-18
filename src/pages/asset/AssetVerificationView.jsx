@@ -213,6 +213,10 @@ const AssetVerificationView = () => {
    */
   const expectedFor = (assetCode) => run?.items?.find((i) => i.assetCode === assetCode) ?? null;
 
+  /** What is in the box right now, and what the run says about it. */
+  const typedCode = assetCodeFrom(code);
+  const identified = typedCode ? { code: typedCode, row: expectedFor(typedCode) } : null;
+
   return (
     <div className="animate-fade-in-up">
       <PageHeader
@@ -282,6 +286,35 @@ const AssetVerificationView = () => {
                           }}
                         />
                       </Space>
+                      {/* Identifying the machine and saying what you found are
+                          two steps, and the second is the one that matters. The
+                          first used to happen invisibly, so a code in the box
+                          was just a string until somebody pressed a button. */}
+                      {identified && (
+                        <div style={{ marginTop: 10 }}>
+                          {identified.row ? (
+                            <Alert
+                              type={identified.row.result === 'PENDING' ? 'info' : 'warning'}
+                              title={identified.row.assetName}
+                              description={(
+                                <>
+                                  The register has it at <strong>{identified.row.expectedLocationText}</strong>,
+                                  in <strong>{conditionMeta(identified.row.expectedCondition).label}</strong> condition.
+                                  {identified.row.result === 'PENDING'
+                                    ? ' Press Found it if that is what you see, or Record a difference if it is not.'
+                                    : ` This one is already down as "${verificationResultMeta(identified.row.result).label}" - scanning again replaces that.`}
+                                </>
+                              )}
+                            />
+                          ) : (
+                            <Alert
+                              type="warning"
+                              title={`${identified.code} is not on this run's list`}
+                              description="Either it belongs to another scope - recording it will ask you to confirm it as a surprise - or the code was misread."
+                            />
+                          )}
+                        </div>
+                      )}
                     </Col>
                   </Row>
                 </PermissionGuard>
@@ -345,11 +378,16 @@ const AssetVerificationView = () => {
               open={camera}
               onClose={() => { setCamera(false); refocus(); }}
               onRead={(scanned) => {
-                // Straight through: a scan that has to be confirmed is not a
-                // scan. The usual refusals still raise their own dialogs.
+                // Reading a label identifies the machine. It does not say the
+                // machine is fine - that is a second thing the verifier decides
+                // while standing in front of it, which is why typing a code
+                // waits for Found it rather than submitting on its own. The
+                // camera used to skip that decision and record "as expected"
+                // before anybody had looked at the machine.
                 setCamera(false);
                 setCode(scanned);
-                send({ assetCode: scanned, addIfOutsideScope: false });
+                message.info(`${scanned} read - now say what you found`);
+                refocus();
               }}
             />
 
