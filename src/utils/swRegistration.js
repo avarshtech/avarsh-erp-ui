@@ -207,6 +207,19 @@ export const registerServiceWorker = (onOfflineReady) => {
   if (!('serviceWorker' in navigator)) return;
   registered = true;
 
+  // There is no service worker in a dev build - vite-plugin-pwa is configured
+  // with devOptions.enabled false, so /sw.js answers with index.html and the
+  // registration fails with a MIME error on every page load. Worse, a worker
+  // installed by an earlier production build or `vite preview` on this same
+  // origin keeps controlling the page afterwards and serves its precached
+  // bundle, so edits appear to do nothing. Tear that one down instead.
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations?.()
+      .then((all) => all.forEach((r) => r.unregister()))
+      .catch(() => {});
+    return;
+  }
+
   const start = () => {
     navigator.serviceWorker
       .register(SW_URL, { scope: SW_SCOPE, type: SW_TYPE })
