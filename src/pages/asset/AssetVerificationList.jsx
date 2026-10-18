@@ -47,12 +47,20 @@ const AssetVerificationList = () => {
     }
   };
 
+  const openRun = (row) => navigate(`/assets/verification/${row.id}`);
+
   const columns = [
     {
       title: 'Run',
       dataIndex: 'runNo',
       width: 150,
-      render: (v, row) => <RecordLink text={v} onClick={() => navigate(`/assets/verification/${row.id}`)} />,
+      // The row opens too, so this stops the click rather than navigating twice.
+      render: (v, row) => (
+        <RecordLink
+          text={v}
+          onClick={(e) => { e?.stopPropagation?.(); openRun(row); }}
+        />
+      ),
     },
     { title: 'Name', dataIndex: 'name' },
     { title: 'Scope', dataIndex: 'scopeText', width: 240 },
@@ -148,6 +156,11 @@ const AssetVerificationList = () => {
           rowKey="id"
           size="middle"
           scroll={{ x: 'max-content' }}
+          // Every other list in this module opens from a row or an eye button
+          // as well as the record number; this one had the number alone, a
+          // small target with nothing to fall back on. Row click is what the
+          // employee, bonus, invoice and shipment lists already do.
+          onRow={(row) => ({ onClick: () => openRun(row), style: { cursor: 'pointer' } })}
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'runs')}
           onChange={list.onTableChange}
           locale={{
