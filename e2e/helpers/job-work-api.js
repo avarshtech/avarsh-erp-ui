@@ -95,6 +95,29 @@ export async function garmentProcessPo(api, gpr, { vendor = VENDOR.wash, rate = 
   return draft ? po : ok(await api.post(`/garment-process-pos/${po.id}/submit`, { version: po.version }), 'submit Garment Process PO');
 }
 
+/** The order's Cut Panel / Garment processes with no PO raised yet — what a Work Order on it waits for. */
+export async function jobWorkGaps(api, orderNo) {
+  return ok(await api.get(`/work-order/job-work-gaps?orderId=${await orderId(api, orderNo)}`), 'job-work gaps');
+}
+
+/**
+ * A Work Order waits until every released requirement's process on its order has a PO. Specs in earlier projects
+ * (bom, po) leave requirements on ORD/0003 with none; this closes them, so a Work Order fixture on the order tests
+ * the Work Order and not their leftovers. Projects run one at a time (one worker), so nothing still uses them.
+ */
+export async function closeJobWorkGaps(api, orderNo) {
+  const done = new Set();
+  for (const gap of await jobWorkGaps(api, orderNo)) {
+    const key = `${gap.kind}-${gap.requirementId}`;
+    if (done.has(key)) continue;
+    done.add(key);
+    const base = gap.kind === 'GARMENT' ? '/garment-process-requirements' : '/cut-panel-requirements';
+    const req = ok(await api.get(`${base}/${gap.requirementId}`), 'requirement');
+    ok(await api.post(`${base}/${gap.requirementId}/close`, { reason: 'e2e: left over by another spec', version: req.version }),
+      'close requirement');
+  }
+}
+
 /**
  * An approved cutting PO cutting `rows` ({ color, size, qty }): in-house at HR unit 1, or outsourced (`unitType`
  * VENDOR) to the seeded Velan Stitching Unit — an outsourced PO's processing unit is a vendor.
@@ -112,14 +135,19 @@ export async function approvedCuttingPo(api, { orderNo, rows, unitType = 'UNIT' 
 
 /** An approved work order on an approved cutting PO, planning `rows` ({ color, size, qty }): in-house unless `unitType` is VENDOR. */
 export async function approvedWorkOrder(api, { orderNo, cuttingPoId, rows, unitType = 'UNIT' }) {
+  const wo = ok(await api.post('/work-order', await workOrderBody(api, { orderNo, cuttingPoId, rows, unitType })), 'create work order');
+  return ok(await api.post(`/work-order/${wo.id}/submit`, { version: wo.version }), 'submit work order');
+}
+
+/** The body of a work order on an approved cutting PO, planning `rows` ({ color, size, qty }). */
+export async function workOrderBody(api, { orderNo, cuttingPoId, rows, unitType = 'UNIT' }) {
   const order = await orderOf(api, orderNo);
-  const wo = ok(await api.post('/work-order', {
+  return {
     orderId: order.id, orderNo: order.orderNo, styleNo: order.styleNo, buyer: order.buyer, cuttingPoId,
     processingUnitType: unitType, processingUnitId: unitType === 'VENDOR' ? await vendorId(api, 'Velan Stitching Unit') : 1, allowancePercent: 0,
     plannedStartDate: day(1), plannedEndDate: day(10), plannedDeliveryDate: day(12),
     items: rows.map((r) => ({ color: r.color, size: r.size, orderQty: r.qty, plannedQty: r.qty, allowancePercent: 0, ratePerPiece: 20 })),
-  }), 'create work order');
-  return ok(await api.post(`/work-order/${wo.id}/submit`, { version: wo.version }), 'submit work order');
+  };
 }
 
 /** The Cut Panel PO as the server has it now. */

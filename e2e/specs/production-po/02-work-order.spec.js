@@ -2,7 +2,11 @@
 // spec 01. Asserts the garment-process banner (BOM-derived), rates the matrix
 // and submits (auto-approves — no WORK_ORDER flow in e2e seeds).
 // Idempotent: skips creation when an approved Work Order already exists.
+// A Work Order waits for the job-work POs of its order: beforeAll closes requirements other projects left on
+// ORD/0003 without one, and the last test proves the wait through the API.
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { closeJobWorkGaps, jobWorkGaps, submittedGpr, garmentProcessPo, workOrderBody } from '../../helpers/job-work-api.js';
 import { navigateWithAuth, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
 import { waitForTableSettled, formField } from '../../helpers/ui-master.js';
 import { selectOptionByText, pickToday, submitAnywayIfAsked, applyBulkRate, approvedRowExists, expectSuccessToast } from './helpers.js';
@@ -10,6 +14,11 @@ import { selectOptionByText, pickToday, submitAnywayIfAsked, applyBulkRate, appr
 const ORDER_NO = 'ORD/0003';
 
 test.describe('Work Order', () => {
+  test.beforeAll(async () => {
+    const api = await createAuthenticatedClient();
+    try { await closeJobWorkGaps(api, ORDER_NO); } finally { await api.dispose(); }
+  });
+
   test.beforeEach(async ({ page }) => {
     await ensureSessionActive(page);
   });
@@ -54,5 +63,25 @@ test.describe('Work Order', () => {
     await waitForPageReady(page);
     await waitForTableSettled(page);
     expect(await approvedRowExists(page, ORDER_NO, { waitMs: 15000 })).toBeTruthy();
+  });
+
+  test('a Work Order waits until each job-work process of its order has a PO', async () => {
+    const api = await createAuthenticatedClient();
+    try {
+      const gpr = await submittedGpr(api, { orderNo: ORDER_NO, process: 'Garment Washing' });
+      expect((await jobWorkGaps(api, ORDER_NO)).map((g) => g.requirementNo)).toContain(gpr.requirementNo);
+
+      const { data: cuts } = await api.get(`/cutting-po/approved?orderId=${gpr.orderId}`);
+      const item = cuts[0].items[0];
+      const body = await workOrderBody(api, { orderNo: ORDER_NO, cuttingPoId: cuts[0].id, rows: [{ color: item.color, size: item.size, qty: 1 }] });
+      const refused = await api.post('/work-order', body);
+      expect(refused.status).toBe(422);
+      expect(refused.data.message).toContain(`Garment Process PO for Garment Washing (${gpr.requirementNo})`);
+
+      await garmentProcessPo(api, gpr, { cells: 1 });
+      expect((await jobWorkGaps(api, ORDER_NO)).map((g) => g.requirementNo)).not.toContain(gpr.requirementNo);
+    } finally {
+      await api.dispose();
+    }
   });
 });

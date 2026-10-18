@@ -36,6 +36,11 @@ const FabricRelaxationList = () => {
   useEffect(() => { load(); }, [load]);
 
   const receiptNo = useCallback((id) => receipts.find((r) => r.id === id)?.receiptNo || '—', [receipts]);
+  // One relaxation per fabric receipt: a new cycle can only start on a receipt that has none
+  const freeReceipts = useMemo(() => {
+    const relaxed = new Set(rows.map((r) => r.receiptId));
+    return receipts.filter((r) => !relaxed.has(r.id));
+  }, [receipts, rows]);
   const receiptFabric = useCallback((id) => {
     const rec = receipts.find((r) => r.id === id);
     return rec?.fabricName || rec?.fabricType || '—';
@@ -106,7 +111,7 @@ const FabricRelaxationList = () => {
         open={drawer.open}
         record={drawer.record}
         readOnly={drawer.readOnly}
-        receipts={receipts}
+        receipts={drawer.record ? receipts : freeReceipts}
         onClose={() => setDrawer({ open: false, record: null, readOnly: false })}
         onSaved={() => { setDrawer({ open: false, record: null, readOnly: false }); load(); }}
       />

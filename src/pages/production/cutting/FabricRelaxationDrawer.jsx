@@ -112,6 +112,7 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
       <Form form={form} layout="vertical" disabled={readOnly}>
         <Form.Item name="receiptId" label="Fabric Receipt #" rules={[{ required: true, message: 'Select receipt' }]}>
           <FormSelect placeholder="Select confirmed receipt" disabled={Boolean(record)}
+            notFoundContent="Every fabric receipt already has a relaxation"
             options={receipts.map((r) => ({
               value: r.id,
               label: `${r.receiptNo}${r.fabricName ? ` · ${r.fabricName}` : ''} (${r.receivedRollCount} rolls)`,

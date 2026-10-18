@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  submittedGpr, garmentProcessPo, approvedCuttingPo, approvedWorkOrder, getGarmentProcessPo, VENDOR,
+  submittedGpr, garmentProcessPo, approvedCuttingPo, approvedWorkOrder, getGarmentProcessPo, VENDOR, closeJobWorkGaps,
 } from '../../helpers/job-work-api.js';
 
 async function pickIn(page, select, text) {
@@ -44,6 +44,8 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   const api = await createAuthenticatedClient();
   try {
+    // A Work Order waits for the order's job-work POs; close what other projects left on ORD/0003 without one
+    await closeJobWorkGaps(api, 'ORD/0003');
     fx.gpr = await submittedGpr(api, { orderNo: 'ORD/0003', process: 'Garment Washing' });
     fx.gpo = await garmentProcessPo(api, fx.gpr, { cells: 2 });
     const rows = fx.gpo.lines.map((l) => ({ color: l.color, size: l.size, qty: Number(l.poQty) }));

@@ -21,10 +21,13 @@ import {
 import { getApprovedCuttingPos } from '../../../services/po/production/cuttingPoService';
 import {
   getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getWorkOrderCoverage,
+  getWorkOrderJobWorkGaps,
 } from '../../../services/po/production/workOrderService';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
+const JOB_WORK_PO = { CUT_PANEL: 'Cut Panel PO', GARMENT: 'Garment Process PO' };
+const JOB_WORK_GAP_TIP = 'Raise the Cut Panel / Garment Process POs for this order first';
 
 // Trim Allocated defaults to BOM requirement and is editable on the Work Order trim panel.
 const normTrimStock = (rows) => rows.map((r) => ({
@@ -48,6 +51,8 @@ const WorkOrderForm = () => {
   const [ppStatus, setPpStatus] = useState(null);
   const [lines, setLines] = useState([]);
   const [coverage, setCoverage] = useState(null);
+  // Cut Panel / Garment processes of the order with no PO raised yet: the Work Order waits for them
+  const [jobWorkGaps, setJobWorkGaps] = useState([]);
   const [allowanceWarn, setAllowanceWarn] = useState(null);
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
@@ -79,6 +84,7 @@ const WorkOrderForm = () => {
       setSaved(wo);
       const o = await hydrateOrder(wo.orderId);
       getWorkOrderCoverage(wo.orderId, id).then(setCoverage);
+      getWorkOrderJobWorkGaps(wo.orderId).then(setJobWorkGaps);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
         setAllowanceWarn({ stored: wo.allowancePercent, live: o.allowancePercent });
       }
@@ -106,6 +112,8 @@ const WorkOrderForm = () => {
     // the order's delivery date (its earliest line dispatch date) is the default; still editable
     form.setFieldValue('plannedDeliveryDate', o?.deliveryDate ? dayjs(o.deliveryDate) : null);
     getWorkOrderCoverage(orderId).then(setCoverage);
+    setJobWorkGaps([]);
+    getWorkOrderJobWorkGaps(orderId).then(setJobWorkGaps);
   };
 
   const handleCuttingPoSelect = async (cpId) => {
@@ -184,6 +192,7 @@ const WorkOrderForm = () => {
 
   if (booting) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
   const ppApproved = isPpApproved(ppStatus);
+  const blockedByJobWork = jobWorkGaps.length > 0;
   const isVendor = unitType === PROCESSING_UNIT_TYPE.VENDOR;
 
   const tabs = [
@@ -225,6 +234,19 @@ const WorkOrderForm = () => {
               </Space>
             }
           />
+        )}
+        {jobWorkGaps.length > 0 && (
+          <Alert type="error" showIcon style={{ marginBottom: 16 }}
+            title="Raise the job-work POs for this order before its Work Order"
+            description={(
+              <Space wrap style={{ marginTop: 4 }}>
+                {jobWorkGaps.map((g) => (
+                  <Tag key={`${g.kind}-${g.requirementId}-${g.processName}`} color={g.kind === 'GARMENT' ? 'purple' : 'geekblue'}>
+                    {JOB_WORK_PO[g.kind]} · {g.processName} ({g.requirementNo})
+                  </Tag>
+                ))}
+              </Space>
+            )} />
         )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
@@ -271,9 +293,12 @@ const WorkOrderForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={isEdit ? 'Edit Work Order' : 'New Work Order'} backPath="/purchase-orders/work-order/list">
-        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft', !cuttingPo)} onClick={() => save(false)} />
-        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !cuttingPo || !ppApproved)}
-          tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
+        {/* A new Work Order waits for its job-work POs; a saved draft can still be edited, not submitted */}
+        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft', !cuttingPo || (!isEdit && blockedByJobWork))}
+          tooltip={!isEdit && blockedByJobWork ? JOB_WORK_GAP_TIP : undefined} onClick={() => save(false)} />
+        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !cuttingPo || !ppApproved || blockedByJobWork)}
+          tooltip={blockedByJobWork ? JOB_WORK_GAP_TIP : (!ppApproved ? 'PP Sample not yet approved for this order' : undefined)}
+          onClick={() => save(true)} />
       </PageHeader>
       <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>
     </div>

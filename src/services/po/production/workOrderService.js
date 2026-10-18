@@ -48,6 +48,13 @@ export const getApprovedWorkOrders = async (orderId) => {
   return data || [];
 };
 
+/** The order's Cut Panel / Garment processes with no job-work PO raised yet; a Work Order waits for them. */
+export const getWorkOrderJobWorkGaps = async (orderId) => {
+  if (USE_MOCK_PRODUCTION_DATA) return [];
+  const { data } = await axiosInstance.get(`${BASE}/job-work-gaps`, { params: { orderId } });
+  return data || [];
+};
+
 export const getWorkOrderCoverage = async (orderId, excludeId) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.getOrderCoverage('WORK_ORDER', orderId, excludeId);
   const { data } = await axiosInstance.get(`${BASE}/coverage`, { params: { orderId, excludeId } });
