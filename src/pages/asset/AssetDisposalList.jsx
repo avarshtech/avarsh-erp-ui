@@ -15,7 +15,8 @@ import {
 } from '../../services/asset/disposalService';
 import { toastUnlessHandled } from '../../utils/apiError';
 import { conditionMeta, DISPOSAL_STATUS, disposalStatusMeta } from '../../utils/assetConstants';
-import TransferDecisionDialog from './components/TransferDecisionDialog';
+import DecisionDialog from './components/DecisionDialog';
+import { DISPOSAL_DECISIONS } from './components/decisionCopy';
 import AssetDisposalDialog from './components/AssetDisposalDialog';
 
 const fetchPage = ({ page, ...rest }) => getDisposals({ ...rest, page: page - 1 });
@@ -131,7 +132,8 @@ const AssetDisposalList = () => {
             <ActionButton action="approve" size="small" aria-label="Approve" onClick={() => { setSelected(row); setDialog('approve'); }} />
           )}
           {row.allowedActions?.includes('reject') && (
-            <ActionButton action="reject" size="small" aria-label="Reject" onClick={() => { setSelected(row); setDialog('reject'); }} />
+            <ActionButton action="reject" size="small" aria-label={`Send ${row.disposalNo} back for correction`}
+              onClick={() => { setSelected(row); setDialog('reject'); }} />
           )}
           {row.allowedActions?.includes('cancel') && (
             <ActionButton action="cancel" size="small" aria-label={`Cancel ${row.disposalNo}`}
@@ -230,9 +232,16 @@ const AssetDisposalList = () => {
         onRaised={(saved) => { setEditing(null); refresh(saved); }}
       />
 
-      <TransferDecisionDialog
+      {/* A disposal is not a transfer. It used to be dressed up as one here -
+          transferNo and interUnit forged onto the row - so that a dialog whose
+          words were written for transfers would accept it, and approving a
+          disposal asked "Approve this transfer?" and promised a challan. The
+          mechanism is shared; the sentences are this document's own. */}
+      <DecisionDialog
         action={dialog}
-        transfer={shown ? { ...shown, transferNo: shown.disposalNo, interUnit: false } : null}
+        record={shown}
+        docNo={shown?.disposalNo}
+        copy={DISPOSAL_DECISIONS}
         onClose={() => setDialog(null)}
         onDone={refresh}
         handlers={{ approve: approveDisposal, reject: rejectDisposal, cancel: cancelDisposal }}

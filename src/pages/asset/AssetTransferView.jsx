@@ -9,7 +9,8 @@ import {
   getTransfer, rejectTransfer, submitTransfer,
 } from '../../services/asset/transferService';
 import { conditionMeta, transferStatusMeta } from '../../utils/assetConstants';
-import TransferDecisionDialog from './components/TransferDecisionDialog';
+import DecisionDialog from './components/DecisionDialog';
+import { TRANSFER_DECISIONS } from './components/decisionCopy';
 import TransferReceiptDialog from './components/TransferReceiptDialog';
 import TransferActionBar from './components/TransferActionBar';
 import { printAssetChallan } from '../../utils/assetChallanPrint';
@@ -187,9 +188,11 @@ const AssetTransferView = () => {
               />
             </Card>
 
-            <TransferDecisionDialog
+            <DecisionDialog
               action={dialog}
-              transfer={transfer}
+              record={transfer}
+              docNo={transfer.transferNo}
+              copy={TRANSFER_DECISIONS}
               onClose={() => setDialog(null)}
               onDone={(saved) => { setTransfer(saved); setDialog(null); }}
               handlers={{
