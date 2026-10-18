@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { App, Card, Col, Menu, Row, Spin } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import useAssetLookups from '../../hooks/useAssetLookups';
 import { toastUnlessHandled } from '../../utils/apiError';
@@ -35,6 +36,7 @@ const AssetReports = () => {
   const [values, setValues] = useState({});
   const [range, setRange] = useState(null);
   const [report, setReport] = useState(null);
+  const [ranAt, setRanAt] = useState(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(null);
   const [extra, setExtra] = useState({ methods: [], runs: [], employees: [] });
@@ -89,7 +91,11 @@ const AssetReports = () => {
   const run = async () => {
     setRunning(true);
     try {
-      setReport(await runReport(code, filter()));
+      const result = await runReport(code, filter());
+      // Stamped when the rows arrive. The header used to read the clock as it
+      // drew, so a report left on screen went on claiming to be fresh.
+      setRanAt(dayjs());
+      setReport(result);
     } catch (e) {
       toastUnlessHandled(message, e, 'Could not run the report');
     } finally {
@@ -162,7 +168,7 @@ const AssetReports = () => {
             hasReport={!!report}
           />
 
-          <AssetReportResult report={report} title={definition?.label} loading={running} />
+          <AssetReportResult report={report} ranAt={ranAt} title={definition?.label} loading={running} />
         </Col>
       </Row>
     </div>

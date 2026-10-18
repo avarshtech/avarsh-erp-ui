@@ -24,7 +24,7 @@ const formatter = (type) => {
  * exports it, prints it, or reads down it, and server paging would make the
  * sub-totals of a grouped report arrive on a different page from their rows.
  */
-const AssetReportResult = ({ report, title, loading }) => {
+const AssetReportResult = ({ report, ranAt, title, loading }) => {
   const columns = useMemo(() => (report?.columns ?? []).map((col, index) => {
     const format = formatter(col.fieldType);
     return {
@@ -62,8 +62,7 @@ const AssetReportResult = ({ report, title, loading }) => {
           {report.totalRows} row{report.totalRows === 1 ? '' : 's'}
           {' · '}
           {report.executionTimeMs} ms
-          {' · '}
-          run {dayjs().format('DD-MM-YYYY HH:mm')}
+          {ranAt && `${' · '}run ${ranAt.format('DD-MM-YYYY HH:mm')}`}
         </Text>
       )}
     >
