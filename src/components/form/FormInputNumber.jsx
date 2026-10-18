@@ -24,11 +24,11 @@ const FormInputNumber = ({
       props.prefix = getCurrencySymbol(currency);
       props.step = 0.01;
     } else if (variant === 'percentage') {
-      props.addonAfter = '%';
+      props.suffix = '%';
       props.max = 100;
       props.step = 0.5;
     } else if (variant === 'quantity') {
-      props.addonAfter = uom?.toUpperCase();
+      props.suffix = uom?.toUpperCase();
       props.step = 0.01;
     }
 

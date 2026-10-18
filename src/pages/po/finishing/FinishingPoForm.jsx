@@ -32,6 +32,9 @@ const FinishingPoForm = () => {
   const [units, setUnits] = useState([]);
   const [hasShortage, setHasShortage] = useState(false);
   const [booting, setBooting] = useState(true);
+  // The form renders only once the PO has loaded, so its values go in as initialValues: setting them on the
+  // instance while the spinner shows warns that it is not connected to any Form
+  const [initialValues, setInitialValues] = useState(null);
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
 
@@ -46,7 +49,7 @@ const FinishingPoForm = () => {
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
         setStock(await getStockByBom(record, 'packing', { plannedQty: record.totalPlannedQty, branchId: record.branchId }));
       }
-      form.setFieldsValue({
+      setInitialValues({
         plannedStartDate: record.plannedStartDate ? dayjs(record.plannedStartDate) : null,
         plannedEndDate: record.plannedEndDate ? dayjs(record.plannedEndDate) : null,
         processingUnitId: record.processingUnitId,
@@ -157,7 +160,7 @@ const FinishingPoForm = () => {
         <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !ppApproved)}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
       </PageHeader>
-      <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>
+      <Card><Form form={form} layout="vertical" initialValues={initialValues}><Tabs items={tabs} /></Form></Card>
     </div>
   );
 };

@@ -216,7 +216,7 @@ const PayrollWizard = () => {
                 label: `Details (${validation.issues.length})`,
                 children: (
                   <Table
-                    rowKey={(r, i) => `${r.employeeId ?? 'run'}-${r.code}-${i}`}
+                    rowKey={(r) => `${r.employeeId ?? 'run'}-${r.code}-${validation.issues.indexOf(r)}`}
                     dataSource={validation.issues}
                     size="small"
                     pagination={{ pageSize: 8, showSizeChanger: false }}

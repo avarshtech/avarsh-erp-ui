@@ -280,7 +280,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
                     pagination={false}
                     size="small"
                     scroll={{ x: 600 }}
-                    rowKey={(r, i) => r.id || i}
+                    rowKey={(r) => r.id ?? lineItems.indexOf(r)}
                     style={{ borderRadius: 8, overflow: 'hidden' }}
                   />
                 </div>

@@ -122,7 +122,7 @@ const FabricQCRollInspectionTable = memo(function FabricQCRollInspectionTable({
         }
       />
       <Table
-        rowKey={(r, i) => `${r.rollNumber}-${i}`}
+        rowKey={(r) => `${r.rollNumber}-${rolls.indexOf(r)}`}
         columns={columns}
         dataSource={rolls}
         pagination={false}

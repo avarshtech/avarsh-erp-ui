@@ -417,7 +417,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric', on
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 840 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${qc.rolls.indexOf(r)}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 840 }} />
               </Card>
             )}
 
@@ -433,7 +433,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric', on
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricDefectColumns} dataSource={qc.defects} pagination={false} size="small" scroll={{ x: 600 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${qc.defects.indexOf(r)}`} columns={fabricDefectColumns} dataSource={qc.defects} pagination={false} size="small" scroll={{ x: 600 }} />
               </Card>
             )}
 

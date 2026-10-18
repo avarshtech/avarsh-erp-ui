@@ -52,6 +52,9 @@ const ReportResultsTable = memo(function ReportResultsTable({
     }));
   }, [columns, sourceHasCurrency]);
 
+  // A row without an id is keyed by its place on the page (antd's rowKey index parameter is deprecated)
+  const rowKeys = useMemo(() => new Map(data.map((row, i) => [row, i])), [data]);
+
   const tablePagination = useMemo(() => {
     if (!pagination) return false;
     return {
@@ -71,7 +74,7 @@ const ReportResultsTable = memo(function ReportResultsTable({
       loading={loading}
       pagination={tablePagination}
       onChange={onTableChange}
-      rowKey={(record, index) => record.id ?? index}
+      rowKey={(record) => record.id ?? rowKeys.get(record)}
       scroll={{ x: 'max-content' }}
       sticky
       size="middle"

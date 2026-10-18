@@ -5,6 +5,7 @@ import { ActionButton } from '../../components/buttons';
 import { hasPermission } from '../../utils/permissions';
 import { toastUnlessHandled } from '../../utils/apiError';
 import { getActiveOrganisation, saveOrganisation } from '../../services/admin/organisationService';
+import useFormValuesWhenReady from '../../hooks/useFormValuesWhenReady';
 
 const MODULE_ID = 'company-profile';
 const { TextArea } = Input;
@@ -37,6 +38,8 @@ const CompanyProfile = () => {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // The form shows only once the profile has loaded; its values go in after it mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !loading);
 
   const canEdit = hasPermission(MODULE_ID, org ? 'update' : 'add');
 
@@ -45,13 +48,13 @@ const CompanyProfile = () => {
     try {
       const active = await getActiveOrganisation();
       setOrg(active);
-      form.setFieldsValue(active || { commercialInvoiceSeries: 'EXSG', sampleInvoiceSeries: 'SA' });
+      setLoadedValues(active || { commercialInvoiceSeries: 'EXSG', sampleInvoiceSeries: 'SA' });
     } catch (e) {
       toastUnlessHandled(message, e, 'Failed to load the company profile');
     } finally {
       setLoading(false);
     }
-  }, [form, message]);
+  }, [setLoadedValues, message]);
 
   useEffect(() => { load(); }, [load]);
 

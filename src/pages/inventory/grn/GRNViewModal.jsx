@@ -383,7 +383,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={rolls} pagination={false} size="small" scroll={{ x: 900 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${rolls.indexOf(r)}`} columns={fabricRollColumns} dataSource={rolls} pagination={false} size="small" scroll={{ x: 900 }} />
               </Card>
             )}
 
@@ -399,7 +399,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.itemCode}-${i}`} columns={accItemColumns} dataSource={grn.items} pagination={false} size="small" scroll={{ x: 800 }} />
+                <Table rowKey={(r) => `${r.itemCode}-${grn.items.indexOf(r)}`} columns={accItemColumns} dataSource={grn.items} pagination={false} size="small" scroll={{ x: 800 }} />
               </Card>
             )}
 
@@ -415,7 +415,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.cartonNumber}-${i}`} columns={cartonColumns} dataSource={grn.cartons} pagination={false} size="small" scroll={{ x: 600 }} />
+                <Table rowKey={(r) => `${r.cartonNumber}-${grn.cartons.indexOf(r)}`} columns={cartonColumns} dataSource={grn.cartons} pagination={false} size="small" scroll={{ x: 600 }} />
               </Card>
             )}
 

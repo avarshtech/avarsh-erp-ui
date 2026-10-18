@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Form, Radio, DatePicker } from 'antd';
+import { Row, Col, Form, Input, Radio, DatePicker } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { DATE_FORMAT } from '../../../utils/uiConstants';
 import { PROCESSING_UNIT_TYPE, PROCESSING_UNIT_OPTIONS, PO_TYPE } from '../../../utils/productionConstants';
@@ -62,7 +62,7 @@ const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) 
             onChange={handleUnitChange}
           />
         </Form.Item>
-        <Form.Item name="processingUnitName" hidden><input /></Form.Item>
+        <Form.Item name="processingUnitName" hidden><Input /></Form.Item>
       </Col>
       <Col xs={24} md={12}>
         <Form.Item

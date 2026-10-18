@@ -7,6 +7,7 @@ import { ActionButton } from '../../../components/buttons';
 import { FormSelect, FormDatePicker, FormInputNumber, FormSection } from '../../../components/form';
 import { numericInputProps } from '../../../utils/inputHelpers';
 import useBusyAction from '../../../hooks/useBusyAction';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
 import MaterialStockPanel from '../components/MaterialStockPanel';
@@ -57,16 +58,19 @@ const WorkOrderForm = () => {
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
+  // An edit shows the form only once the PO has loaded; its values go in after the form mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !booting);
   const [saved, setSaved] = useState(null); // the work order being edited, for its refer-back notice
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => { getConfirmedOrders().then(setOrders); getSewingLines().then(setLines); }, []);
 
-  const hydrateOrder = useCallback(async (orderId) => {
+  // branchId: the edited Work Order's own, or the form's (a new one); the form is not mounted while an edit loads
+  const hydrateOrder = useCallback(async (orderId, branchId = form.getFieldValue('branchId')) => {
     const [o, pp, cps] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId), getApprovedCuttingPos(orderId)]);
     setOrder(o); setPpStatus(pp); setCuttingPos(cps);
-    setStock(normTrimStock(await getStockByBom(o, 'trim', { branchId: form.getFieldValue('branchId') })));
+    setStock(normTrimStock(await getStockByBom(o, 'trim', { branchId })));
     return o;
   }, [form]);
 
@@ -82,7 +86,7 @@ const WorkOrderForm = () => {
     getWorkOrder(id).then(async (wo) => {
       if (!wo) { message.error('Work Order not found'); return navigate('/purchase-orders/work-order/list'); }
       setSaved(wo);
-      const o = await hydrateOrder(wo.orderId);
+      const o = await hydrateOrder(wo.orderId, wo.branchId);
       getWorkOrderCoverage(wo.orderId, id).then(setCoverage);
       getWorkOrderJobWorkGaps(wo.orderId).then(setJobWorkGaps);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
@@ -94,7 +98,7 @@ const WorkOrderForm = () => {
       };
       setCuttingPo(cp);
       setItems(wo.items || []);
-      form.setFieldsValue({
+      setLoadedValues({
         orderId: wo.orderId, cuttingPoId: wo.cuttingPoId, branchId: wo.branchId,
         plannedStartDate: wo.plannedStartDate ? dayjs(wo.plannedStartDate) : null,
         plannedEndDate: wo.plannedEndDate ? dayjs(wo.plannedEndDate) : null,

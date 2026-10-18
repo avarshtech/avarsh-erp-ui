@@ -10,6 +10,7 @@ import { FormSection, FormInput, FormSelect, FormDatePicker } from '../../../com
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import useBusyAction from '../../../hooks/useBusyAction';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 import { hasPermission } from '../../../utils/permissions';
 import { validate } from '../../../utils/expDocValidation';
 import { PACKING_ENTRY_STATUS_CONFIG } from '../../../utils/statusConfig';
@@ -70,6 +71,10 @@ const CartonPackingForm = () => {
   const { busy, setBusy, busyProps } = useBusyAction();
   const [loadError, setLoadError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
+  // A loaded entry's header waits for the form to mount (the skeleton shows until then); the style is
+  // watched rather than read in render, before the form exists
+  const setLoadedHeader = useFormValuesWhenReady(form, !loading);
+  const styleNo = Form.useWatch('styleNo', form);
 
   const [orderOptions, setOrderOptions] = useState([]);
   const [orderLoading, setOrderLoading] = useState(false);
@@ -103,7 +108,7 @@ const CartonPackingForm = () => {
         getOrderById(data.orderId, { silent: true })
           .then((order) => { if (!cancelled) setOrderPos(orderPosOf(order)); })
           .catch(() => { if (!cancelled) setOrderPos([]); });
-        form.setFieldsValue({
+        setLoadedHeader({
           orderNo: data.orderNo,
           packingDate: data.packingDate ? dayjs(data.packingDate) : null,
           buyerName: data.buyerName,
@@ -355,7 +360,7 @@ const CartonPackingForm = () => {
         sectionKey={key}
         readOnly={readOnly}
         issuesByRow={issuesByRow}
-        styleNo={form.getFieldValue('styleNo')}
+        styleNo={styleNo}
         buyerPoNo={null}
         poOptions={orderPos}
         onChange={handleGroupsChange}

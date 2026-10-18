@@ -7,6 +7,7 @@ import { ActionButton } from '../../../components/buttons';
 import { FormSelect, FormDatePicker, FormSection } from '../../../components/form';
 import { numericInputProps } from '../../../utils/inputHelpers';
 import useBusyAction from '../../../hooks/useBusyAction';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
 import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel';
@@ -54,6 +55,8 @@ const CuttingPoForm = () => {
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
+  // An edit shows the form only once the PO has loaded; its values go in after the form mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !booting);
   const [saved, setSaved] = useState(null); // the PO being edited, for its refer-back notice
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
@@ -62,7 +65,8 @@ const CuttingPoForm = () => {
 
   // plannedQty: the PO's total when editing; a fresh order's own planned rows otherwise.
   // Both the consumption totals and the stock requirement are per-piece × this total.
-  const hydrateFromOrder = useCallback(async (orderId, cadPerPc, plannedQty) => {
+  // branchId: the edited PO's own, or the form's (a new PO); the form is not mounted while an edit loads
+  const hydrateFromOrder = useCallback(async (orderId, cadPerPc, plannedQty, branchId = form.getFieldValue('branchId')) => {
     const [o, pp, alloc] = await Promise.all([
       getOrderForPo(orderId), getPpApprovalStatus(orderId),
       getOrderAllocations(orderId).catch(() => null),
@@ -71,7 +75,7 @@ const CuttingPoForm = () => {
     const cons = await getConsumptionComparison(o, cadPerPc, total);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
     setAllocations(alloc?.rows || []);
-    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') })));
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, plannedQty: total, branchId })));
     return o;
   }, [form]);
 
@@ -81,13 +85,13 @@ const CuttingPoForm = () => {
     getCuttingPo(id).then(async (po) => {
       if (!po) { message.error('Cutting PO not found'); return navigate('/purchase-orders/cutting-po/list'); }
       setSaved(po);
-      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc, po.totalPlannedQty);
+      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc, po.totalPlannedQty, po.branchId);
       setItems(po.items || []);
       getCuttingPoCoverage(po.orderId, id).then(setCoverage);
       if (o && po.allowancePercent != null && o.allowancePercent !== po.allowancePercent) {
         setAllowanceWarn({ stored: po.allowancePercent, live: o.allowancePercent });
       }
-      form.setFieldsValue({
+      setLoadedValues({
         orderId: po.orderId, plannedCutDate: po.plannedCutDate ? dayjs(po.plannedCutDate) : null,
         plannedDeliveryDate: po.plannedDeliveryDate ? dayjs(po.plannedDeliveryDate) : null,
         orderAllocationId: po.orderAllocationId, branchId: po.branchId,

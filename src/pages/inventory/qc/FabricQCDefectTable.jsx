@@ -106,7 +106,7 @@ const FabricQCDefectTable = memo(function FabricQCDefectTable({
   return (
     <>
       <Table
-        rowKey={(_, idx) => idx}
+        rowKey={(r) => defects.indexOf(r)}
         columns={columns}
         dataSource={defects}
         pagination={false}

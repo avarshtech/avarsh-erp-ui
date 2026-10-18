@@ -48,7 +48,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable =
 
   return (
     <Table
-      rowKey={(r, i) => `${r.color}-${r.size}-${i}`}
+      rowKey={(r) => `${r.color}-${r.size}-${items.indexOf(r)}`}
       columns={columns}
       dataSource={items}
       pagination={false}

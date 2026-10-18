@@ -114,13 +114,15 @@ const ExpandableTable = memo(function ExpandableTable({ columns, data }) {
 
   const needsExpand = data.length > PREVIEW_ROWS;
   const displayData = expanded ? data : data.slice(0, PREVIEW_ROWS);
+  // Rows carry no id; key each by its place in the result (antd's rowKey index parameter is deprecated)
+  const rowKeys = useMemo(() => new Map(data.map((row, i) => [row, i])), [data]);
 
   return (
     <div>
       <Table
         columns={columns}
         dataSource={displayData}
-        rowKey={(_, index) => index}
+        rowKey={(row) => rowKeys.get(row)}
         size="small"
         pagination={false}
         scroll={{ x: 'max-content' }}

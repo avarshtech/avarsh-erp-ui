@@ -1,4 +1,4 @@
-import { Row, Col, Form, Typography } from 'antd';
+import { Row, Col, Form, Input, Typography } from 'antd';
 import FileUpload from '../../../components/FileUpload';
 import { FormInputNumber } from '../../../components/form';
 
@@ -26,7 +26,7 @@ const MarkerUploadCard = ({ disabled = false }) => {
           onSelect={(file) => form.setFieldValue('markerFileUrl', file.name)}
           onRemove={() => form.setFieldValue('markerFileUrl', null)}
         />
-        <Form.Item name="markerFileUrl" hidden><input /></Form.Item>
+        <Form.Item name="markerFileUrl" hidden><Input /></Form.Item>
       </Col>
       <Col xs={24} md={10}>
         <Form.Item name="markerEfficiency" label="Marker Efficiency">

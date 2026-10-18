@@ -23,6 +23,7 @@ import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
 import { unitOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 
 const { TextArea } = Input;
 
@@ -173,6 +174,8 @@ const EmployeeForm = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  // The form shows only once the employee has loaded; their values go in after it mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !loading);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
@@ -222,7 +225,7 @@ const EmployeeForm = () => {
     setLoading(true);
     getEmployeeById(id)
       .then((emp) => {
-        form.setFieldsValue({
+        setLoadedValues({
           ...emp,
           dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
           dateOfJoining: emp.dateOfJoining ? dayjs(emp.dateOfJoining) : null,
@@ -235,7 +238,7 @@ const EmployeeForm = () => {
       })
       .catch(() => message.error('Failed to load employee'))
       .finally(() => setLoading(false));
-  }, [id, form, message]);
+  }, [id, setLoadedValues, message]);
 
   // Manager search
   const handleManagerSearch = useCallback(async (val) => {

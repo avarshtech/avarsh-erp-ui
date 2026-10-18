@@ -153,7 +153,7 @@ const LoanView = () => {
           />
         )}
         <Table
-          rowKey={(r, idx) => r.id || idx}
+          rowKey={(r) => r.id ?? recoveries.indexOf(r)}
           dataSource={recoveries}
           columns={recoveryColumns}
           pagination={false}

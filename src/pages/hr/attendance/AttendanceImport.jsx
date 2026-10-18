@@ -225,7 +225,7 @@ const AttendanceImport = () => {
           {result.issues?.length > 0 && (
             <Card size="small" title="Issues" style={{ marginBottom: 16 }}>
               <Table
-                rowKey={(r, i) => `${r.rowNumber}-${r.field}-${i}`}
+                rowKey={(r) => `${r.rowNumber}-${r.field}-${result.issues.indexOf(r)}`}
                 dataSource={result.issues}
                 columns={issueColumns}
                 size="small"
@@ -263,7 +263,7 @@ const AttendanceImport = () => {
             )}
           >
             <Table
-              rowKey={(r, i) => `${r.employeeId}-${r.attendanceDate}-${i}`}
+              rowKey={(r) => `${r.employeeId}-${r.attendanceDate}-${result.rows.indexOf(r)}`}
               dataSource={result.rows}
               columns={rowColumns}
               size="small"
