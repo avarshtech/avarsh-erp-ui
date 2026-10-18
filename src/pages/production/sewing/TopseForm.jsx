@@ -183,7 +183,7 @@ const TopseForm = () => {
           </div>
           <div>
             <FieldLabel>Total Inspected</FieldLabel>
-            <InputNumber min={0} value={report.totalInspected} style={{ width: 110 }} onChange={(v) => patch({ totalInspected: v })} />
+            <InputNumber aria-label="Total Inspected" min={0} value={report.totalInspected} style={{ width: 110 }} onChange={(v) => patch({ totalInspected: v })} />
           </div>
           <div>
             <FieldLabel>Inspector</FieldLabel>
