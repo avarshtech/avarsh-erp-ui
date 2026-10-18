@@ -187,6 +187,18 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Production flow — one fresh order from costing to packing. The upstream chain (costing →
+      // order → BOM → supplier PO → GRN → QC → stock) is built through the API, then every
+      // production stage is driven through its screen. Numbered: each file finds the order the
+      // earlier ones built. Signs in per test (the authedPage fixture), so it needs no `setup`.
+      name: 'production-flow',
+      testDir: './e2e/specs/production-flow',
+      timeout: 180000,
+      use: {
+        browserName: 'chromium',
+      },
+    },
+    {
       // Sample Requests — the module came off its localStorage mock in seven
       // stages; these specs are what proves it. Numbered because 02 raises the
       // request 03 and 04 then dispatch, invoice and close.

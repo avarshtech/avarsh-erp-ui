@@ -204,9 +204,18 @@ test.describe('HR Masters — Departments', () => {
 
     await page.getByRole('heading', { name: /Edit Department/i }).waitFor({ state: 'visible', timeout: 8000 });
 
-    // Toggle the Active switch OFF
+    // Toggle the Active switch OFF. The form ignores changes for a moment after it opens, so a flip in
+    // that moment leaves Save disabled: flip back and forth (ending OFF) until the change registers.
     const activeSwitch = page.locator('.ant-form-item').filter({ hasText: 'Active' }).first().locator('.ant-switch');
+    const save = page.getByRole('button', { name: /^(save\s+)?save$/i });
     await activeSwitch.click();
+    await expect(async () => {
+      if (await save.isEnabled()) return;
+      await activeSwitch.click();
+      await activeSwitch.click();
+      await expect(save).toBeEnabled({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+    await expect(activeSwitch).toHaveAttribute('aria-checked', 'false');
 
     // Save the status change
     const [updateResp] = await Promise.all([

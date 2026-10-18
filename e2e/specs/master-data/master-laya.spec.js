@@ -131,14 +131,17 @@ test('The chat opens by its button, drags anywhere (remembered), and double-clic
   await page.mouse.down();
   await page.mouse.move(grab.x - 700, grab.y + grab.height / 2 + 120, { steps: 8 });
   await page.mouse.up();
+  // The pointer went from grab.x + 60 to grab.x - 700, so the panel lands 760 px left of where it
+  // started, once React has rendered the last move
+  await expect.poll(async () => Math.round((await panel(page).boundingBox()).x)).toBe(Math.round(start.x - 760));
   const moved = await panel(page).boundingBox();
   expect(start.x - moved.x).toBeGreaterThan(600);
   expect(moved.y - start.y).toBeGreaterThan(100);
 
-  // Remembered after closing and opening again.
+  // Remembered after closing and opening again (measured once the open animation has settled).
   await panel(page).getByRole('button', { name: 'Close Laya AI' }).click();
   await launcher(page).click();
-  expect(Math.round((await panel(page).boundingBox()).x)).toBe(Math.round(moved.x));
+  await expect.poll(async () => Math.round((await panel(page).boundingBox()).x)).toBe(Math.round(moved.x));
 
   await handle.dblclick();
   await expect.poll(async () => Math.round((await panel(page).boundingBox()).x)).toBe(Math.round(start.x));

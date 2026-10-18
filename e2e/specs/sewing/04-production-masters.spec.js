@@ -55,11 +55,8 @@ test.describe('Production Masters', () => {
     expect(errors, errors.join('\n')).toHaveLength(0);
   });
 
-  // FIXME: this flow is verified working by hand — create, edit and delete of a
-  // production line all succeed in the browser. The spec hangs on resolving the
-  // form controls by accessible name and needs stable test ids on the panel
-  // before it can be trusted. Enable once those land.
-  test.fixme('a production line can be created, edited and deleted', async ({ page }) => {
+  // The panel's Save button is named "save Save" (its icon carries a label), so it is matched by its end.
+  test('a production line can be created, edited and deleted', async ({ page }) => {
     const name = `E2E-Line-${Date.now().toString().slice(-5)}`;
     await openMasterTab(page, 'Production Lines');
 
@@ -72,7 +69,7 @@ test.describe('Production Masters', () => {
       .first().click();
 
     await capacityField(page).fill('18');
-    await page.getByRole('button', { name: /^Save$/ }).click();
+    await page.getByRole('button', { name: /Save$/ }).click();
     await expectToast(page, /created/i);
     await settle(page);
 
@@ -81,10 +78,10 @@ test.describe('Production Masters', () => {
     // ── edit: Save stays disabled until something actually changes ──
     await page.locator('.ant-table-tbody tr').filter({ hasText: name }).first().click();
     await settle(page, 600);
-    await expect(page.getByRole('button', { name: /^Save$/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Save$/ })).toBeDisabled();
 
     await capacityField(page).fill('26');
-    await page.getByRole('button', { name: /^Save$/ }).click();
+    await page.getByRole('button', { name: /Save$/ }).click();
     await expectToast(page, /updated/i);
     await settle(page);
 
@@ -103,9 +100,7 @@ test.describe('Production Masters', () => {
     expect((await tableRows(page)).some((r) => r.includes(name))).toBe(false);
   });
 
-  // FIXME: same locator problem as the line CRUD above; the validator itself is
-  // verified — an inverted band is refused in the browser.
-  test.fixme('the incentive slab form refuses a band that ends below where it starts', async ({ page }) => {
+  test('the incentive slab form refuses a band that ends below where it starts', async ({ page }) => {
     await openMasterTab(page, 'Incentive Slabs');
     await page.getByRole('button', { name: /Add Slab/i }).click();
 
@@ -114,7 +109,7 @@ test.describe('Production Masters', () => {
     await page.getByRole('spinbutton', { name: /To Efficiency/ }).fill('80');
     await page.getByRole('spinbutton', { name: /Amount per day/ }).fill('50');
 
-    await page.getByRole('button', { name: /^Save$/ }).click();
+    await page.getByRole('button', { name: /Save$/ }).click();
     await expect(page.getByText(/must end above where it starts/i)).toBeVisible({ timeout: 10000 });
   });
 

@@ -16,6 +16,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   antTableWaitForData,
   antMessageContains,
@@ -132,14 +133,20 @@ test.describe('HR Masters — Units', () => {
   test('edit existing unit — modify name and save', async ({ page }) => {
     const stamp = STAMP();
 
+    // A unit of its own: the first row is the seed's "Unit 1 - Main Production", which the production
+    // specs pick by name, and renaming it broke them
+    const api = await createAuthenticatedClient();
+    const { status } = await api.post('/units', {
+      unitCode: `EU-${stamp}`, unitName: `E2E Edit Unit ${stamp}`, city: 'Tiruppur', state: 'TN', isActive: true,
+    });
+    expect(status).toBeLessThan(300);
+
     await goToUnits(page);
 
-    const rows = page.locator('.ant-table-row');
-    const rowCount = await rows.count();
-    test.skip(rowCount === 0, 'No unit rows to edit');
-
-    // Click the first row to open the edit form
-    await rows.first().click();
+    // Click the unit's row to open the edit form
+    const row = page.locator('.ant-table-row').filter({ hasText: `EU-${stamp}` }).first();
+    await row.waitFor({ state: 'visible', timeout: 10000 });
+    await row.click();
 
     // Wait for edit form panel to appear
     await page.getByRole('heading', { name: /Edit Unit|View Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
@@ -149,10 +156,13 @@ test.describe('HR Masters — Units', () => {
     const isReadOnly = await saveBtn.isHidden().catch(() => true);
     test.skip(isReadOnly, 'Unit form is read-only for this user');
 
-    // Modify the Unit Name
+    // Modify the Unit Name. The form ignores changes for a moment after it opens, so retype until Save wakes.
     const nameInput = page.locator('.ant-form-item').filter({ hasText: 'Unit Name' }).first().locator('input').first();
-    await nameInput.clear();
-    await nameInput.fill(`E2E Updated Unit ${stamp}`);
+    await expect(async () => {
+      await nameInput.fill(`E2E Updated Unit ${stamp}`);
+      await expect(saveBtn).toBeEnabled({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+    await api.dispose();
 
     // Save and wait for PUT API response
     const [updateResp] = await Promise.all([

@@ -6,7 +6,7 @@ import {
 } from '../../helpers/antd-helpers.js';
 import { navigateWithAuth, ensureSessionActive, waitForPageReady } from '../../helpers/navigation.js';
 import {
-  findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload, submitGrn,
+  findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload, submitGrn, trimsGrnPayload,
 } from '../../helpers/grn-qc-data.js';
 
 let api;
@@ -51,7 +51,8 @@ test.describe('GRN UI Tests', () => {
     await page.waitForTimeout(2000);
 
     // 2. Check line item checkbox if present
-    const rowCheckboxes = page.locator('.ant-table-tbody .ant-checkbox-input:not([disabled])');
+    // Data rows only: a sticky table repeats its header (with a "Select all" box) inside the body
+    const rowCheckboxes = page.locator('.ant-table-tbody .ant-table-row .ant-checkbox-input:not([disabled])');
     await page.waitForTimeout(500);
     if (await rowCheckboxes.count() > 0) {
       await rowCheckboxes.first().check();
@@ -146,7 +147,8 @@ test.describe('GRN UI Tests', () => {
     await page.waitForTimeout(2000);
 
     // Check checkbox
-    const rowCheckboxes = page.locator('.ant-table-tbody .ant-checkbox-input:not([disabled])');
+    // Data rows only: a sticky table repeats its header (with a "Select all" box) inside the body
+    const rowCheckboxes = page.locator('.ant-table-tbody .ant-table-row .ant-checkbox-input:not([disabled])');
     await page.waitForTimeout(500);
     if (await rowCheckboxes.count() > 0) {
       await rowCheckboxes.first().check();
@@ -463,6 +465,15 @@ test.describe('QC UI Tests', () => {
   });
 
   test('Test 8: Create Trims QC via UI', async ({ page }) => {
+    // A trims GRN waiting for QC, of this test's own: the form only offers QC-pending GRNs, and the
+    // ones other files leave behind are not there when this file runs alone
+    test.skip(!accessoriesPO, 'No Accessories PO');
+    await refreshPO(api, accessoriesPO);
+    const trim = accessoriesPO.items.find((i) => i.pendingQty > 0);
+    test.skip(!trim, 'No trims balance left on the Accessories PO');
+    const pending = await submitGrn(api, trimsGrnPayload(accessoriesPO, [{ ...trim, pendingQty: 1 }]));
+    expect(pending.status).toBe('QC_Pending');
+
     const apiErrors = [];
     page.on('response', (response) => {
       if (response.url().includes('/api/v1/') && response.status() >= 500) {

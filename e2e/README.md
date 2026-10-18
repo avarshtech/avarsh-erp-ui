@@ -143,6 +143,7 @@ On 2026-10-13, `npx playwright test --list` counted 919 tests in 126 files in
 | `smoke` | `specs/smoke/` | What CI runs on every push: the route sweep (every parameter-free route in `SCREENS` loads with no page error, console error or warning), the fixtures' own checks, and each core module's records in the API and on its list. Signs in per test, so it needs no `setup`. On the dev server the sweep also catches React and antd warnings, which production builds strip. |
 | `legacy` | `e2e/costing.spec.js`, `e2e/costing-full-entry.spec.js` | The original costing specs. |
 | `master-data`, `costing`, `orders`, `bom`, `po`, `production-po`, `cutting`, `sewing`, `virtual-factory`, `tna`, `sample-requests`, `hr`, `admin`, `approvals`, `inventory`, `reports`, `validation`, `grn-qc`, `export-docs` | `specs/<project>/` | One folder per module. Where the files are numbered, they run in order and build on each other. |
+| `production-flow` | `specs/production-flow/` | One fresh order from costing to packing. The upstream chain (costing → order → BOM → supplier PO → GRN → QC → stock) is built through the API; then every production stage runs on its screen: the floor masters, the Cutting PO and fabric issue, the Work Order, the cutting room (receipt, relaxation, marker plan and size-set, lay audit, TMB, cutting report, bundling, issue to sewing, re-cut, reconciliation), the sewing floor (plan, cut-parts receipt, trim card, hourly sheet, measurement, end-line check, replacements, garment issue), finishing on the API (Finishing PO, receiving, garment process out and back, garment check) and packing. Numbered: each file finds the order the earlier ones built (`helpers/production-flow-seed.js`). Signs in per test, so it needs no `setup`; about 6 minutes. |
 | `journey` | `specs/journey/` | Creates every record through the real screens (masters, costing, BOM, order, PO, GRN). Numbered and idempotent; 15-minute test timeout; video on. |
 | `branch` | `specs/branch/` | Makes the company multi-branch, and `99-restore-single-branch` closes the branches again. Declared last: run nothing after it until the restore has run. |
 | `rbac-soak-setup`, `rbac-soak-merch`, `rbac-soak-store`, `rbac-soak-costing` (demo config) | `rbac-soak-setup.js`, `specs/rbac-soak/` | Non-admin roles that exist only in the e2e seed, with their own setup. |
@@ -197,22 +198,28 @@ e2e/
 
 ## Known failures
 
-As of 2026-10-13 these fail on a clean `dev`. Check this list before you blame your change, and
+As of 2026-10-19 these fail on a clean `dev`. Check this list before you blame your change, and
 delete a row in the commit that fixes it.
 
 | Spec | Cause |
 |---|---|
-| `master-data/process.spec.js`, the serial "UI Operations" block | Marked `test.describe.fixme`: the screen now derives Type from the category and has no Cost/Allowance toggle. Needs a rewrite. |
-| `grn-qc` | Spec defects, for example `grn-qc-ui.spec.js:136` "Test 5: Create Accessories GRN via UI", where the sticky header intercepts the checkbox click. |
-| `inventory/bill-passing.spec.js` list tests: `:79` "the list loads from the API and shows its KPI cards", `:127` "a bill is raised, saved, referred back and resubmitted" | Not diagnosed yet. |
+| `journey` from `00-contract-smoke.spec.js:105` on | The journey's dataset (`data/garment-dataset.js`, the fixture in `00`) reuses names the e2e seed now owns under its own taxonomy: the seed has "Single Jersey" under "Knit", the journey wants it under "Knits". `ensureMasterRecord` checks by name only, so it skips the item type, and the fabric item cannot be created; every later step follows. Needs the dataset moved onto names of its own. |
 | `export-docs/buyer-templates.spec.js:74`, the font picker step | Flaky: the click can land while the option list re-renders. It passes on a re-run. |
 
 Things that look like failures but come from the environment:
 
 - The first run after starting vite times out the `setup` login: warm the dev server first.
 - Two Playwright processes on one stack time out `setup` and report "N did not run".
+- **A run longer than about two hours loses its login.** `setup` writes `e2e/.auth/user.json`
+  once and the session idles out after 120 minutes, so every spec that uses the saved state
+  lands on the login page after that (specs on the `authedPage` fixture are not affected). The
+  full suite takes longer than that on a laptop: run it in batches of projects that each finish
+  in under ~90 minutes, since each command runs `setup` again.
 - An API that has run for hours (after several full projects) slows down until costing
   scenarios and the `journey` pickers fail. Prove a regression on a freshly booted API.
+- Re-running a project on the same database is not always idempotent:
+  `production-po/02-work-order.spec.js:68` needs ORD/0003 to have no Garment Washing PO yet,
+  which holds only on the run after a boot.
 
 ## CI
 

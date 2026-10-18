@@ -6,6 +6,7 @@
 // Idempotent: small quantities against the large V117 stock budget
 // (ROLL-E2E-001 800kg, TRM-BTN-001 30000pc) tolerate repeated runs.
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { navigateWithAuth, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
 import { waitForTableSettled } from '../../helpers/ui-master.js';
 import { selectOptionByText, expectSuccessToast } from './helpers.js';
@@ -32,6 +33,35 @@ async function readIssueNumberFromToast(page) {
   return match[0];
 }
 
+/**
+ * The Cutting PO and Work Order specs 01/02 raised on ORD/0003 through their screens: they carry the
+ * order's BOM, which the issue lines come from. The pick-lists hold other projects' POs too (the newest
+ * first, and API-made ones carry no BOM), so the spec picks these by number.
+ */
+async function bomDocsOfOrder() {
+  const api = await createAuthenticatedClient();
+  try {
+    const { data: orders } = await api.get('/production/eligible-orders');
+    const order = orders.find((o) => o.orderNo === ORDER_NO);
+    const { data: cuts } = await api.get(`/cutting-po/approved?orderId=${order.id}`);
+    const { data: wos } = await api.get(`/work-order/approved?orderId=${order.id}`);
+    const cut = cuts.find((c) => c.bomId);
+    const wo = wos.find((w) => w.bomId);
+    if (!cut || !wo) throw new Error(`run 01 and 02 first: ${ORDER_NO} needs an approved Cutting PO and Work Order with its BOM`);
+    return { cuttingPoNo: cut.cuttingPoNo, workOrderNo: wo.workOrderNo };
+  } finally {
+    await api.dispose();
+  }
+}
+
+/** Pick `text` in the form select labelled `label`, typing it into the select's search first. */
+async function searchAndPick(page, label, text) {
+  const select = page.locator('.ant-form-item').filter({ has: page.locator('label', { hasText: label }) }).first().locator('.ant-select').first();
+  await select.click();
+  await select.locator('input').first().fill(text);
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option', { hasText: text }).first().click();
+}
+
 test.describe('Material Issue', () => {
   test.beforeEach(async ({ page }) => {
     await ensureSessionActive(page);
@@ -42,7 +72,8 @@ test.describe('Material Issue', () => {
     await waitForPageReady(page);
 
     // Cutting PO from spec 01, then its (single) fabric line for ORD/0003.
-    await selectOptionByText(page, 'Cutting PO', 'CPO/');
+    const { cuttingPoNo } = await bomDocsOfOrder();
+    await searchAndPick(page, 'Cutting PO', cuttingPoNo);
     await selectOptionByText(page, 'Cutting PO Line', ORDER_NO);
 
     // Real GRN rolls arrive from /material-issues/issuable-rolls.
@@ -72,7 +103,8 @@ test.describe('Material Issue', () => {
     await navigateWithAuth(page, '/inventory/issue/accessories/new');
     await waitForPageReady(page);
 
-    await selectOptionByText(page, 'Work Order', 'WO/');
+    const { workOrderNo } = await bomDocsOfOrder();
+    await searchAndPick(page, 'Work Order', workOrderNo);
 
     // BOM items table hydrates from /material-issues/work-orders.
     const trimRow = page.locator('.ant-table-row', { hasText: TRIM_CODE }).first();

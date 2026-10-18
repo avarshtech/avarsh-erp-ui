@@ -144,20 +144,26 @@ test.describe('Approval engine — multi-level PO flow', () => {
   });
 
   test('AF6 — a user whose role does not match the current level is refused', async () => {
+    // Super Admin is a superuser and may act at any level, by design (the desk of last resort, API
+    // 4410f7e), so the guard is proven with the Level-1 manager (Admin, an ordinary role) trying to
+    // act at Level 2, which wants Super Admin.
     const po = await createDraftPo(superadmin);
     await submitPo(superadmin, po.id);
 
-    const req = await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id);
-    expect(req.currentLevel).toBe(1); // Level 1 wants Admin; superadmin is Super Admin.
+    let req = await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id);
+    await actOnRequest(manager, req.id, 'APPROVE', 'L1 manager approve');
+    req = await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id);
+    expect(req.currentLevel).toBe(2);
 
-    const res = await superadmin.post(`/approval-requests/${req.id}/action`, {
+    const res = await manager.post(`/approval-requests/${req.id}/action`, {
       actionType: 'APPROVE',
       comments: 'should not be allowed',
     });
     expect(res.status, 'wrong-role approval must be refused').toBeGreaterThanOrEqual(400);
     expect(await poStatus(superadmin, po.id)).toBe('Pending_Approval');
+    expect((await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id)).currentLevel).toBe(2);
 
-    await actOnRequest(manager, req.id, 'REJECT', 'Cleanup rejection so no request stays pending.');
+    await actOnRequest(superadmin, req.id, 'REJECT', 'Cleanup rejection so no request stays pending.');
   });
 
   test('AF10 — a second submit while a request is PENDING is refused', async () => {
@@ -180,20 +186,22 @@ test.describe('Approval engine — multi-level PO flow', () => {
   test('AF5 — preventSelfApproval blocks the submitter, a peer with the same role may act', async () => {
     // The seeded PO flow has preventSelfApproval unset; build a dedicated 1-level
     // COST_SHEET flow with the guard on, driven by a REAL cost sheet so the
-    // CostSheetApprovalListener has an entity to transition. A second Super Admin
-    // user ("director") proves the guard blocks the submitter, not the role.
+    // CostSheetApprovalListener has an entity to transition. The level wants Admin, an
+    // ordinary role: Super Admin is a superuser and no maker-checker guard stops it, by
+    // design (API 4410f7e). The manager (Admin) submits; a second Admin user ("peer")
+    // proves the guard blocks the submitter, not the role.
     const { data: roles } = await superadmin.get('/roles');
-    const superRole = (Array.isArray(roles) ? roles : roles?.content || []).find((r) => r.name === 'Super Admin');
+    const adminRole = (Array.isArray(roles) ? roles : roles?.content || []).find((r) => r.name === 'Admin');
 
-    const director = await ensureUser(superadmin, {
-      name: 'E2E Director',
-      username: 'e2e-director',
-      password: 'Director@123',
-      email: 'e2e-director@avarsh.com',
-      roleId: superRole.id,
+    const peer = await ensureUser(superadmin, {
+      name: 'E2E Peer Manager',
+      username: 'e2e-manager-peer',
+      password: 'Manager@123',
+      email: 'e2e-manager-peer@avarsh.com',
+      roleId: adminRole.id,
     });
-    expect(director).toBeTruthy();
-    const directorApi = await createAuthenticatedClient('e2e-director', 'Director@123');
+    expect(peer).toBeTruthy();
+    const peerApi = await createAuthenticatedClient('e2e-manager-peer', 'Manager@123');
 
     const flowRes = await superadmin.post('/approval-flows', {
       name: `E2E SelfApproval Guard ${Date.now()}`,
@@ -205,7 +213,7 @@ test.describe('Approval engine — multi-level PO flow', () => {
         levelNumber: 1,
         levelName: 'Only level',
         approverType: 'ROLE',
-        approverRoleId: superRole.id,
+        approverRoleId: adminRole.id,
         allowReferBack: false,
         allowReject: true,
       }],
@@ -216,17 +224,17 @@ test.describe('Approval engine — multi-level PO flow', () => {
     try {
       // Real cost sheet: Draft → submit as Final. With the flow active it must stay
       // Final with a PENDING request (not auto-approve).
-      const { data: buyers } = await superadmin.get('/buyers');
-      const { data: style } = await superadmin.post('/styles', stylePayload(buyers[0].id));
-      const draft = await superadmin.post(
+      const { data: buyers } = await manager.get('/buyers');
+      const { data: style } = await manager.post('/styles', stylePayload(buyers[0].id));
+      const draft = await manager.post(
         '/cost-sheets',
         costSheetPayload(buyers[0].id, style.id),
       );
       expect(draft.status).toBeLessThan(300);
       const sheetId = draft.data.id;
 
-      const { data: cur } = await superadmin.get(`/cost-sheets/${sheetId}`);
-      await superadmin.post(`/cost-sheets/${sheetId}/submit`, { version: cur.version });
+      const { data: cur } = await manager.get(`/cost-sheets/${sheetId}`);
+      await manager.post(`/cost-sheets/${sheetId}/submit`, { version: cur.version });
       const { data: afterSubmit } = await superadmin.get(`/cost-sheets/${sheetId}`);
       expect(afterSubmit.status, 'flow present → no auto-approve').toBe('Final');
 
@@ -234,7 +242,7 @@ test.describe('Approval engine — multi-level PO flow', () => {
       expect(req).toBeTruthy();
 
       // Submitter matches the approver role but the guard must refuse them.
-      const selfRes = await superadmin.post(`/approval-requests/${req.id}/action`, {
+      const selfRes = await manager.post(`/approval-requests/${req.id}/action`, {
         actionType: 'APPROVE',
         comments: 'self-approve attempt',
       });
@@ -242,7 +250,7 @@ test.describe('Approval engine — multi-level PO flow', () => {
       expect((await superadmin.get(`/cost-sheets/${sheetId}`)).data.status).toBe('Final');
 
       // A different user with the same role completes it — request drained, sheet Approved.
-      await actOnRequest(directorApi, req.id, 'APPROVE', 'Director approval (AF5)');
+      await actOnRequest(peerApi, req.id, 'APPROVE', 'Peer approval (AF5)');
       expect((await superadmin.get(`/cost-sheets/${sheetId}`)).data.status).toBe('Approved');
       expect(await findPendingRequest(superadmin, 'COST_SHEET', sheetId)).toBeNull();
     } finally {
@@ -250,7 +258,7 @@ test.describe('Approval engine — multi-level PO flow', () => {
       // the flow, and an inactive flow no longer matches future submits — restoring
       // the "costing auto-approves" behaviour the rest of the estate expects.
       await superadmin.patch(`/approval-flows/${flowId}/toggle`);
-      await directorApi.dispose();
+      await peerApi.dispose();
     }
   });
 });

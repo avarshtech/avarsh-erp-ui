@@ -120,14 +120,12 @@ test.describe('Approval engine — condition routing', () => {
     const req = await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id);
     expect(req).toBeTruthy();
 
-    // Superadmin must be refused — proof the high flow's condition excluded this PO.
-    const wrong = await superadmin.post(`/approval-requests/${req.id}/action`, {
-      actionType: 'APPROVE', comments: 'super admin should not hold this level',
-    });
-    expect(wrong.status).toBeGreaterThanOrEqual(400);
-
+    // The manager (Admin) is refused on the high-value flow (AF7a) and the seeded flow takes two
+    // levels, so one manager approval that sends the PO proves the low-value flow matched. (Super
+    // Admin is a superuser and may act on any flow, by design, so refusing it would prove nothing.)
     await actOnRequest(manager, req.id, 'APPROVE', 'Low-value approval');
     expect((await superadmin.get(`/purchase-orders/${po.id}`)).data.status).toBe('Sent_To_Supplier');
+    expect(await findPendingRequest(superadmin, 'PURCHASE_ORDER', po.id)).toBeNull();
   });
 
   test('AF8 — with every PO flow inactive, submit silently auto-approves (the hazard)', async () => {

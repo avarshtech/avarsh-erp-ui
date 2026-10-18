@@ -18,10 +18,11 @@ import {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** YYYY-MM-DD `days` from today, by the local calendar (toISOString is UTC: a day early before 05:30 IST). */
 const iso = (days) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 /** The DD-MMM-YYYY shape the app's pickers and formatDate use. */

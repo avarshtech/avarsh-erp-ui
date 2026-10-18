@@ -42,11 +42,7 @@ test.describe('Sewing — records survive a reload', () => {
     expect(errors, errors.join('\n')).toHaveLength(0);
   });
 
-  // FIXME: TopseForm renders Total Inspected as a bare InputNumber under a
-  // styled div rather than a Form.Item, so it exposes no accessible name and
-  // getByRole('spinbutton') never resolves. Give that field a label
-  // association (or a data-testid) and this test can be enabled as written.
-  test.fixme('an end-line report keeps its derived DHU and traffic light after reload', async ({ page }) => {
+  test('an end-line report keeps its derived DHU and traffic light after reload', async ({ page }) => {
     const errors = watchConsole(page);
     await openTab(page, TABS.topse);
 

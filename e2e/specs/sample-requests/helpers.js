@@ -164,7 +164,8 @@ export function watchConsole(page) {
 const iso = (daysFromToday) => {
   const d = new Date();
   d.setDate(d.getDate() + daysFromToday);
-  return d.toISOString().slice(0, 10);
+  // The local calendar date: toISOString is UTC, a day early before 05:30 IST
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 /** Fail loudly with the server's own message rather than a bare status code. */
