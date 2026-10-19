@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Drawer, Form, Select, DatePicker, Radio, Input, Space, Button, Typography } from 'antd';
+import { App, Drawer, Form, Select, Radio, Input, Space, Button, Typography } from 'antd';
+import DateInput from '../../../components/DateInput';
 import dayjs from 'dayjs';
 import { applyLeave, getLeaveBalances } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
@@ -166,7 +167,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
         {isRange ? (
           <>
             <Form.Item name="fromDate" label="From Date" rules={[{ required: true, message: 'Please select from date' }]}>
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item
               name="toDate"
@@ -183,12 +184,12 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
                 }),
               ]}
             >
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
           </>
         ) : (
           <Form.Item name="leaveDate" label="Leave Date" rules={[{ required: true, message: 'Please select the leave date' }]}>
-            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
         )}
 

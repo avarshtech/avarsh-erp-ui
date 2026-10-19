@@ -6,7 +6,6 @@ import { getAllUnits, createUnit, updateUnit, deleteUnit } from '../../../servic
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { INDIAN_STATES } from '../../../utils/hrConstants';
-import { UNIT_TYPES, unitTypeLabel } from '../../../utils/branchConstants';
 import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
@@ -63,11 +62,6 @@ const UnitMaster = ({ onDirtyChange }) => {
 
   const columns = useMemo(() => [
     {
-      title: 'Unit Code',
-      dataIndex: 'unitCode',
-      sorter: (a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''),
-    },
-    {
       title: 'Unit Name',
       dataIndex: 'unitName',
       sorter: (a, b) => (a.unitName || '').localeCompare(b.unitName || ''),
@@ -79,12 +73,6 @@ const UnitMaster = ({ onDirtyChange }) => {
       // A unit with no branch (an old seed) is the head office's, as the server treats it
       render: (val) => branchName(val ?? defaultBranch?.id),
     }] : []),
-    {
-      title: 'Type',
-      dataIndex: 'unitType',
-      width: 150,
-      render: (val) => unitTypeLabel(val),
-    },
     {
       title: 'City',
       dataIndex: 'city',
@@ -194,7 +182,6 @@ const UnitMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.unitCode?.toLowerCase().includes(lower) ||
         item.unitName?.toLowerCase().includes(lower) ||
         item.city?.toLowerCase().includes(lower)
       )
@@ -280,14 +267,15 @@ const UnitMaster = ({ onDirtyChange }) => {
                   <Select placeholder="Select branch" options={branchOptions} showSearch optionFilterProp="label" />
                 </Form.Item>
               )}
-              <Form.Item name="unitCode" label="Unit Code" rules={[{ required: true, message: 'Please enter a unit code' }]}>
-                <Input placeholder="e.g. UNIT-1" maxLength={20} />
-              </Form.Item>
-              <Form.Item name="unitName" label="Unit Name" rules={[{ required: true, message: 'Please enter a unit name' }]}>
-                <Input placeholder="e.g. Sewing Unit 1" maxLength={200} />
-              </Form.Item>
-              <Form.Item name="unitType" label="Unit Type" extra="what the unit does — a production PO offers only units that can do the work">
-                <Select placeholder="Select type" options={UNIT_TYPES} allowClear />
+              {/* A unit is the factory or building, not the kind of work done in it -
+                  that is a department. The placeholder says so. */}
+              <Form.Item
+                name="unitName"
+                label="Unit Name"
+                extra="The factory or building. Asset IDs are built from it, so a short name keeps the stickers short."
+                rules={[{ required: true, message: 'Please enter a unit name' }]}
+              >
+                <Input placeholder="e.g. U1, or Unit 1 - Tirupur" maxLength={200} />
               </Form.Item>
               <Form.Item name="address" label="Address">
                 <Input.TextArea rows={2} placeholder="Street address" maxLength={500} />

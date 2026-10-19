@@ -4,6 +4,7 @@ import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { getAllDesignations, createDesignation, updateDesignation, deleteDesignation } from '../../../services/master/hrMasterService';
 import { getActiveDepartments } from '../../../services/master/hrMasterService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
@@ -27,21 +28,39 @@ const DesignationMaster = ({ onDirtyChange }) => {
   const skipDirty = useRef(false);
 
   const [departments, setDepartments] = useState([]);
+  const [units, setUnits] = useState([]);
+  // Which unit the form is currently filtering departments by.
+  const selectedUnitId = Form.useWatch('unitId', form);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
 
+  const unitOptions = useMemo(() =>
+    units.map(u => ({ value: u.id, label: u.unitName })),
+  [units]);
+
+  // Only the chosen unit's departments. Two units can both have a "Sewing", and
+  // an unfiltered list would show both under the same label with nothing to tell
+  // them apart - which is exactly how a designation ends up on the wrong one.
   const departmentOptions = useMemo(() =>
-    departments.map(d => ({ value: d.id, label: `${d.code} - ${d.name}` })),
-  [departments]);
+    departments
+      .filter(d => !selectedUnitId || d.unitId === selectedUnitId)
+      .map(d => ({ value: d.id, label: d.name })),
+  [departments, selectedUnitId]);
 
   const departmentMap = useMemo(() => {
     const map = {};
     departments.forEach(d => { map[d.id] = d.name; });
     return map;
   }, [departments]);
+
+  const unitMap = useMemo(() => {
+    const map = {};
+    units.forEach(u => { map[u.id] = u.unitName; });
+    return map;
+  }, [units]);
 
   const categoryMap = useMemo(() => {
     const map = {};
@@ -73,25 +92,37 @@ const DesignationMaster = ({ onDirtyChange }) => {
     }
   }, []);
 
-  useEffect(() => { fetchData(); fetchDepartments(); }, [fetchData, fetchDepartments]);
+  const fetchUnits = useCallback(async () => {
+    try {
+      const result = await getActiveUnits();
+      setUnits(Array.isArray(result) ? result : (result?.data || []));
+    } catch {
+      // Silent — the unit dropdown will just be empty
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); fetchDepartments(); fetchUnits(); }, [fetchData, fetchDepartments, fetchUnits]);
 
   const columns = [
     {
-      title: 'Code',
-      dataIndex: 'code',
-      width: 100,
-      sorter: (a, b) => (a.code || '').localeCompare(b.code || ''),
-    },
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
+      // Unit then department then designation - the chain that actually
+      // identifies the row. "Helper" alone identifies nothing.
+      title: 'Unit',
+      dataIndex: 'unitId',
+      width: 150,
+      sorter: (a, b) => (unitMap[a.unitId] || '').localeCompare(unitMap[b.unitId] || ''),
+      render: (val, row) => unitMap[val] || row.unitName || '—',
     },
     {
       title: 'Department',
       dataIndex: 'departmentId',
-      width: 140,
-      render: (val) => departmentMap[val] || '—',
+      width: 150,
+      render: (val, row) => departmentMap[val] || row.departmentName || '—',
+    },
+    {
+      title: 'Designation',
+      dataIndex: 'name',
+      sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
     },
     {
       title: 'Category',
@@ -191,7 +222,6 @@ const DesignationMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.code?.toLowerCase().includes(lower) ||
         item.name?.toLowerCase().includes(lower) ||
         item.category?.toLowerCase().includes(lower)
       )
@@ -272,14 +302,36 @@ const DesignationMaster = ({ onDirtyChange }) => {
               disabled={isReadOnly}
               onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
-              <Form.Item name="code" label="Designation Code" rules={[{ required: true, message: 'Please enter a designation code' }]}>
-                <Input placeholder="e.g. OPR" maxLength={20} />
+              {/* Unit, then department, then the name - the order the thing is built in. */}
+              <Form.Item
+                name="unitId"
+                label="Unit"
+                rules={[{ required: true, message: 'Please select the unit' }]}
+              >
+                <Select
+                  placeholder="Select unit"
+                  options={unitOptions}
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={() => form.setFieldValue('departmentId', undefined)}
+                />
+              </Form.Item>
+              <Form.Item
+                name="departmentId"
+                label="Department"
+                extra="Only this unit's departments are listed."
+                rules={[{ required: true, message: 'Please select the department this designation belongs to' }]}
+              >
+                <Select
+                  placeholder={selectedUnitId ? 'Select department' : 'Pick a unit first'}
+                  disabled={!selectedUnitId}
+                  options={departmentOptions}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
               <Form.Item name="name" label="Designation Name" rules={[{ required: true, message: 'Please enter a designation name' }]}>
-                <Input placeholder="e.g. Sewing Operator" maxLength={200} />
-              </Form.Item>
-              <Form.Item name="departmentId" label="Department" rules={[{ required: true, message: 'Please select a department' }]}>
-                <Select placeholder="Select department" options={departmentOptions} showSearch optionFilterProp="label" allowClear />
+                <Input placeholder="e.g. Packer" maxLength={200} />
               </Form.Item>
               <Form.Item name="category" label="Employee Category" rules={[{ required: true, message: 'Please select a category' }]}>
                 <Select placeholder="Select category" options={EMPLOYEE_CATEGORY} allowClear />

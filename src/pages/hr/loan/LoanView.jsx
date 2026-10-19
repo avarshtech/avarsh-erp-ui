@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Descriptions, Table, Tag, Card, Spin, Button, Modal, Form, InputNumber, DatePicker, Input, Alert } from 'antd';
+import { App, Descriptions, Table, Tag, Card, Spin, Button, Modal, Form, InputNumber, Input, Alert } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getLoanById, getLoanRecoveries, recordLoanRecovery } from '../../../services/hr/loanService';
@@ -199,7 +200,7 @@ const LoanView = () => {
             <InputNumber style={{ width: '100%' }} min={0} prefix={'₹'} />
           </Form.Item>
           <Form.Item name="recoveryDate" label="Date" rules={[{ required: true, message: 'Date is required' }]}>
-            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="remarks" label="Remarks" extra="e.g. cash repayment, early settlement">
             <Input.TextArea rows={2} maxLength={300} />

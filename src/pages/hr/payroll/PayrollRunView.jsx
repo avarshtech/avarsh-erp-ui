@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space, Alert, Collapse } from 'antd';
+import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, Input, Select, Space, Alert, Collapse } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -360,7 +361,7 @@ const PayrollRunView = () => {
         </p>
         <Form form={payForm} layout="vertical" initialValues={{ paymentDate: dayjs(), mode: 'BANK_TRANSFER' }}>
           <Form.Item name="paymentDate" label="Payment Date" rules={[{ required: true, message: 'Payment date is required' }]}>
-            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="mode" label="Payment Mode" rules={[{ required: true, message: 'Payment mode is required' }]}>
             <Select options={PAYMENT_MODES} />

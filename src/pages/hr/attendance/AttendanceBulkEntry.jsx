@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert, App, Table, Button, Select, DatePicker, TimePicker, InputNumber, Input, Row, Col, Space } from 'antd';
+import { Alert, App, Table, Button, Select, InputNumber, Input, Row, Col, Space } from 'antd';
+import DateInput from '../../../components/DateInput';
+import TimeInput from '../../../components/TimeInput';
 import { SaveOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -121,6 +123,13 @@ const AttendanceBulkEntry = () => {
     });
   }, [locked, unitId, selectedDate, modal, message, fetchLock, fetchData]);
 
+  /**
+   * An out time at or before the in time on the same day. A shift that really
+   * crosses midnight is recorded by its own procedure, not this grid, so there
+   * is no exception to make here.
+   */
+  const outBeforeIn = (row) => !!row?.inTime && !!row?.outTime && row.outTime <= row.inTime;
+
   const handleFieldChange = useCallback((index, field, value) => {
     setData((prev) => {
       const next = [...prev];
@@ -132,6 +141,13 @@ const AttendanceBulkEntry = () => {
   const handleSaveAll = useCallback(async () => {
     if (!selectedDate || !unitId) {
       message.warning('Please select a date and unit');
+      return;
+    }
+    // Catch the bad rows before the request: the server refuses the whole save,
+    // and naming the employees is more use than one rejected row's message.
+    const reversed = data.filter(outBeforeIn);
+    if (reversed.length) {
+      message.error(`Out time is before in time for ${reversed.map((r) => r.employeeNo || r.employeeName).join(', ')}.`);
       return;
     }
     setSaving(true);
@@ -180,12 +196,10 @@ const AttendanceBulkEntry = () => {
       key: 'inTime',
       width: 130,
       render: (val, _record, index) => (
-        <TimePicker
-          format="HH:mm"
+        <TimeInput
           value={val ? dayjs(val, 'HH:mm') : null}
           onChange={(time) => handleFieldChange(index, 'inTime', time ? time.format('HH:mm') : null)}
           disabled={locked || !canEdit}
-          style={{ width: '100%' }}
         />
       ),
     },
@@ -194,13 +208,15 @@ const AttendanceBulkEntry = () => {
       dataIndex: 'outTime',
       key: 'outTime',
       width: 130,
-      render: (val, _record, index) => (
-        <TimePicker
-          format="HH:mm"
+      // There is no Form wrapping this grid, so the cell carries its own error
+      // state. The server refuses the row as well; this just says so sooner.
+      render: (val, record, index) => (
+        <TimeInput
           value={val ? dayjs(val, 'HH:mm') : null}
           onChange={(time) => handleFieldChange(index, 'outTime', time ? time.format('HH:mm') : null)}
           disabled={locked || !canEdit}
-          style={{ width: '100%' }}
+          status={outBeforeIn(record) ? 'error' : undefined}
+          title={outBeforeIn(record) ? 'The out time is before the in time' : undefined}
         />
       ),
     },
@@ -283,7 +299,7 @@ const AttendanceBulkEntry = () => {
       />
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={8} md={6}>
-          <DatePicker
+          <DateInput
             value={selectedDate}
             onChange={setSelectedDate}
             style={{ width: '100%' }}

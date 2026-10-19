@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Drawer, Form, Select, DatePicker, InputNumber, Input, Button, Space } from 'antd';
+import { App, Drawer, Form, Select, InputNumber, Input, Button, Space } from 'antd';
+import DateInput from '../../../components/DateInput';
 import dayjs from 'dayjs';
 import { createLoan } from '../../../services/hr/loanService';
 import { searchEmployees } from '../../../services/hr/employeeService';
@@ -79,13 +80,13 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
           />
         </Form.Item>
         <Form.Item name="loanDate" label="Loan Date" rules={[{ required: true, message: 'Select loan date' }]}>
-          <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          <DateInput style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="amount" label="Loan Amount" rules={[{ required: true, message: 'Enter amount' }]}>
           <InputNumber style={{ width: '100%' }} min={1} prefix={'\u20B9'} formatter={(v) => v ? Number(v).toLocaleString('en-IN') : ''} />
         </Form.Item>
         <Form.Item name="dueStartDate" label="EMI Start Date" rules={[{ required: true, message: 'Select start date' }]}>
-          <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          <DateInput style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="emiAmount" label="EMI Amount" rules={[{ required: true, message: 'Enter EMI amount' }]}>
           <InputNumber style={{ width: '100%' }} min={1} prefix={'\u20B9'} formatter={(v) => v ? Number(v).toLocaleString('en-IN') : ''} />

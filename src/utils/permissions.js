@@ -67,6 +67,7 @@ export const SECTIONS = [
     description: 'Every tab of the Master Data workspace is granted separately.' },
   { key: 'reports',    label: 'Reports',              icon: 'BarChartOutlined' },
   { key: 'hr',         label: 'HR & Payroll',         icon: 'TeamOutlined' },
+  { key: 'assets',     label: 'Asset Management',     icon: 'ToolOutlined' },
   { key: 'admin',      label: 'Administration',       icon: 'SettingOutlined' },
 ];
 
@@ -538,6 +539,57 @@ export const SCREENS = [
     path: '/hr/fnf', routes: ['/hr/fnf', '/hr/fnf/new', '/hr/fnf/edit/:id', '/hr/fnf/:id'],
     ops: [...STANDARD_OPERATIONS, 'approve', 'pay'],
     opLabels: { pay: 'Settle' } },
+
+  // Setup is separate from the register on purpose: a category's code becomes
+  // part of every asset ID printed under it, so inventing categories is a
+  // different job from adding assets.
+  // Read-only, so view is its only operation. Separate from the register
+  // because seeing the shape of the estate is not the same right as opening
+  // every machine's purchase cost.
+  { id: 'asset-dashboard', name: 'Asset Dashboard', section: 'assets', kind: 'dashboard',
+    path: '/assets/dashboard', ops: ['view'],
+    description: 'Read-only indicators, pending queues and recent movements.' },
+  { id: 'assets', name: 'Asset Register', section: 'assets', kind: 'screen',
+    path: '/assets',
+    routes: ['/assets', '/assets/new', '/assets/:id', '/assets/:id/edit', '/assets/code/:code'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'asset-setup', name: 'Asset Setup', section: 'assets', kind: 'screen',
+    path: '/assets/setup', routes: ['/assets/setup'],
+    ops: STANDARD_OPERATIONS,
+    description: 'Categories, their extra fields, and the section and line levels of a location.' },
+  // Raising a move and approving one are different jobs, and the approval is
+  // what makes the movement history worth anything. dispatch and receive are
+  // the two ends of the journey.
+  { id: 'asset-transfers', name: 'Asset Transfers', section: 'assets', kind: 'screen',
+    path: '/assets/transfers',
+    routes: ['/assets/transfers', '/assets/transfers/new', '/assets/transfers/:id', '/assets/transfers/:id/edit'],
+    ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel', 'dispatch', 'receive'],
+    description: 'Moving assets between units, departments, sections and lines.' },
+  // Approval is Finance's call in the PRD, not the unit admin's - even though
+  // the unit admin is the one who raises the request.
+  { id: 'asset-disposals', name: 'Asset Disposals', section: 'assets', kind: 'screen',
+    path: '/assets/disposals', routes: ['/assets/disposals'],
+    ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel'],
+    description: 'Retiring assets. Approving a request is what marks an asset disposed.' },
+  // HR reads this without any right over the register itself: they need the
+  // exit-clearance list, not the asset master.
+  { id: 'asset-assignments', name: 'Asset Assignments', section: 'assets', kind: 'screen',
+    path: '/assets', routes: [],
+    ops: ['view', 'add', 'update'],
+    description: 'Issuing assets to employees and taking them back. Shown on the asset itself.' },
+  // verify is one scan; lock is closing and reopening the run, which decides
+  // whether anybody may still scan into it.
+  // Read-only, and separate from the register: a report is a bulk read of the
+  // whole estate including every machine's cost, which is a different right
+  // from opening one asset.
+  { id: 'asset-reports', name: 'Asset Reports', section: 'assets', kind: 'dashboard',
+    path: '/assets/reports', ops: ['view'],
+    description: 'The nine fixed asset reports, with Excel, PDF and print.' },
+  { id: 'asset-verification', name: 'Asset Verification', section: 'assets', kind: 'screen',
+    path: '/assets/verification',
+    routes: ['/assets/verification', '/assets/verification/:id'],
+    ops: ['view', 'add', 'verify', 'lock'],
+    description: 'Physical checks that the assets recorded at a location are really there.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

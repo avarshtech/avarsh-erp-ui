@@ -57,7 +57,6 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_ID__: JSON.stringify(buildId),
   },
-  ...(uploadSourceMaps ? { build: { sourcemap: 'hidden' } } : {}),
   plugins: [
     react(),
     VitePWA({
@@ -73,7 +72,14 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // The Virtual Factory page carries three.js (only it imports it), so only the people who open
         // that screen download it.
-        globIgnores: ['**/node_modules/**/*', '**/VirtualFactoryPage-*.{js,css}'],
+        // The QR decoder is 400 KB and only the verification screen loads it,
+        // so it is left out for the same reason three.js is: precaching it
+        // would make every install pay for a camera nobody else opens.
+        globIgnores: [
+          '**/node_modules/**/*',
+          '**/VirtualFactoryPage-*.{js,css}',
+          '**/qr-scanner-*.js',
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         // The service worker is built after the Sentry plugin has deleted the uploaded maps, so it
         // must never get one of its own (the default follows build.sourcemap, which is false today).
@@ -130,6 +136,16 @@ export default defineConfig({
     }),
     ...sentryPlugins,
   ],
+  build: {
+    ...(uploadSourceMaps ? { sourcemap: 'hidden' } : {}),
+    rollupOptions: {
+      output: {
+        // Named so the service worker can recognise it and skip precaching it.
+        // Everything else keeps Rollup's own chunking.
+        manualChunks: (id) => (id.includes('@zxing') ? 'qr-scanner' : undefined),
+      },
+    },
+  },
   server: {
     port: 3000,
     // Test runs and tools write into the project while the dev server is up. Watching those folders

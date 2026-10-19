@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Table, Space, Tag, Alert, Row, Col, Drawer, Button, InputNumber, Input, Checkbox, TimePicker } from 'antd';
+import { App, Card, Table, Space, Tag, Alert, Row, Col, Drawer, Button, InputNumber, Input, Checkbox } from 'antd';
+import TimeInput from '../../../components/TimeInput';
 import dayjs from 'dayjs';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
@@ -137,7 +138,8 @@ const MetalDetectionTab = () => {
                 onChange={(e) => setEntry((prev) => ({ ...prev, calibrationOk: e.target.checked, calibratedAt: e.target.checked ? dayjs().format('HH:mm') : null }))}>
                 Shift calibration done
               </Checkbox>
-              <TimePicker format="HH:mm" value={entry.calibratedAt ? dayjs(entry.calibratedAt, 'HH:mm') : null} disabled={!entry.calibrationOk}
+              <TimeInput value={entry.calibratedAt ? dayjs(entry.calibratedAt, 'HH:mm') : null} disabled={!entry.calibrationOk}
+                style={{ width: 120 }}
                 onChange={(t) => setEntry((prev) => ({ ...prev, calibratedAt: t ? t.format('HH:mm') : null }))} />
               <Checkbox.Group options={['Ferrous', 'Non-ferrous', 'Stainless']} value={entry.testCards}
                 onChange={(v) => setEntry((prev) => ({ ...prev, testCards: v }))} disabled={!entry.calibrationOk} />

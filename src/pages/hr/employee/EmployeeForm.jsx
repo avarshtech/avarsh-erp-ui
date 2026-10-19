@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  App, Form, Input, Select, DatePicker, Switch, Button, Tabs, Card,
+  App, Form, Input, Select, Switch, Button, Tabs, Card,
   Row, Col, InputNumber, Table, Space, Spin, Upload, Tooltip,
 } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -21,6 +22,7 @@ import {
 import { uploadFile } from '../../../services/core/fileService';
 import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
+import EmployeePhoto from '../../../components/EmployeePhoto';
 import { unitOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
@@ -271,6 +273,31 @@ const EmployeeForm = () => {
     return null;
   };
 
+  // The photo picked before the employee exists. A ref, not state: it is only
+  // ever read at save time and re-rendering the form for it would be noise.
+  const pendingPhoto = useRef(null);
+
+  /**
+   * Sends the held photo now that there is an employee to attach it to.
+   *
+   * A failure here does not fail the save: the employee is already created and
+   * telling someone their employee did not save would be a lie. They are told
+   * the photo did not go, and can add it from the employee's own page.
+   */
+  const uploadPendingPhoto = async (newId) => {
+    const file = pendingPhoto.current;
+    if (!file || !newId) return;
+    try {
+      await uploadFile(file, {
+        module: 'HR', entity: 'EMPLOYEE', entityId: newId,
+        fileCategory: 'PHOTO', description: 'Employee photo',
+      });
+      pendingPhoto.current = null;
+    } catch {
+      message.warning('The employee was saved, but the photo did not upload. Add it from their page.');
+    }
+  };
+
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
@@ -329,8 +356,9 @@ const EmployeeForm = () => {
         await updateEmployee(id, payload);
         message.success('Employee updated successfully');
       } else {
-        await createEmployee(payload);
+        const created = await createEmployee(payload);
         message.success('Employee created successfully');
+        await uploadPendingPhoto(created?.id);
       }
       clearDirty();
       navigate('/hr/employees');
@@ -465,7 +493,7 @@ const EmployeeForm = () => {
                 },
               ]}
             >
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus" rules={[{ required: true, message: 'Marital status is required' }]}><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} /></Form.Item></Col>
@@ -606,7 +634,7 @@ const EmployeeForm = () => {
                 }),
               ]}
             >
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           {/*
@@ -636,7 +664,7 @@ const EmployeeForm = () => {
                   }),
                 ]}
               >
-                <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" allowClear />
+                <DateInput style={{ width: '100%' }} allowClear />
               </Form.Item>
             </Col>
           )}
@@ -736,6 +764,17 @@ const EmployeeForm = () => {
       <PageHeader
         title={isEdit ? 'Edit Employee' : 'New Employee'}
         backPath="/hr/employees"
+        /* A photo is a file against an employee id. On a new employee there is
+           no id yet, so the picture is held here and uploaded by handleSave
+           once the employee exists - see pendingPhoto. */
+        avatar={(
+          <EmployeePhoto
+            employeeId={isEdit ? Number(id) : null}
+            employeeName={form.getFieldValue('fullName')}
+            canEdit
+            onPendingChange={(file) => { pendingPhoto.current = file; }}
+          />
+        )}
       >
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/hr/employees')}>Back</Button>

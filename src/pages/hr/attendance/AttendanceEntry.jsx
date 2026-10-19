@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  App, Card, Form, Select, DatePicker, TimePicker, InputNumber, Input,
+  App, Card, Form, Select, InputNumber, Input,
   Button, Row, Col, Space, Tag, Alert,
 } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, TableOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -13,6 +14,8 @@ import { useBranch } from '../../../context/BranchContext';
 import { getActiveLeaveTypes } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS, HALF_DAY_TYPE } from '../../../utils/hrConstants';
 import { employeeOptions, unitOptions } from '../../../utils/hrLabels';
+import TimeInput from '../../../components/TimeInput';
+import { afterRuleSameDay } from '../../../utils/timeRules';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 
@@ -153,7 +156,7 @@ const AttendanceEntry = () => {
 
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="attendanceDate" label="Date" rules={[{ required: true, message: 'Date is required' }]}>
-                <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
 
@@ -196,13 +199,23 @@ const AttendanceEntry = () => {
 
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="inTime" label="In Time">
-                <TimePicker style={{ width: '100%' }} format="HH:mm" minuteStep={5} />
+                <TimeInput />
               </Form.Item>
             </Col>
 
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name="outTime" label="Out Time">
-                <TimePicker style={{ width: '100%' }} format="HH:mm" minuteStep={5} />
+              {/* An out time before the in time used to be accepted here and the
+                  hours calculation quietly added 24 to the negative, so 9am-6am
+                  read as nine hours worked. A shift that really does cross
+                  midnight is recorded by its own procedure, not this screen. */}
+              <Form.Item
+                name="outTime"
+                label="Out Time"
+                dependencies={['inTime']}
+                rules={[afterRuleSameDay(() => form.getFieldValue('inTime'),
+                  { earlier: 'in time', later: 'out time' })]}
+              >
+                <TimeInput />
               </Form.Item>
             </Col>
 

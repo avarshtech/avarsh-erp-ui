@@ -108,10 +108,9 @@ export const getAllHolidays = async () => {
 
 // GET /hr/holidays/by-year — the root mapping takes no params, so sending
 // ?year= there was silently ignored and returned every holiday.
-export const getHolidaysByYear = async (year, unitId) => {
-  const params = { year };
-  if (unitId) params.unitId = unitId;
-  const response = await axiosInstance.get(`${HOLIDAY_URL}/by-year`, { params });
+// Holidays are the company's, so the year is the only thing left to narrow by.
+export const getHolidaysByYear = async (year) => {
+  const response = await axiosInstance.get(`${HOLIDAY_URL}/by-year`, { params: { year } });
   return response.data;
 };
 

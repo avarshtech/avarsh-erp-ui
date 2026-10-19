@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, Input, Descriptions, Alert, Tooltip } from 'antd';
+import DateInput from '../../../components/DateInput';
+import TimeInput from '../../../components/TimeInput';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createMissPunch, getMissPunchByStatus, approveMissPunch, rejectMissPunch } from '../../../services/hr/missPunchService';
@@ -340,13 +342,13 @@ const MissPunchList = () => {
             />
           </Form.Item>
           <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
-            <DatePicker style={{ width: '100%' }} />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="punchType" label="Punch Type" rules={[{ required: true, message: 'Please select punch type' }]}>
             <Select options={PUNCH_TYPE} placeholder="Select Type" />
           </Form.Item>
           <Form.Item name="correctedTime" label="Corrected Time" rules={[{ required: true, message: 'Please enter corrected time' }]}>
-            <TimePicker format="HH:mm" style={{ width: '100%' }} />
+            <TimeInput />
           </Form.Item>
           <Form.Item name="reason" label="Reason for Request" rules={[{ required: true, message: 'Please enter a reason' }]}>
             <Input.TextArea rows={3} placeholder="Reason for miss punch" />

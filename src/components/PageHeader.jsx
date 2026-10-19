@@ -13,6 +13,9 @@ const PageHeader = memo(function PageHeader({
   addLabel,
   extra,
   status,
+  /** Rendered between the back arrow and the title: a photo belongs with the
+      name it identifies, not over with the buttons that act on the record. */
+  avatar,
   children,
   className,
   style,
@@ -44,6 +47,7 @@ const PageHeader = memo(function PageHeader({
             size="small"
           />
         )}
+        {avatar}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h1>{title}</h1>

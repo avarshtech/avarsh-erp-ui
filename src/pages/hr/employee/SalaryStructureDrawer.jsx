@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { App, Drawer, Form, InputNumber, DatePicker, Button, Space, Descriptions } from 'antd';
+import { App, Drawer, Form, InputNumber, Button, Space, Descriptions } from 'antd';
+import DateInput from '../../../components/DateInput';
 import dayjs from 'dayjs';
 import { createSalaryStructure, updateSalaryStructure } from '../../../services/hr/salaryStructureService';
 
@@ -112,9 +113,8 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
             },
           ]}
         >
-          <DatePicker
+          <DateInput
             style={{ width: '100%' }}
-            format="DD-MMM-YYYY"
             disabledDate={!isEdit && supersededFrom
               ? (d) => d && !d.isAfter(supersededFrom, 'day')
               : undefined}
