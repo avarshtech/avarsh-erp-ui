@@ -113,9 +113,9 @@ of the changed screen. A whole Playwright project, several projects, the full su
 - Prove: Playwright project of the source AND destination section, plus `admin` (matrix).
 
 ## 8. Flyway PG ↔ H2 twin ↔ seeds
-- Lives: `src/main/resources/db/migration` (new files `V<yyyyMMddHHmmss>__<desc>.sql`; the
-  V1–V37 sequence is retired), `db/h2migration` (sequential mirror, below V100), `db/e2eseed`
-  (V100+), `db/seed`, `db/mobileseed`, `db/rollback`, `src/test/resources/db/testmigration`.
+- Lives: `src/main/resources/db/migration` (V1–V28: the one-file-per-module baseline of 2026-10-20;
+  new files `V<yyyyMMddHHmmss>__<desc>.sql`), `db/h2migration` (sequential mirror below V100, next
+  V29), `db/e2eseed` (V100+), `db/seed`, `db/mobileseed`, `src/test/resources/db/testmigration`.
   Conventions: `db/migration/README.md`.
 - Breaks: a PG schema change without its H2 twin fails the e2e boot and Playwright `setup` times
   out; a NOT NULL column without DEFAULT breaks every seed that inserts into the table; editing

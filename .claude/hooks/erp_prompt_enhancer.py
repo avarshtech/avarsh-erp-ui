@@ -45,7 +45,7 @@ Otherwise, before any tool call, check whether the prompt gives:
      `npx playwright test --project=<name>`, screen verified in the browser.
      API: `./gradlew compileJava`, `./gradlew test`.
   R6 Constraints respected - an applied Flyway migration is never edited or renamed;
-     new ones are V<yyyyMMddHHmmss>__<desc>.sql (the V1-V37 sequence is retired);
+     new ones are V<yyyyMMddHHmmss>__<desc>.sql (V1-V28 are the per-module baseline);
      H2 mirrors in db/h2migration stay sequential below V100; no AntD 6 deprecated props.
 
 Proceed silently if R1-R3 and R5 are answerable from the prompt plus existing context

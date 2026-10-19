@@ -37,9 +37,10 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
   repository/ service/` (no `mapper/`; mapping is hand-written at `order/service/OrderService.java:551`);
   `erp/purchaseorder/` adds `mapper/` and a nested sub-feature `ordermapping/` with the same five dirs;
   `inventory/grn`, `hr`, `production/cutting`, `costing` follow the layered form (+ `specification/`, `util/`).
-- Flyway dirs (`ls src/main/resources/db`): `migration` (93 files: 36 legacy `V1–V37` + timestamped + README),
-  `h2migration` (81, head `V80`), `e2eseed` (32, `V100__…` upward), `mobileseed`, `seed` (plain SQL, not
-  Flyway), `rollback` (hand-run reversals named after the PG file); tests add `src/test/resources/db/testmigration/`.
+- Flyway dirs (`ls src/main/resources/db`): `migration` (the 2026-10-20 baseline `V1__system_auth` …
+  `V27__virtual_factory` + `V28__foreign_keys`, one file per module, then timestamped files + README),
+  `h2migration` (the same 28 as `V<n>__h2_<module>`, next twin V29), `e2eseed` (42, `V100__…` upward plus
+  timestamped seeds), `mobileseed`, `seed` (plain SQL, not Flyway); tests add `src/test/resources/db/testmigration/`.
 
 ## 2. Request lifecycle (real)
 
@@ -95,7 +96,7 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
 | UI page triple | `pages/orders/OrderList.jsx` (PageHeader, SearchFilterBar, `StatusTag` + `ORDER_STATUS_CONFIG`, `getTablePagination`, `useDebouncedSearch`, `App.useApp()` `:35`, `useBranch`), `OrderForm.jsx` (`useStore().invalidateCache` `:933`, adopts the saved `version` `:980,1646`, `useUnsavedChanges` `:854`), `OrderView.jsx` (`components/approval/ApprovalActionBar` + `ApprovalHistoryPanel` `:27-28`, `services/core/fileService` `:29`, `StatusSteps`, `DraftWatermark`, `utils/orderPdfGenerator` `:24`) |
 | UI service file | `services/orders/orderService.js` — `const BASE = '/orders'`, default-import `axiosInstance`, returns `response.data`; `searchOrders` maps `pageNumber/pageSize` to the table shape (`:24-30`) |
 | StoreContext dropdown | `pages/expdoc/shipments/ShipmentForm.jsx:61-81` (fetch-or-reuse, excerpt below); master screens read lists straight off the store: `pages/master/ItemTypeMaster.jsx:14`. Keys (`context/StoreContext.jsx:14-45`): categories subCategories itemTypes attributes uoms variants suppliers buyers styles termsConditions paymentTerms sizePresets users roles sampleOrderNos; TTL 5 min (`:124`); `useStoreData` (`:302`) has no callers under `src/pages`, `src/components`, `src/hooks` |
-| Migration pair | PG `db/migration/V20260922193000__ntf_device_tokens_and_mobile_prefs.sql` ↔ H2 `db/h2migration/V80__h2_ntf_device_tokens_and_mobile_prefs.sql` (header names its PG original and lists the H2 differences) ↔ `db/rollback/V20260922193000__ntf_device_tokens_and_mobile_prefs.sql`. Re-check the heads with `ls db/migration | grep ^V2026 | sort | tail -1` and `ls db/h2migration | sort -V | tail -1` |
+| Migration pair | Baseline: PG `db/migration/V9__notification.sql` ↔ H2 `db/h2migration/V9__h2_notification.sql` (each header names its module and twin; FKs only in `V28__foreign_keys.sql`). A new change: PG `V<yyyyMMddHHmmss>__<desc>.sql` ↔ H2 `V<next>__h2_<desc>.sql`, the H2 header naming its PG original and the H2 differences. Re-check the heads with `ls db/migration | grep ^V2026 | sort | tail -1` and `ls db/h2migration | sort -V | tail -1` |
 | Mobile / BFF controller | `erp/mobile/approvals/controller/MobileApprovalsController.java:52` (`/api/v1/mobile/approvals`, per-method `@NoPermissionRequired(reason="self-scoped…")` `:78`); one `ModuleSummaryProvider` per `EntityType` in `mobile/approvals/summary/`; decisions via `mobile/approvals/decide/DecisionDispatcher`; login `erp/iam/controller/MobileAuthController.java:30-33` (`/api/v1/auth/mobile`) |
 | Domain event | `erp/shared/schedule/OrderScheduleImpactEvent.java` (record of order ids, "publish AFTER your own write has been flushed") + `OrderDelayContributor.java` (interface the PO and sampling modules implement) → `erp/order/service/OrderScheduleImpactListener.java` (`@EventListener`, synchronous, → `OrderDispatchRevisionService.recompute`). Publishers: `PurchaseOrderService.java:770`, `purchaseorder/ordermapping/service/PoOrderMappingService.java`, `sampling/dispatch/SampleDispatchSendService.java`, `sampling/request/service/SampleDeadlineService.java`, `SampleStatusService.java` |
 
