@@ -200,28 +200,41 @@ const AssetDisposalList = () => {
         size={520}
       >
         {shown && (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="Status">
-              <Tag color={disposalStatusMeta(shown.status).color}>{disposalStatusMeta(shown.status).label}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Asset">{shown.assetCode} — {shown.assetName}</Descriptions.Item>
-            <Descriptions.Item label="Category">{shown.categoryName ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Was at">{shown.locationText ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Bought">{date(shown.purchaseDate)}</Descriptions.Item>
-            <Descriptions.Item label="Cost when bought">{money(shown.purchaseCost)}</Descriptions.Item>
-            <Descriptions.Item label="Reason">{shown.reasonLabel ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Condition">
-              <Tag color={conditionMeta(shown.assetCondition).color}>
-                {conditionMeta(shown.assetCondition).label}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Method">{shown.methodLabel ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Amount">{money(shown.value)}</Descriptions.Item>
-            <Descriptions.Item label="Buyer">{shown.buyerText ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Disposed on">{date(shown.disposalDate)}</Descriptions.Item>
-            <Descriptions.Item label="Decision note">{shown.decisionReason ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Remarks">{shown.remarks ?? '-'}</Descriptions.Item>
-          </Descriptions>
+          <Descriptions
+            column={1}
+            bordered
+            size="small"
+            items={[
+              {
+                key: 'status',
+                label: 'Status',
+                children: (
+                  <Tag color={disposalStatusMeta(shown.status).color}>{disposalStatusMeta(shown.status).label}</Tag>
+                ),
+              },
+              { key: 'asset', label: 'Asset', children: `${shown.assetCode} — ${shown.assetName}` },
+              { key: 'category', label: 'Category', children: shown.categoryName ?? '-' },
+              { key: 'wasAt', label: 'Was at', children: shown.locationText ?? '-' },
+              { key: 'bought', label: 'Bought', children: date(shown.purchaseDate) },
+              { key: 'cost', label: 'Cost when bought', children: money(shown.purchaseCost) },
+              { key: 'reason', label: 'Reason', children: shown.reasonLabel ?? '-' },
+              {
+                key: 'condition',
+                label: 'Condition',
+                children: (
+                  <Tag color={conditionMeta(shown.assetCondition).color}>
+                    {conditionMeta(shown.assetCondition).label}
+                  </Tag>
+                ),
+              },
+              { key: 'method', label: 'Method', children: shown.methodLabel ?? '-' },
+              { key: 'amount', label: 'Amount', children: money(shown.value) },
+              { key: 'buyer', label: 'Buyer', children: shown.buyerText ?? '-' },
+              { key: 'disposedOn', label: 'Disposed on', children: date(shown.disposalDate) },
+              { key: 'decisionNote', label: 'Decision note', children: shown.decisionReason ?? '-' },
+              { key: 'remarks', label: 'Remarks', children: shown.remarks ?? '-' },
+            ]}
+          />
         )}
       </Drawer>
 

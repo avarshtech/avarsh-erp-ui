@@ -260,9 +260,6 @@
   "src/pages/hr/attendance/AttendanceCalendar.jsx": {
     "max-lines": {
       "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 6
     }
   },
   "src/pages/hr/attendance/GatePassList.jsx": {

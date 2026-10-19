@@ -468,31 +468,40 @@ const AttendanceCalendar = () => {
                 <div style={{ fontSize: 12, opacity: 0.65 }}>{selectedEmployee.employeeNo}</div>
               )}
             </div>
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="Status">
-                <Tag color={statusMap[selectedDay.status]?.tag}>
-                  {statusMap[selectedDay.status]?.label ?? selectedDay.status}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="In Time">{clockTime(selectedDay.inTime)}</Descriptions.Item>
-              <Descriptions.Item label="Out Time">{clockTime(selectedDay.outTime)}</Descriptions.Item>
-              {/* Only worth a row when there is one: an hours row reading "-" on
-                  every ordinary day is noise on a panel this small. */}
-              {workedHours(selectedDay) && (
-                <Descriptions.Item label="Hours Worked">{workedHours(selectedDay)}</Descriptions.Item>
-              )}
-              {Number(selectedDay.otHours) > 0 && (
-                <Descriptions.Item label="Overtime">{Number(selectedDay.otHours)} h</Descriptions.Item>
-              )}
-              {selectedDay.halfDaySession && (
-                <Descriptions.Item label="Half Taken">
-                  {selectedDay.halfDaySession === 'FIRST_HALF' ? 'First half' : 'Second half'}
-                </Descriptions.Item>
-              )}
-              {selectedDay.leaveTypeName && (
-                <Descriptions.Item label="Leave Type">{selectedDay.leaveTypeName}</Descriptions.Item>
-              )}
-            </Descriptions>
+            <Descriptions
+              column={1}
+              bordered
+              size="small"
+              items={[
+                {
+                  key: 'status',
+                  label: 'Status',
+                  children: (
+                    <Tag color={statusMap[selectedDay.status]?.tag}>
+                      {statusMap[selectedDay.status]?.label ?? selectedDay.status}
+                    </Tag>
+                  ),
+                },
+                { key: 'inTime', label: 'In Time', children: clockTime(selectedDay.inTime) },
+                { key: 'outTime', label: 'Out Time', children: clockTime(selectedDay.outTime) },
+                // Only worth a row when there is one: an hours row reading "-" on
+                // every ordinary day is noise on a panel this small.
+                workedHours(selectedDay) && {
+                  key: 'hoursWorked', label: 'Hours Worked', children: workedHours(selectedDay),
+                },
+                Number(selectedDay.otHours) > 0 && {
+                  key: 'overtime', label: 'Overtime', children: `${Number(selectedDay.otHours)} h`,
+                },
+                selectedDay.halfDaySession && {
+                  key: 'halfTaken',
+                  label: 'Half Taken',
+                  children: selectedDay.halfDaySession === 'FIRST_HALF' ? 'First half' : 'Second half',
+                },
+                selectedDay.leaveTypeName && {
+                  key: 'leaveType', label: 'Leave Type', children: selectedDay.leaveTypeName,
+                },
+              ].filter(Boolean)}
+            />
           </>
         )}
       </Drawer>

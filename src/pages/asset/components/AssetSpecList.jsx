@@ -20,11 +20,12 @@ const AssetSpecList = ({ specData, fieldDefs }) => {
   return (
     <>
       <Divider titlePlacement="start">Category details</Divider>
-      <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
-        {defs.map((def) => (
-          <Descriptions.Item key={def.key} label={def.label}>{String(values[def.key])}</Descriptions.Item>
-        ))}
-      </Descriptions>
+      <Descriptions
+        bordered
+        column={{ xs: 1, sm: 2, md: 3 }}
+        size="small"
+        items={defs.map((def) => ({ key: def.key, label: def.label, children: String(values[def.key]) }))}
+      />
     </>
   );
 };

@@ -118,61 +118,90 @@ const AssetView = () => {
         {asset && (
           <>
             <Card title="Identification">
-              <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
-                <Descriptions.Item label="Status">
-                  <Tag color={statusMeta(asset.status).color}>{statusMeta(asset.status).label}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Condition">
-                  <Tag color={conditionMeta(asset.condition).color}>{conditionMeta(asset.condition).label}</Tag>
-                </Descriptions.Item>
-                {/* The reason sits beside the status it explains. "Idle" on its
-                    own is the half of the answer nobody needs. */}
-                <Descriptions.Item label="Why">
-                  {asset.statusReasonLabel
-                    ? `${asset.statusReasonLabel}${asset.statusReasonText ? ` - ${asset.statusReasonText}` : ''}`
-                    : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Since">
-                  {asset.statusChangedAt ? dayjs(asset.statusChangedAt).format('DD-MM-YYYY') : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Category">
-                  {asset.subCategoryName ? `${asset.categoryName} / ${asset.subCategoryName}` : dash(asset.categoryName)}
-                </Descriptions.Item>
-                <Descriptions.Item label="Brand">{dash(asset.brand)}</Descriptions.Item>
-                <Descriptions.Item label="Model">{dash(asset.model)}</Descriptions.Item>
-                <Descriptions.Item label="Manufacturer">{dash(asset.manufacturer)}</Descriptions.Item>
-                <Descriptions.Item label="Serial no.">{dash(asset.serialNo)}</Descriptions.Item>
-                <Descriptions.Item label="Tag no.">{dash(asset.tagNo)}</Descriptions.Item>
-                <Descriptions.Item label="Remarks" span={3}>{dash(asset.remarks)}</Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                bordered
+                column={{ xs: 1, sm: 2, md: 3 }}
+                size="small"
+                items={[
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    children: <Tag color={statusMeta(asset.status).color}>{statusMeta(asset.status).label}</Tag>,
+                  },
+                  {
+                    key: 'condition',
+                    label: 'Condition',
+                    children: <Tag color={conditionMeta(asset.condition).color}>{conditionMeta(asset.condition).label}</Tag>,
+                  },
+                  // The reason sits beside the status it explains. "Idle" on its
+                  // own is the half of the answer nobody needs.
+                  {
+                    key: 'why',
+                    label: 'Why',
+                    children: asset.statusReasonLabel
+                      ? `${asset.statusReasonLabel}${asset.statusReasonText ? ` - ${asset.statusReasonText}` : ''}`
+                      : '-',
+                  },
+                  {
+                    key: 'since',
+                    label: 'Since',
+                    children: asset.statusChangedAt ? dayjs(asset.statusChangedAt).format('DD-MM-YYYY') : '-',
+                  },
+                  {
+                    key: 'category',
+                    label: 'Category',
+                    children: asset.subCategoryName
+                      ? `${asset.categoryName} / ${asset.subCategoryName}`
+                      : dash(asset.categoryName),
+                  },
+                  { key: 'brand', label: 'Brand', children: dash(asset.brand) },
+                  { key: 'model', label: 'Model', children: dash(asset.model) },
+                  { key: 'manufacturer', label: 'Manufacturer', children: dash(asset.manufacturer) },
+                  { key: 'serialNo', label: 'Serial no.', children: dash(asset.serialNo) },
+                  { key: 'tagNo', label: 'Tag no.', children: dash(asset.tagNo) },
+                  { key: 'remarks', label: 'Remarks', span: 3, children: dash(asset.remarks) },
+                ]}
+              />
               <AssetSpecList specData={asset.specData} fieldDefs={asset.fieldDefs} />
             </Card>
 
             <Card title="Location" style={{ marginTop: 16 }}>
-              <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-                <Descriptions.Item label="Where it is">{location || '-'}</Descriptions.Item>
-                <Descriptions.Item label="Custodian">{dash(asset.custodianName)}</Descriptions.Item>
-                <Descriptions.Item label="Issued to">{dash(asset.assignedToName)}</Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                bordered
+                column={{ xs: 1, sm: 2 }}
+                size="small"
+                items={[
+                  { key: 'location', label: 'Where it is', children: location || '-' },
+                  { key: 'custodian', label: 'Custodian', children: dash(asset.custodianName) },
+                  { key: 'assignedTo', label: 'Issued to', children: dash(asset.assignedToName) },
+                ]}
+              />
             </Card>
 
             <Card title="Purchase, warranty and AMC" style={{ marginTop: 16 }}>
-              <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
-                <Descriptions.Item label="Purchased on">{date(asset.purchaseDate)}</Descriptions.Item>
-                <Descriptions.Item label="Supplier">{dash(supplier)}</Descriptions.Item>
-                <Descriptions.Item label="Cost">{money(asset.purchaseCost)}</Descriptions.Item>
-                <Descriptions.Item label="Invoice no.">{dash(asset.invoiceNo)}</Descriptions.Item>
-                <Descriptions.Item label="PO no.">{dash(asset.poNo)}</Descriptions.Item>
-                <Descriptions.Item label="Warranty">
-                  {asset.warrantyEnd ? `${date(asset.warrantyStart)} to ${date(asset.warrantyEnd)}` : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="AMC">
-                  {asset.amcAvailable ? `${date(asset.amcStart)} to ${date(asset.amcEnd)}` : 'No'}
-                </Descriptions.Item>
-                <Descriptions.Item label="AMC vendor">
-                  {dash(asset.amcVendorName ?? asset.amcVendorText)}
-                </Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                bordered
+                column={{ xs: 1, sm: 2, md: 3 }}
+                size="small"
+                items={[
+                  { key: 'purchaseDate', label: 'Purchased on', children: date(asset.purchaseDate) },
+                  { key: 'supplier', label: 'Supplier', children: dash(supplier) },
+                  { key: 'cost', label: 'Cost', children: money(asset.purchaseCost) },
+                  { key: 'invoiceNo', label: 'Invoice no.', children: dash(asset.invoiceNo) },
+                  { key: 'poNo', label: 'PO no.', children: dash(asset.poNo) },
+                  {
+                    key: 'warranty',
+                    label: 'Warranty',
+                    children: asset.warrantyEnd ? `${date(asset.warrantyStart)} to ${date(asset.warrantyEnd)}` : '-',
+                  },
+                  {
+                    key: 'amc',
+                    label: 'AMC',
+                    children: asset.amcAvailable ? `${date(asset.amcStart)} to ${date(asset.amcEnd)}` : 'No',
+                  },
+                  { key: 'amcVendor', label: 'AMC vendor', children: dash(asset.amcVendorName ?? asset.amcVendorText) },
+                ]}
+              />
             </Card>
 
             {/* Only for a category marked issuable: a compressor bolted to the

@@ -153,28 +153,40 @@ const AssetTransferView = () => {
             </Card>
 
             <Card title="The move" style={{ marginTop: 16 }}>
-              <Descriptions bordered column={{ xs: 1, sm: 2, md: 3 }} size="small">
-                <Descriptions.Item label="From">{transfer.fromUnitName}</Descriptions.Item>
-                <Descriptions.Item label="To" span={2}>{transfer.toLocationText}</Descriptions.Item>
-                <Descriptions.Item label="Reason">{transfer.reasonLabel ?? '-'}</Descriptions.Item>
-                <Descriptions.Item label="Planned">{date(transfer.plannedDate)}</Descriptions.Item>
-                <Descriptions.Item label="Custodian on arrival">{transfer.toCustodianName ?? '-'}</Descriptions.Item>
-                <Descriptions.Item label="Challan no.">
-                  {transfer.challanNo ?? (transfer.interUnit ? '-' : 'not needed')}
-                </Descriptions.Item>
-                <Descriptions.Item label="Vehicle">{transfer.vehicleNo ?? '-'}</Descriptions.Item>
-                <Descriptions.Item label="Notes">{transfer.reasonText ?? '-'}</Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                bordered
+                column={{ xs: 1, sm: 2, md: 3 }}
+                size="small"
+                items={[
+                  { key: 'from', label: 'From', children: transfer.fromUnitName },
+                  { key: 'to', label: 'To', span: 2, children: transfer.toLocationText },
+                  { key: 'reason', label: 'Reason', children: transfer.reasonLabel ?? '-' },
+                  { key: 'planned', label: 'Planned', children: date(transfer.plannedDate) },
+                  { key: 'custodian', label: 'Custodian on arrival', children: transfer.toCustodianName ?? '-' },
+                  {
+                    key: 'challanNo',
+                    label: 'Challan no.',
+                    children: transfer.challanNo ?? (transfer.interUnit ? '-' : 'not needed'),
+                  },
+                  { key: 'vehicle', label: 'Vehicle', children: transfer.vehicleNo ?? '-' },
+                  { key: 'notes', label: 'Notes', children: transfer.reasonText ?? '-' },
+                ]}
+              />
             </Card>
 
             <Card title="Who did what" style={{ marginTop: 16 }}>
-              <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
-                <Descriptions.Item label="Raised">{stamp(transfer.requestedAt)}</Descriptions.Item>
-                <Descriptions.Item label="Decided">{stamp(transfer.approvedAt)}</Descriptions.Item>
-                <Descriptions.Item label="Dispatched">{stamp(transfer.dispatchedAt)}</Descriptions.Item>
-                <Descriptions.Item label="Received">{stamp(transfer.receivedAt)}</Descriptions.Item>
-                <Descriptions.Item label="Decision note" span={2}>{transfer.decisionReason ?? '-'}</Descriptions.Item>
-              </Descriptions>
+              <Descriptions
+                bordered
+                column={{ xs: 1, sm: 2 }}
+                size="small"
+                items={[
+                  { key: 'raised', label: 'Raised', children: stamp(transfer.requestedAt) },
+                  { key: 'decided', label: 'Decided', children: stamp(transfer.approvedAt) },
+                  { key: 'dispatched', label: 'Dispatched', children: stamp(transfer.dispatchedAt) },
+                  { key: 'received', label: 'Received', children: stamp(transfer.receivedAt) },
+                  { key: 'decisionNote', label: 'Decision note', span: 2, children: transfer.decisionReason ?? '-' },
+                ]}
+              />
             </Card>
 
             <Card title={`Assets (${transfer.items.length})`} style={{ marginTop: 16 }}>

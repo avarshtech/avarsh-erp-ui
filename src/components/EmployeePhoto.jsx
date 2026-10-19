@@ -180,7 +180,7 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
         width={size}
         height={size}
         style={{ objectFit: 'cover' }}
-        preview={{ visible: preview, onVisibleChange: setPreview, src }}
+        preview={{ open: preview, onOpenChange: setPreview, src }}
       />
       {busy && <div className="employee-photo-busy"><Spin indicator={<LoadingOutlined spin />} /></div>}
 
