@@ -11,7 +11,7 @@ import { getSalaryStructuresByEmployee } from '../../../services/hr/salaryStruct
 import { hasPermission } from '../../../utils/permissions';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
-  PAYMENT_MODES, DOCUMENT_TYPES, EMPLOYEE_CATEGORY,
+  PAYMENT_MODES, DOCUMENT_TYPES, EMPLOYEE_CATEGORY, gradeLabel,
 } from '../../../utils/hrConstants';
 import { isStoredFile, isOpenableLink, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
@@ -176,7 +176,7 @@ const EmployeeView = () => {
           <Descriptions.Item label="Unit">{employee.unitName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Category">{getLabel(EMPLOYEE_CATEGORY, employee.category)}</Descriptions.Item>
           <Descriptions.Item label="Employee Type">{getLabel(EMPLOYEE_TYPE, employee.employeeType)}</Descriptions.Item>
-          <Descriptions.Item label="Grade">{employee.grade ? employee.grade.replace('_', '+') : '-'}</Descriptions.Item>
+          <Descriptions.Item label="Grade">{employee.grade ? gradeLabel(employee.grade) : '-'}</Descriptions.Item>
           <Descriptions.Item label="Date of Joining">{employee.dateOfJoining ? dayjs(employee.dateOfJoining).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
           {employee.dateOfLeaving && (
             <Descriptions.Item label="Date of Leaving">

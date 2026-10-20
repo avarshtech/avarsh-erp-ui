@@ -52,6 +52,7 @@ import {
   getAllUOMs,
 } from '../../services/master/masterDataService';
 import { getStyles } from '../../services/master/styleService';
+import { getBuyers } from '../../services/master/buyerService';
 import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
 import { getAllSizePresets } from '../../services/master/sizePresetService';
 
@@ -403,7 +404,7 @@ const collapsedItemSelected = {
 const MasterDashboard = () => {
   const { message, modal } = App.useApp();
   const {
-    categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets,
+    categories, subCategories, itemTypes, attributes, uoms, styles, buyers, paymentTerms, sizePresets,
     setData, setLoading, loading, isCacheValid,
   } = useStore();
 
@@ -511,6 +512,18 @@ const MasterDashboard = () => {
       );
     }
 
+    // Styles pick their buyer from this list: without it a fresh session's Style form offers no
+    // buyers (and the style list shows buyer ids) until the Buyers tab happens to be opened.
+    if (!isCacheValid('buyers') || buyers.length === 0) {
+      setLoading('buyers', true);
+      fetchPromises.push(
+        getBuyers()
+          .then((data) => setData('buyers', Array.isArray(data) ? data : data?.content || []))
+          .catch(() => message.error('Failed to load buyers'))
+          .finally(() => setLoading('buyers', false))
+      );
+    }
+
     if (!isCacheValid('paymentTerms') || paymentTerms.length === 0) {
       setLoading('paymentTerms', true);
       fetchPromises.push(
@@ -534,7 +547,7 @@ const MasterDashboard = () => {
     if (fetchPromises.length > 0) {
       await Promise.allSettled(fetchPromises);
     }
-  }, [categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets, isCacheValid, setData, setLoading]);
+  }, [categories, subCategories, itemTypes, attributes, uoms, styles, buyers, paymentTerms, sizePresets, isCacheValid, setData, setLoading]);
 
   useEffect(() => {
     fetchAllMetaData();

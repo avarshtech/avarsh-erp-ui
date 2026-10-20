@@ -17,7 +17,7 @@ import { searchEmployees } from '../../../services/hr/employeeService';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
   BLOOD_GROUPS, PAYMENT_MODES, DOCUMENT_TYPES, RELATIONSHIP_TYPES,
-  EMPLOYEE_CATEGORY, EMPLOYEE_GRADE,
+  EMPLOYEE_CATEGORY, EMPLOYEE_GRADE, gradeLabel,
 } from '../../../utils/hrConstants';
 import { uploadFile } from '../../../services/core/fileService';
 import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
@@ -598,7 +598,7 @@ const EmployeeForm = () => {
           <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: g.replace('_', '+') }))} allowClear /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: gradeLabel(g) }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Reporting Manager" name="reportingManagerId">
               <Select
