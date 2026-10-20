@@ -16,8 +16,8 @@ const REVISE_REASON = 'Changed in the cost sheet editor after it was submitted';
  *
  * An existing sheet changes status by its own commands, not by the save: Submit saves the edits
  * with the status the sheet has, then sends it for approval with the version the save answered;
- * Save Draft on a submitted sheet first takes it back to Draft (the withdraw), then saves the
- * edits. A draft's save beside a command goes as an autosave, so the people told about cost
+ * Save Draft or Submit on a submitted sheet first takes it back to Draft (the withdraw), then saves
+ * the edits (and Submit sends it for approval again). A draft's save beside a command goes as an autosave, so the people told about cost
  * sheets get the command's one message, as before. A new sheet is still created as Draft or Final.
  */
 export default function useSheetPersist({ form, sheet, dispatch, totals, meta, setMeta, todaysRate, labelsOf }) {
@@ -40,12 +40,15 @@ export default function useSheetPersist({ form, sheet, dispatch, totals, meta, s
 
       let current = metaRef.current;
       const existing = !!current.id && !autosave;
-      const submitting = existing && status === COSTING_STATUS.FINAL && current.status !== COSTING_STATUS.FINAL;
       let withdrawn = false;
-      if (existing && status === COSTING_STATUS.DRAFT && current.status === COSTING_STATUS.FINAL) {
+      // A submitted sheet opened to revise (the list's Revise) is taken back to Draft before its
+      // edits are saved — whether it is then kept as a draft or submitted again. The server
+      // refuses edits to a Final sheet, so Submit straight from a revised sheet used to fail (409).
+      if (existing && current.status === COSTING_STATUS.FINAL) {
         current = adopt(current, await withdrawCostSheet(current.id, current.version, REVISE_REASON));
         withdrawn = true;
       }
+      const submitting = existing && status === COSTING_STATUS.FINAL && current.status !== COSTING_STATUS.FINAL;
       // Beside a command, a draft's edits are saved the way autosave saves them: no WhatsApp
       // message and no feed row of their own, so the command's are the only ones, as when the
       // save itself carried the move. A rejected sheet cannot autosave and is saved as usual.
