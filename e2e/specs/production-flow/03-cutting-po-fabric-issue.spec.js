@@ -27,7 +27,7 @@ test.describe('Production flow — Cutting PO and fabric issue', () => {
     await chooseLabelled(authedPage, 'Confirmed Order', order.orderNo);
     await expect(authedPage.locator('.ant-alert', { hasText: /PP Sample approved/i })).toBeVisible({ timeout: 10000 });
     await pickToday(authedPage, 'Planned Cut Date');
-    await selectOptionByText(authedPage, 'Unit Unit', 'Unit 1');
+    await selectOptionByText(authedPage, 'Unit', 'Unit 1');
     await pickToday(authedPage, 'Planned Delivery Date');
 
     await applyBulkRate(authedPage, 8);

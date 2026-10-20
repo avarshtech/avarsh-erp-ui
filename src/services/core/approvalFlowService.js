@@ -54,8 +54,12 @@ export const submitForApproval = async (data) => {
   return response.data;
 };
 
+/** Fired after an approval action, so the menu's pending-approvals badge re-counts at once. */
+export const APPROVALS_CHANGED = 'erp:approvals-changed';
+
 export const processApprovalAction = async (id, data) => {
   const response = await axiosInstance.post(`${ENDPOINTS.REQUESTS}/${id}/action`, data);
+  window.dispatchEvent(new Event(APPROVALS_CHANGED));
   return response.data;
 };
 

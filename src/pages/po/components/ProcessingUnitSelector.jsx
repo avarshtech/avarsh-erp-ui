@@ -52,7 +52,7 @@ const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) 
       <Col xs={24} md={12}>
         <Form.Item
           name="processingUnitId"
-          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Unit Unit'}
+          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Unit'}
           rules={[{ required: true, message: 'Select a processing unit' }]}
         >
           <FormSelect
