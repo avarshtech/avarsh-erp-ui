@@ -17,11 +17,17 @@ const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
 
   useEffect(() => { if (open) setOrderId(defaultOrderId(orders)); }, [open, orders, defaultOrderId]);
 
+  // The drawer opens on a default order and the user picks theirs: the first order's balances can arrive
+  // last, and they used to replace the picked order's rows (its sizes saved under the picked order). Rows
+  // clear on every change and a late answer for another order is dropped.
   useEffect(() => {
-    if (!open || !orderId) { setLines([]); return; }
+    setLines([]);
+    if (!open || !orderId) return undefined;
+    let current = true;
     getIssueOpeningLines(orderId)
-      .then(setLines)
-      .catch(() => message.error('Failed to load the size-wise balances'));
+      .then((next) => { if (current) setLines(next); })
+      .catch(() => { if (current) message.error('Failed to load the size-wise balances'); });
+    return () => { current = false; };
   }, [open, orderId, message]);
 
   const setQty = useCallback((idx, val) => {
