@@ -18,6 +18,7 @@ import { getVariantsByIds } from '../master/variantService';
 import { getActiveDefectTypes as fetchActiveDefectTypes } from '../master/defectTypeService';
 import { getActiveTrimsQCCriteria as fetchActiveTrimsQCCriteria } from '../master/trimsQCCriteriaService';
 import { getItemMetaData } from '../master/itemService';
+import { QC_STATUS } from '../../utils/inventoryConstants';
 
 // Dev-only flag — when true, PO / GRN / QC reads are served from local mock data.
 // GRN + QC screens are now wired to the real API; leave false unless you need to
@@ -598,6 +599,19 @@ const fetchQCList = async (type, params = {}) => {
 
 export const getFabricQCList = (params = {}) => fetchQCList('Fabric', params);
 export const getTrimsQCList = (params = {}) => fetchQCList('Accessories', params);
+
+/**
+ * The lines of a GRN that already have a QC standing for them — any but a rejected one — as
+ * poLineItemId → QC number. A GRN line is inspected once; the API refuses a second QC on it.
+ */
+export const getInspectedGrnLines = async (type, grnId) => {
+  if (USE_MOCK_INVENTORY_DATA) return new Map();
+  const response = await axiosInstance.get(QC_ENDPOINT, { params: { type, grnId, page: 0, size: 200 } });
+  const data = response.data ?? response;
+  return new Map((data.content || [])
+    .filter((q) => q.status !== QC_STATUS.REJECTED && q.poLineItemId != null)
+    .map((q) => [q.poLineItemId, q.qcNumber]));
+};
 
 const fetchQCById = async (id) => {
   if (USE_MOCK_INVENTORY_DATA) {

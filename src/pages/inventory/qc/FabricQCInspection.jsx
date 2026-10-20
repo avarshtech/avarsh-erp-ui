@@ -25,6 +25,7 @@ import FabricQCParameters from './FabricQCParameters';
 import FabricQCRollInspectionTable from './FabricQCRollInspectionTable';
 import FabricQCDefectAnalysis from './FabricQCDefectAnalysis';
 import FabricQCResultPanel from './FabricQCResultPanel';
+import useInspectedLines, { lineOption } from './useInspectedLines';
 
 /**
  * Fabric QC Inspection — card-grouped single-scroll layout.
@@ -189,10 +190,11 @@ const FabricQCInspection = () => {
   }, []);
 
   // ─── Derived data ──────────────────────────────────────────────────────────
-  const lineItemOptions = useMemo(() => {
-    const lineItems = selectedGRN?.lineItems || [];
-    return lineItems.map((li) => ({ label: `${li.variantCode || li.itemCode || '—'} — ${li.variantName || li.description}`, value: li.poLineItemId || li.id }));
-  }, [selectedGRN]);
+  const inspectedLines = useInspectedLines('Fabric', selectedGRN?.id, isNew);
+  const lineItemOptions = useMemo(
+    () => (selectedGRN?.lineItems || []).map((li) => lineOption(li, inspectedLines)),
+    [selectedGRN, inspectedLines],
+  );
 
   const defectTypeOptions = useMemo(
     () => defectTypes.filter((d) => d.active).map((d) => ({ label: d.name, value: d.id })),
