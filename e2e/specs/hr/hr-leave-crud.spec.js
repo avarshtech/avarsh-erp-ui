@@ -18,9 +18,12 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { ensureLeaveType } from '../../helpers/hr-leave-seed.js';
 import {
   antSelect,
-  antDatePickerToday,
+  antDatePickerType,
+  dayAhead,
   antTableWaitForData,
   antMessageContains,
   antFormFill,
@@ -31,11 +34,20 @@ import {
 import {
   navigateWithAuth,
   ensureSessionActive,
-  goToListPage,
   waitForPageReady,
 } from '../../helpers/navigation.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
+
+// The Apply Leave drawer offers the active leave types, and the e2e data seeds none
+test.beforeAll(async () => {
+  const api = await createAuthenticatedClient();
+  try {
+    await ensureLeaveType(api);
+  } finally {
+    await api.dispose();
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -215,19 +227,14 @@ test.describe('HR Leave — Apply Leave Drawer', () => {
     // Select first available leave type
     await antFormSelect(page, 'Leave Type', null, { first: true });
 
-    // Pick From Date (today)
-    const fromDateFormItem = page
+    // A day of its own (the server refuses overlapping leave; hr-leave-workflow uses 40+). One day is the
+    // drawer's default Duration, which asks for a single Leave Date; From and To are for "Multiple Days"
+    const day = dayAhead(80);
+    const leaveDateFormItem = page
       .locator('.ant-form-item')
-      .filter({ hasText: 'From Date' })
+      .filter({ hasText: 'Leave Date' })
       .first();
-    await antDatePickerToday(page, fromDateFormItem.locator('.ant-picker').first());
-
-    // Pick To Date (today)
-    const toDateFormItem = page
-      .locator('.ant-form-item')
-      .filter({ hasText: 'To Date' })
-      .first();
-    await antDatePickerToday(page, toDateFormItem.locator('.ant-picker').first());
+    await antDatePickerType(page, leaveDateFormItem.locator('.ant-picker').first(), day);
 
     // Fill reason
     await antFormFill(page, 'Reason', `E2E test leave reason ${STAMP()}`);
@@ -262,27 +269,27 @@ test.describe('HR Leave — Leave Balances Page', () => {
     await navigateWithAuth(page, '/hr/leaves/balances');
     await waitForPageReady(page);
 
-    // Page header
-    await expect(page.getByText('Leave Balances')).toBeVisible({ timeout: 10000 });
+    // Page header (the side menu carries the same words once the HR group is open)
+    await expect(page.getByRole('heading', { name: 'Leave Balances' })).toBeVisible({ timeout: 10000 });
 
     // Year select should be visible
     await page.locator('.ant-select').first().waitFor({ state: 'visible', timeout: 5000 });
 
-    // Factory select placeholder
-    await expect(page.getByText('Select Factory')).toBeVisible();
+    // Unit select placeholder
+    await expect(page.getByText('Select Unit')).toBeVisible();
   });
 
-  test('Leave Balances — table renders after factory selection', async ({ page }) => {
+  test('Leave Balances — table renders after unit selection', async ({ page }) => {
     await navigateWithAuth(page, '/hr/leaves/balances');
     await waitForPageReady(page);
 
     // Table should be present (even if empty)
     await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 15000 });
 
-    // Select first factory to trigger employee + balance load
-    const factorySelect = page.getByText('Select Factory').locator('xpath=ancestor::div[contains(@class,"ant-select")]').first();
-    if (await factorySelect.isVisible().catch(() => false)) {
-      await antSelect(page, factorySelect, null, { first: true });
+    // Select first unit to trigger employee + balance load
+    const unitSelect = page.getByText('Select Unit').locator('xpath=ancestor::div[contains(@class,"ant-select")]').first();
+    if (await unitSelect.isVisible().catch(() => false)) {
+      await antSelect(page, unitSelect, null, { first: true });
       await waitForPageReady(page);
       // Table should still be visible after selection
       await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 10000 });

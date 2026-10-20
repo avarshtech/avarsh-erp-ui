@@ -1,4 +1,5 @@
 import axiosInstance, { upload } from './axiosInstance';
+import { inertBlob } from '../../utils/inertBlob';
 
 /**
  * File Storage API Service
@@ -70,7 +71,8 @@ export const downloadFileAsBlob = async (fileId) => {
   const response = await axiosInstance.get(`${ENDPOINTS.DOWNLOAD}/${fileId}`, {
     responseType: 'blob',
   });
-  return response.data;
+  // Callers show these blobs or open them in a new window, in this app's origin (review U077).
+  return inertBlob(response.data);
 };
 
 /**
@@ -83,10 +85,33 @@ export const getFileMetadata = async (fileId) => {
   return response.data;
 };
 
+/**
+ * Save a stored file to disk under its original name.
+ *
+ * The download endpoint needs the auth header, so the browser cannot be pointed
+ * at a URL — the bytes come back as a Blob and are handed to a throwaway anchor.
+ * Throws on failure so the caller can toast in its own words.
+ *
+ * @param {Object} file - FileStorageDTO (needs `fileId`, uses `originalFilename`)
+ */
+export const downloadStoredFile = async (file) => {
+  const blob = await downloadFileAsBlob(file.fileId);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.originalFilename || 'download';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Revoke after a short delay so the browser can finalise the download
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export default {
   uploadFile,
   deleteFile,
   getFilesByEntity,
   downloadFileAsBlob,
+  downloadStoredFile,
   getFileMetadata,
 };

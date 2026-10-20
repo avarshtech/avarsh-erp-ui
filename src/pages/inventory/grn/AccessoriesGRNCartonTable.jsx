@@ -116,7 +116,7 @@ const AccessoriesGRNCartonTable = ({ cartons = [], items = [], onCartonChange, r
         width: 170,
         render: (v, row) => {
           if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
-          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{v ?? '—'}</Text>;
+          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{row.variantCode || '—'}</Text>;
         },
       },
       {
@@ -164,7 +164,7 @@ const AccessoriesGRNCartonTable = ({ cartons = [], items = [], onCartonChange, r
               value={val}
               placeholder="Qty"
               controls={false}
-              addonAfter={row.uom || ''}
+              suffix={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
               status={hasOverage ? 'error' : (!val ? 'warning' : '')}

@@ -7,8 +7,11 @@
  * Non-credential display data (user name, role, permissions) is cached in
  * sessionStorage WITHOUT the token field for instant UI rendering on page refresh.
  *
- * This module has ZERO imports to prevent circular dependency issues.
+ * To prevent circular dependency issues this module imports only leaf modules that import
+ * nothing themselves (utils/apiCaches).
  */
+
+import { clearApiCaches } from '../../utils/apiCaches';
 
 // ── Private in-memory state (not accessible via browser storage APIs) ────────
 
@@ -107,6 +110,8 @@ export const hasSessionActiveFlag = () => {
 
 export const clearSessionActiveFlag = () => {
   localStorage.removeItem('sessionActive');
+  // The working branch is a per-user choice; the next user on this browser starts at their own home branch
+  localStorage.removeItem('activeBranchId');
 };
 
 // ── User Display Cache (localStorage — survives PWA restart) ─────────────────
@@ -185,4 +190,44 @@ export const clearAll = () => {
   sessionStorage.removeItem('authToken');
   sessionStorage.removeItem('refreshToken');
   sessionStorage.removeItem('organisationInfo');
+
+  // On a shared PC the next person must not be served this user's data: the service worker's
+  // API caches go with the session, and so do the working branch, the lists' remembered
+  // searches and filters (utils/listMemory) and the Help Genie's conversations. The Preview
+  // modules' own data is kept: it belongs to the browser, not to a session.
+  clearApiCaches();
+  try {
+    localStorage.removeItem('activeBranchId');
+    sessionStorage.removeItem('avarsh-genie-threads');
+    Object.keys(sessionStorage).filter((key) => key.startsWith('erp:list:')).forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // Storage unavailable: nothing was kept in it
+  }
+};
+
+// ── Logout across tabs ──────────────────────────────────────────────────────
+
+const SESSION_CHANNEL = 'avarsh-session';
+// A channel message also reaches this tab's own listener, so each tab knows its own messages
+const TAB_ID = Math.random().toString(36).slice(2);
+
+/** Tell this browser's other tabs that the user logged out here. */
+export const announceLogout = () => {
+  try {
+    const channel = new BroadcastChannel(SESSION_CHANNEL);
+    channel.postMessage({ type: 'logout', from: TAB_ID });
+    channel.close();
+  } catch {
+    // No BroadcastChannel: the other tabs end at their next refresh, as before
+  }
+};
+
+/** Run `handler` when another tab of this browser logs out. Returns the unsubscribe function. */
+export const onLogoutElsewhere = (handler) => {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  const channel = new BroadcastChannel(SESSION_CHANNEL);
+  channel.onmessage = (event) => {
+    if (event.data?.type === 'logout' && event.data.from !== TAB_ID) handler();
+  };
+  return () => channel.close();
 };

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { UPDATE_CANCELLED_EVENT } from '../utils/swRegistration';
 
 /**
  * Full-screen overlay shown while the app is updating to a new version.
@@ -10,8 +11,16 @@ const UpdateOverlay = () => {
 
   useEffect(() => {
     const show = () => setVisible(true);
+    // The reload can be refused by an unsaved-changes prompt. This overlay
+    // covers the whole screen and has no close control, so it must come back
+    // down when that happens or the user is trapped behind it.
+    const hide = () => setVisible(false);
     window.addEventListener('pwa-updating', show);
-    return () => window.removeEventListener('pwa-updating', show);
+    window.addEventListener(UPDATE_CANCELLED_EVENT, hide);
+    return () => {
+      window.removeEventListener('pwa-updating', show);
+      window.removeEventListener(UPDATE_CANCELLED_EVENT, hide);
+    };
   }, []);
 
   if (!visible) return null;

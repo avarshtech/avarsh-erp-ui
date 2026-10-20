@@ -1,0 +1,566 @@
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { App, Card, Form, Input, DatePicker, Row, Col, Collapse, Typography, Tag, Alert, Space, Skeleton, Result } from 'antd';
+import { useNavigate, useParams } from 'react-router-dom';
+import dayjs from 'dayjs';
+import PageHeader from '../../../components/PageHeader';
+import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
+import { ActionButton } from '../../../components/buttons';
+import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useBillWorkflow from '../../../hooks/useBillWorkflow';
+import useBillPassingMasters from '../../../hooks/useBillPassingMasters';
+import { useTheme } from '../../../context/ThemeContext';
+import { hasPermission } from '../../../utils/permissions';
+import { formatCurrency, formatNumber } from '../../../utils/formatters';
+import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { recalcBill, recalcTaxes, billLines, debitPercentOfInvoice, hasSupplierInvoice } from '../../../utils/billPassingCalc';
+import { printBillPassingVoucher } from '../../../utils/billPassingVoucherPrint';
+import {
+  BILL_PASSING_STATUS as S,
+  BILL_PASSING_STATUS_COLOR,
+  BILL_PASSING_STATUS_LABEL,
+  EXCEPTION_SEVERITY,
+  ISSUE_STATUS,
+  BP_MODULE_ID,
+  getBillReason,
+} from '../../../utils/billPassingConstants';
+import {
+  getBill, updateBill, getPoBillingSource,
+  submitBill, startVerification, raiseQuery, referBackBill, holdBill, releaseHold, sendForApproval,
+  approveBill, rejectBill, reopenBill, sendToAccounts, recordTallyReference,
+  saveDebit, setDebitStatus, deleteDebit, refreshProposedDebits,
+  addIssue, setIssueStatus, withdrawIssue, addAttachment, removeAttachment,
+} from '../../../services/inventory/billPassingService';
+import BpPoSummaryCard from './BpPoSummaryCard';
+import BpGrnSelectionTable from './BpGrnSelectionTable';
+import BpQcPanel from './BpQcPanel';
+import BpReconciliationPanel from './BpReconciliationPanel';
+import BpDebitTable from './BpDebitTable';
+import BpCalculationPanel from './BpCalculationPanel';
+import BpIssueLog from './BpIssueLog';
+import BpAttachments from './BpAttachments';
+import BillWorkflowBar from './BillWorkflowBar';
+import BillReasonModal from './BillReasonModal';
+import { buildBillActions } from './billWorkflowActions';
+
+const { Text } = Typography;
+const { TextArea } = Input;
+
+const SECTION_KEYS = ['po', 'grn', 'qc', 'recon', 'debits', 'calc', 'issues', 'docs'];
+
+/** The supplier bill's workflow verbs, under the names the shared action table uses. */
+const SUPPLIER_VERBS = {
+  startVerification, referBack: referBackBill, raiseQuery, hold: holdBill, sendForApproval, releaseHold,
+  approve: approveBill, reject: rejectBill, sendToAccounts, reopen: reopenBill, recordTallyReference,
+};
+
+/**
+ * The bill workspace, always opened on an existing draft — the supplier/PO pick
+ * that starts one lives in BillPassingCreateModal, off the list page.
+ */
+const BillPassingForm = () => {
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const { isDarkMode } = useTheme();
+  const [form] = Form.useForm();
+
+  const [bill, setBill] = useState(null);
+  const [source, setSource] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  // Cached across screens rather than fetched on every bill open.
+  const { debitTypes, chargeTypes, issueTypes } = useBillPassingMasters();
+
+  const [isDirty, setIsDirty] = useState(false);
+  const { clearDirty } = useUnsavedChanges(isDirty);
+
+  // Every mutation returns the bill; adopting it (version included) is what keeps the next save from a
+  // false conflict. `run` / `busyProps` / the reason modal are shared with the job-work bill workspace.
+  const adoptBill = useCallback((next) => {
+    setBill(next);
+    setIsDirty(false);
+    clearDirty();
+  }, [clearDirty]);
+  const { busyProps, run, openReason, reasonModal } = useBillWorkflow(adoptBill);
+
+  // Permissions come from the session token and do not change while the page is mounted.
+  const { canUpdate, canVerify, canApprove } = useMemo(() => ({
+    canUpdate: hasPermission(BP_MODULE_ID, 'update'),
+    canVerify: hasPermission(BP_MODULE_ID, 'verify'),
+    canApprove: hasPermission(BP_MODULE_ID, 'approve'),
+  }), []);
+
+  // Open until the bill is passed, but only to someone allowed to update it — a
+  // verify-only user gets the same read-only workspace they would after approval.
+  const readOnly = !bill?.editable || !canUpdate;
+
+  // ==================== LOAD ====================
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError('');
+    (async () => {
+      try {
+        const b = await getBill(id);
+        if (cancelled) return;
+        setBill(b);
+        const src = await getPoBillingSource(b.poId, { excludeBillId: b.id });
+        if (!cancelled) setSource(src);
+      } catch (e) {
+        if (!cancelled) setLoadError(e.message || 'Failed to load this bill');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, message]);
+
+  // The header fields are pushed in only once the form is on screen. While the
+  // bill is loading the workspace renders a skeleton, and writing to a
+  // `useForm` instance whose <Form> has not mounted warns in the console.
+  const seededBillId = useRef(null);
+  useEffect(() => {
+    if (loading || !bill || seededBillId.current === bill.id) return;
+    seededBillId.current = bill.id;
+    form.setFieldsValue({
+      supplierInvoiceNo: bill.supplierInvoiceNo,
+      invoiceDate: bill.invoiceDate ? dayjs(bill.invoiceDate) : null,
+      headerRemarks: bill.headerRemarks,
+    });
+  }, [loading, bill, form]);
+
+  /** Re-read the bill after the approval engine has acted on it. */
+  const reloadBill = useCallback(async () => {
+    try {
+      setBill(await getBill(id));
+    } catch (e) {
+      if (!e.response) message.error(e.message || 'Failed to reload the bill');
+    }
+  }, [id, message]);
+
+  const reloadSource = useCallback(async (b) => {
+    try {
+      setSource(await getPoBillingSource(b.poId, { excludeBillId: b.id }));
+    } catch (e) {
+      // The interceptor has already shown the server's message; this is for
+      // the failure it cannot see, where the request never got an answer.
+      if (!e.response) message.error(e.message || 'Failed to refresh PO billing data');
+    }
+  }, [message]);
+
+  // ==================== LOCAL EDITS ====================
+
+  /** Local, in-progress edits (GRN picks, charges, adjustments) — recalculated live. */
+  const patchBill = useCallback((patch) => {
+    setBill((prev) => {
+      if (!prev) return prev;
+      const merged = { ...prev, ...patch };
+      const next = recalcBill({ ...merged, taxes: patch.taxes ?? recalcTaxes(merged) });
+      // Keep the section header counters honest while the user is still editing —
+      // grnCount/lineCount/debitPercent are server decorations that go stale on a local patch.
+      return {
+        ...next,
+        grnCount: (next.grns || []).length,
+        lineCount: billLines(next).length,
+        debitPercent: debitPercentOfInvoice(next),
+      };
+    });
+    setIsDirty(true);
+  }, []);
+
+  /** Everything the server needs to save the bill, from the form and local edits. */
+  const savePayload = useCallback((values, duplicateOverrideReason) => ({
+    supplierInvoiceNo: values.supplierInvoiceNo,
+    invoiceDate: values.invoiceDate.format('YYYY-MM-DD'),
+    headerRemarks: values.headerRemarks || '',
+    adjustmentTotal: bill.adjustmentTotal,
+    grns: (bill.grns || []).map((g) => ({
+      grnId: g.grnId,
+      lines: (g.lines || []).map((l) => ({
+        grnLineItemId: l.grnLineItemId,
+        billedQty: l.billedQty,
+        invoiceRate: l.invoiceRate,
+      })),
+    })),
+    // A row the user just added has a temporary key rather than an id; the
+    // server assigns the real one and the panel re-seeds from the response.
+    charges: (bill.charges || []).map((c) => ({
+      ...c,
+      id: typeof c.id === 'string' && c.id.startsWith('tmp-') ? null : c.id,
+    })),
+    taxes: (bill.taxes || []).map((t) => ({
+      ...t,
+      id: typeof t.id === 'string' && t.id.startsWith('tmp-') ? null : t.id,
+    })),
+    duplicateOverrideReason,
+    version: bill.version,
+  }), [bill]);
+
+  // `busyKey` lets Submit's save-then-submit keep the Submit button spinning
+  // throughout. `quiet` drops the "Bill saved" toast when the save is only the
+  // first half of a submit, so a refused submit shows one message, not a
+  // success followed by an error.
+  const handleSave = useCallback(async (busyKey = 'save', { quiet = false } = {}) => {
+    let values;
+    try {
+      values = await form.validateFields();
+    } catch {
+      message.warning('Please complete the invoice details before saving');
+      return null;
+    }
+    const next = await run(
+      busyKey,
+      () => updateBill(bill.id, savePayload(values)),
+      quiet ? null : 'Bill saved',
+      (e) => {
+        // BR-04 refuses an invoice number already booked this financial year.
+        // It is the one refusal with a way through: an approver may override it
+        // with a reason, which is how one supplier invoice covering two purchase
+        // orders gets billed at all. Offer that rather than only reporting it.
+        if (e.response?.data?.error !== 'DUPLICATE_INVOICE') return false;
+        openReason({
+          key: busyKey,
+          title: 'Override the duplicate invoice check?',
+          label: 'Why this invoice number is being booked a second time',
+          okText: 'Override and save',
+          placeholder: 'e.g. this supplier invoice covers two purchase orders',
+          successMsg: quiet ? null : 'Bill saved with a duplicate override',
+          onSubmit: async (text) => {
+            const saved = await updateBill(bill.id, savePayload(values, text));
+            reloadSource(saved);
+            return saved;
+          },
+        });
+        return true;
+      },
+    );
+    if (next) reloadSource(next);
+    return next;
+  }, [form, run, bill, savePayload, openReason, reloadSource, message]);
+
+  const handleSubmit = useCallback(() => {
+    modal.confirm({
+      title: `Submit ${bill.bpNumber}?`,
+      content: 'The bill is saved and moves to the verification queue. It stays editable until it is approved.',
+      okText: 'Save & Submit',
+      onOk: async () => {
+        const saved = await handleSave('submit', { quiet: true });
+        if (saved) {
+          await run('submit', () => submitBill(saved.id, saved.version),
+            'Bill submitted for verification');
+        }
+      },
+    });
+  }, [bill, handleSave, modal, run]);
+
+  // The same voucher the view dialog prints. GSTIN and payment terms live on the
+  // supplier master, which the PO billing source already carries, so the window
+  // opens synchronously inside the click and pop-up blockers stay quiet.
+  const handlePrint = useCallback(() => {
+    if (!bill) return;
+    const ok = printBillPassingVoucher({
+      ...bill,
+      supplierGstin: source?.supplier?.gstin,
+      paymentTerms: source?.supplier?.paymentTerms,
+    });
+    if (!ok) message.warning('Allow pop-ups to print the bill passing voucher');
+  }, [bill, source, message]);
+
+  // ==================== HEADER ACTIONS ====================
+
+  // Submit is refused without a billed line or the supplier invoice copy
+  // (BR-15). Mirroring those two checks here lets the button say why it is
+  // disabled instead of saving the bill and then failing the round trip.
+  const submitBlockReason = useMemo(() => {
+    if (!bill) return null;
+    if (!billLines(bill).length) return 'Select at least one GRN line to bill';
+    // Whether the invoice copy is mandatory is the server's rule, not ours: it
+    // is switched off where there is no file storage to attach one to.
+    if (bill.requireInvoiceAttachment && !hasSupplierInvoice(bill)) {
+      return 'Attach the supplier invoice before submitting (BR-15)';
+    }
+    return null;
+  }, [bill]);
+
+  const headerActions = useMemo(() => (
+    <BillWorkflowBar
+      busyProps={busyProps}
+      actions={buildBillActions({
+        bill,
+        docNo: bill?.bpNumber,
+        can: { update: canUpdate, verify: canVerify, approve: canApprove },
+        verbs: SUPPLIER_VERBS,
+        ui: { run, openReason, confirm: (cfg) => modal.confirm(cfg), onSave: handleSave, onSubmit: handleSubmit },
+        submitBlockReason,
+        print: { text: 'Print Voucher', onClick: handlePrint },
+      })}
+    />
+  ), [bill, submitBlockReason, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
+
+  // ==================== SECTION STYLES ====================
+
+  const sectionHeaderStyle = (color) => ({
+    background: isDarkMode
+      ? `linear-gradient(135deg, ${color}22 0%, ${color}11 100%)`
+      : `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`,
+    borderRadius: 8,
+    border: `1px solid ${isDarkMode ? `${color}33` : `${color}22`}`,
+  });
+
+  const warnExceptions = useMemo(
+    () => (bill?.exceptions || []).filter((x) => x.severity === EXCEPTION_SEVERITY.WARN),
+    [bill],
+  );
+
+  const openIssues = useMemo(
+    () => (bill?.issues || []).filter((i) => i.status === ISSUE_STATUS.OPEN || i.status === ISSUE_STATUS.IN_PROGRESS).length,
+    [bill],
+  );
+
+  // Why the bill is back with the clerk (or parked), shown above the workspace.
+  const reason = getBillReason(bill);
+
+  const label = (text, color, tag) => (
+    <Space size={8}>
+      <Text strong style={{ fontSize: 15, color }}>{text}</Text>
+      {tag}
+    </Space>
+  );
+
+  const collapseItems = useMemo(() => {
+    if (!bill) return [];
+    return [
+      {
+        key: 'po',
+        label: label('PO Summary', '#6366f1', source?.po?.poNumber ? <Tag color="geekblue">{source.po.poNumber}</Tag> : null),
+        style: sectionHeaderStyle('#6366f1'),
+        children: <BpPoSummaryCard source={source} bill={bill} />,
+      },
+      {
+        key: 'grn',
+        label: label('GRN / Challan Details', 'var(--info-color)', <Tag color="cyan">{`${bill.grnCount || 0} GRN · ${bill.lineCount || 0} lines`}</Tag>),
+        style: sectionHeaderStyle('#0891b2'),
+        children: (
+          <BpGrnSelectionTable
+            source={source}
+            bill={bill}
+            readOnly={readOnly}
+            onChange={(grns) => patchBill({ grns })}
+          />
+        ),
+      },
+      {
+        key: 'qc',
+        label: label('QC Details', '#8b5cf6', null),
+        style: sectionHeaderStyle('#8b5cf6'),
+        children: <BpQcPanel bill={bill} source={source} />,
+      },
+      {
+        key: 'recon',
+        label: label('Reconciliation', '#0ea5e9', bill.exceptions?.length ? <Tag color="orange">{`${bill.exceptions.length} exception${bill.exceptions.length > 1 ? 's' : ''}`}</Tag> : <Tag color="green">Clean</Tag>),
+        style: sectionHeaderStyle('#0ea5e9'),
+        children: <BpReconciliationPanel bill={bill} />,
+      },
+      {
+        key: 'debits',
+        label: label('Debits', '#ef4444', <Tag color="red">{`${formatCurrency(bill.debitTotal)} · ${formatNumber(bill.debitPercent, 2)}%`}</Tag>),
+        style: sectionHeaderStyle('#ef4444'),
+        children: (
+          <BpDebitTable
+            bill={bill}
+            debitTypes={debitTypes}
+            readOnly={!bill.debitsEditable}
+            onSave={(debit) => run('debit', () => saveDebit(bill.id, { ...debit, version: bill.version }), 'Debit saved')}
+            onSetStatus={(debitId, status, reason) => run('debit', () => setDebitStatus(bill.id, debitId, status, reason, bill.version), 'Debit updated')}
+            onDelete={(debitId) => run('debit', () => deleteDebit(bill.id, debitId, bill.version), 'Debit removed')}
+            onRefreshProposals={() => run('debit', () => refreshProposedDebits(bill.id, bill.version), 'Proposed debits refreshed')}
+          />
+        ),
+      },
+      {
+        key: 'calc',
+        label: label('Calculation', '#10b981', <Tag color="green">{`Net ${formatCurrency(bill.netPayable)}`}</Tag>),
+        style: sectionHeaderStyle('#10b981'),
+        children: (
+          <BpCalculationPanel
+            bill={bill}
+            chargeTypes={chargeTypes}
+            readOnly={readOnly}
+            onChange={patchBill}
+          />
+        ),
+      },
+      {
+        key: 'issues',
+        label: label('Issues', '#f59e0b', openIssues ? <Tag color="orange">{`${openIssues} open`}</Tag> : null),
+        style: sectionHeaderStyle('#f59e0b'),
+        children: (
+          <BpIssueLog
+            bill={bill}
+            issueTypes={issueTypes}
+            onAdd={(issue) => run('issue', () => addIssue(bill.id, { ...issue, version: bill.version }), 'Issue logged')}
+            onSetStatus={(issueId, status, remarks) => run('issue', () => setIssueStatus(bill.id, issueId, status, remarks, bill.version), 'Issue updated')}
+            onWithdraw={(issueId, reason) => run('issue', () => withdrawIssue(bill.id, issueId, reason, bill.version), 'Issue withdrawn')}
+          />
+        ),
+      },
+      {
+        key: 'docs',
+        label: label('Attachments', '#64748b', bill.attachments?.length ? <Tag>{bill.attachments.length}</Tag> : null),
+        style: sectionHeaderStyle('#64748b'),
+        children: (
+          <BpAttachments
+            bill={bill}
+            readOnly={readOnly}
+            onAdd={(att) => run('attachment', () => addAttachment(bill.id, att), 'Attachment added')}
+            onRemove={(attId) => run('attachment', () => removeAttachment(bill.id, attId), 'Attachment removed')}
+          />
+        ),
+      },
+    ];
+    // sectionHeaderStyle/label are cheap pure closures over isDarkMode
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bill, source, readOnly, isDarkMode, debitTypes, chargeTypes, issueTypes, openIssues, patchBill, run]);
+
+  // ==================== RENDER ====================
+
+  if (loading) {
+    return (
+      <div className="animate-fade-in-up inv-page">
+        <PageHeader title="Bill Passing" backPath="/inventory/bill-passing" />
+        <Card style={{ marginBottom: 16 }}><Skeleton active paragraph={{ rows: 3 }} /></Card>
+        <Card><Skeleton active paragraph={{ rows: 8 }} /></Card>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="animate-fade-in-up inv-page">
+        <PageHeader title="Bill Passing" backPath="/inventory/bill-passing" />
+        <Result
+          status="warning"
+          title="This bill could not be opened"
+          subTitle={loadError}
+          extra={<ActionButton action="back" text="Back to Bill Passing" onClick={() => navigate('/inventory/bill-passing')} />}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade-in-up inv-page">
+      <PageHeader
+        title={bill?.bpNumber || 'New Bill Passing'}
+        subtitle={bill ? `${bill.supplierName} · PO ${bill.poNumber}` : undefined}
+        backPath="/inventory/bill-passing"
+        status={bill ? (
+          <Tag color={BILL_PASSING_STATUS_COLOR[bill.status]} style={{ fontSize: 13, padding: '2px 10px' }}>
+            {BILL_PASSING_STATUS_LABEL[bill.status]}
+          </Tag>
+        ) : undefined}
+        extra={headerActions}
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      />
+
+      {reason && (
+        <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} title={reason.label} description={reason.text} />
+      )}
+
+      {/* Not status-gated: whoever approves this payable must see that the
+          duplicate-invoice check was set aside, and on whose reasoning. */}
+      {bill.duplicateOverrideReason && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="The duplicate invoice check was overridden on this bill"
+          description={bill.duplicateOverrideReason}
+        />
+      )}
+
+      {/* An approval flow, once an admin configures one, decides this bill
+          rather than the Approve and Reject buttons in the header. */}
+      {bill?.approvalMode === 'ENGINE' && (
+        <ApprovalActionBar
+          entityType="BILL_PASSING"
+          entityId={bill.id}
+          docLabel="Bill Passing"
+          docNumber={bill.bpNumber}
+          onActionComplete={reloadBill}
+        />
+      )}
+
+      {bill?.blockers?.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`${bill.blockers.length} blocker${bill.blockers.length > 1 ? 's' : ''} must be cleared before this bill can be approved`}
+          description={<ul style={{ margin: 0, paddingLeft: 18 }}>{bill.blockers.map((b, i) => <li key={i}>{b}</li>)}</ul>}
+        />
+      )}
+
+      {warnExceptions.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`${warnExceptions.length} tolerance warning${warnExceptions.length > 1 ? 's' : ''}`}
+          description={<ul style={{ margin: 0, paddingLeft: 18 }}>{warnExceptions.map((x) => <li key={x.code}>{x.title} — {x.detail}</li>)}</ul>}
+        />
+      )}
+
+      <Card style={{ marginBottom: 16, borderLeft: '3px solid var(--primary-color)' }} title="Invoice Details">
+        <Form form={form} layout="vertical" disabled={readOnly} onValuesChange={() => setIsDirty(true)}>
+          <Row gutter={16}>
+            <Col xs={24} md={6}>
+              <Form.Item label="Supplier">
+                <Input value={bill?.supplierName || ''} disabled />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+              <Form.Item label="Purchase Order">
+                <Input value={bill?.poNumber || ''} disabled />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+              <Form.Item
+                label="Supplier Invoice No"
+                name="supplierInvoiceNo"
+                rules={[{ required: true, message: 'Supplier invoice number is required' }]}
+              >
+                <Input placeholder="As printed on the supplier invoice" maxLength={40} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+              <Form.Item
+                label="Invoice Date"
+                name="invoiceDate"
+                rules={[{ required: true, message: 'Invoice date is required' }]}
+              >
+                <DatePicker
+                  format={DATE_FORMAT}
+                  style={{ width: '100%' }}
+                  disabledDate={(d) => d && d.isAfter(dayjs(), 'day')}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item label="Header Remarks" name="headerRemarks">
+                <TextArea rows={2} maxLength={500} showCount placeholder="Anything the verifier or approver should know about this invoice" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Card>
+
+      <Collapse defaultActiveKey={SECTION_KEYS} items={collapseItems} />
+
+      <BillReasonModal {...reasonModal} />
+    </div>
+  );
+};
+
+export default BillPassingForm;

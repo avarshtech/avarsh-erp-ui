@@ -34,6 +34,30 @@
 | activityLogService.js | UserActivityLogController | `/api/v1/activity-logs` |
 | aiService.js | AiExtractionController | `/api/v1/ai` |
 | organisationService.js | OrganisationInfoController | `/api/v1/organisation-info` |
+| inventoryService.js | GRNController, QCController, FabricStockController, AccessoriesStockController, StockAdjustmentController, InventoryDashboardController | `/api/v1/grns`, `/api/v1/qc`, `/api/v1/inventory/stock/*`, `/api/v1/stock-adjustments`, `/api/v1/dashboard/inventory` |
+| materialIssueService.js | MaterialIssueController | `/api/v1/material-issues` (incl. `POST /{id}/cancel`) |
+| openingStockService.js | OpeningStockController | `/api/v1/opening-stock` |
+| returnToSupplierService.js | ReturnToSupplierController, DebitNoteController | `/api/v1/inventory/returns-to-supplier`, `/api/v1/inventory/debit-notes` |
+| bom/cutPanel/cutPanelService.js | CprController, CprCommandController | `/api/v1/cut-panel-requirements` (`/filter-options`, `/eligible-orders`, `/order-context/{orderId}`, `/by-order/{orderId}`, `/{id}/allocation`, `/{id}/history`; `/{id}/submit`, `/revise`, `/close`) |
+| bom/garmentProcess/garmentProcessService.js | GprController, GprCommandController | `/api/v1/garment-process-requirements` (the same set, no DELETE) |
+| po/cutPanelPo/cutPanelPoService.js (+ `cutPanelPoLookupService.js`) | CppController, CppCommandController, CppAmendmentController, CppLookupController — key `cut-panel-po` | `/api/v1/cut-panel-pos` (`DELETE /{id}?version=` a draft, `/filter-options`, `/{id}/issued-details`, `/{id}/submit|recall|send|cancel|short-close`, `/{id}/overrides`, `/{id}/amendment[/submit|/discard]`, `/lookups/processes|requirements|context`) |
+| po/garmentProcessPo/garmentProcessPoService.js (+ `garmentProcessPoLookupService.js`) | GpoController, GpoCommandController — key `garment-process-po` | `/api/v1/garment-process-pos` (`DELETE /{id}?version=` a draft, `/filter-options`, `/{id}/delivery`, `/{id}/submit|recall|send|cancel|short-close`, `/{id}/excess[/{oid}/approve]`, `/lookups/requirement-rows`, `/lookups/requirements/{gprId}/cells`, `/lookups/context`) |
+| production/cuttingApi.js `listIssuableCutPanelPos` · finishingProcessApi.js `getProcessJobWorkPos` | CutExternalProcessController · GarmentProcessController | `GET /api/v1/cutting/panel-issues/job-work-pos?cuttingPoId=` · `GET /api/v1/finishing/process-lookups/job-work-pos?workOrderId=` |
+
+> Job work (2026-10-06): every command body carries the `version` the screen read and answers with the saved
+> document; the screen adopts it. A refused submit is a 422 with `errors[]` (the services send those with
+> `silent: true` and `useActionRunner` shows the list). PO approve / reject / send back are the approval engine's
+> (`EntityType` CUT_PANEL_PO, GARMENT_PROCESS_PO via `POST /approval-requests/{id}/action`); a Garment Process PO's
+> vendor sign-off is the action's `actionData { signOff, acknowledged }`, `acknowledged` = the server's warn-only
+> eligibility texts. History rows carry `changes[{field, from, to}]`, folded into `details` by `toHistory`.
+
+> Backend package note (2026-08-17): all inventory controllers/services/domain live under
+> `com.avarsh.erp.inventory.{grn,qc,stock,openingstock,returns,issue,adjustment,dashboard}` —
+> feature-first packages mirroring the production module. URLs were NOT changed by the move.
+> Stock Adjustment: POST applies immediately (no approval), adjustments are immutable, fabric
+> adjusts per roll (fabric_stock_id), accessories aggregate per variant with FIFO lot application.
+> Material Issue cancel: restores exact source lots, blocks if a lot was Returned, reinstates the
+> soft allocation only while the production PO is still APPROVED.
 
 ---
 
@@ -73,7 +97,7 @@
 | getBuyerById | GET | `/buyers/{id}` |
 | createBuyer | POST | `/buyers` |
 | updateBuyer | POST | `/buyers` |
-| deleteBuyer | POST | `/buyers` |
+| deleteBuyer | DELETE | `/buyers/{id}` |
 
 ### Suppliers
 | Function | Method | Endpoint |
@@ -110,7 +134,7 @@
 ### Orders
 | Function | Method | Endpoint |
 |---|---|---|
-| searchOrders | GET | `/orders/search` |
+| searchOrders | GET | `/orders/search` (params incl. `orderType=BULK\|SAMPLE` since 2026-08-26; `ord_orders.order_type` NOT NULL default `BULK`, locked after Draft) |
 | getOrderById | GET | `/orders/{id}` |
 | getOrderByOrderNo | GET | `/orders/by-order-no` |
 | createOrder | POST | `/orders` |
@@ -134,13 +158,19 @@
 | getCostSheetById | GET | `/cost-sheets/{id}` |
 | getCostSheetByCostingId | GET | `/cost-sheets/by-costing-id` |
 | createCostSheet | POST | `/cost-sheets` |
-| updateCostSheet | PUT | `/cost-sheets/{id}` |
+| updateCostSheet | POST | `/cost-sheets` (id in body) |
+| autosaveCostSheet | POST | `/cost-sheets?autosave=true` — existing Draft only; no WhatsApp, no feed row |
 | deleteCostSheet | DELETE | `/cost-sheets/{id}` |
 | duplicateCostSheet | POST | `/cost-sheets/{id}/duplicate` |
 | getCostSheetHistory | GET | `/cost-sheets/{id}/history` |
-| getPastPOSuggestions | GET | `/cost-sheets/suggestions/past-po` |
+| getVariantPastPrices (costingPriceService) | GET | `/cost-sheets/past-prices?variantId=` (itemId still accepted) |
+| getLastPrices (costingPriceService) | GET | `/cost-sheets/last-prices?variantIds=` |
+| getRecentCostings (costingPriceService) | GET | `/cost-sheets/recent?buyerId=&limit=&statuses=` (no params = last 5 Approved) |
+| getStoredRate (exchangeRateService) | GET | `/exchange-rates/today?from=&to=` — 404 when no rate is stored |
+| findOrCreateItem / findOrCreateItems (quickItemService) | POST | `/items/find-or-create`, `/items/find-or-create/batch` (422 + rowErrors) |
 | getAllCostSheetSummaries | GET | `/cost-sheets/summaries` |
-| extractTechpackForCosting | POST | `/cost-sheets/extract-techpack` |
+| createAiDraft (costingAiService) | POST | `/cost-sheets/ai-draft` multipart `files[]` (audio/photo/PDF, ≤5, ≤18 MB) + `text` + `buyerId` + `styleId` → AiCostingDraftDTO; 503 AI_NOT_CONFIGURED, 502 upstream; save sends back `aiSourceFileIds` |
+| genieChat (core/genieService) | POST | `/genie/chat` {screenId, message \| audioBase64, history[{role,text}], context} → {reply, transcript, actions[{tool,args}], proposals[{id,kind,title,detail,data}]}; deferred permission: the screen's view key (costing-sheet → costing); 429 after 40 turns / 10 min |
 | calculateConsumption | POST | `/cost-sheets/calculate-consumption` |
 | uploadAttachmentsBatch | POST | `/cost-sheets/{costSheetId}/attachments` |
 | getAttachments | GET | `/cost-sheets/{costSheetId}/attachments` |
@@ -233,6 +263,51 @@
 | updateTermsConditions | PUT | `/terms-conditions/{id}` |
 | deleteTermsConditions | DELETE | `/terms-conditions/{id}` |
 
+### Sample Requests
+`src/services/sample-request/sampleRequestService.js` is still the single import surface every screen uses, but every
+export now delegates to `src/services/sample-request/sampleRequestApi.js` and the real `com.avarsh.erp.sampling` module.
+The `srMock*` files, `srDocNumbers.js` and `srEnv.js` are deleted; `sampleRequestApi.js` (formerly `srApi.js`) clears the old
+`avarsh.sr.mockStore.v1` key on load.
+
+| Function | Method | Endpoint |
+|---|---|---|
+| searchSampleRequests | GET | `/sample-requests` (search, status, sampleTypeId, buyer, deadlineFrom/To, overdue, pendingApproval, page, size, sort, direction) |
+| getSampleRequest | GET | `/sample-requests/{id}` |
+| bomPreview | GET | `/sample-requests/bom-preview?bomId=` or `?orderNo=` |
+| createSampleRequest / updateSampleRequest | POST / PUT | `/sample-requests` · `/sample-requests/{id}` |
+| updateInstructions | PATCH | `/sample-requests/{id}/instructions` |
+| deleteSampleRequest | DELETE | `/sample-requests/{id}` |
+| changeStatus | PUT | `/sample-requests/{id}/status` |
+| listByOrderNo | GET | `/sample-requests/by-order?orderNo=` (order nos carry `/`) |
+| listSrBuyers | GET | `/sample-requests/buyers` |
+| getSampleDashboard | GET | `/sample-requests/dashboard` |
+| saveFeedbackDraft / recordFeedback | PUT | `/sample-requests/{id}/feedback/draft` · `/sample-requests/{id}/feedback` |
+| parseCommentSheet | POST | `/sample-requests/{id}/comment-sheet/parse` (multipart) |
+| listSampleTypes / listCouriers / listRejectionReasons / getFeedbackCategoryLabels / listHsnCodes | GET | `/sample-requests/masters/{sample-types\|couriers\|rejection-reasons\|feedback-categories\|hsn-codes}` |
+| listIssuableSrs | GET | `/sample-issues/issuable-srs` |
+| getSampleIssuableRolls | GET | `/sample-issues/issuable-rolls?srId=&lineNo=` |
+| createSampleFabricIssue / createSampleTrimsIssue | POST | `/sample-issues/fabric` · `/sample-issues/trims` |
+| listSampleIssues / getSampleIssue | GET | `/sample-issues` · `/sample-issues/{id}` |
+| cancelSampleIssue | POST | `/sample-issues/{id}/cancel` |
+| searchDispatches | GET | `/sample-dispatches` |
+| getDispatch / createDispatch / updateDispatch / deleteDispatch | GET/POST/PUT/DELETE | `/sample-dispatches[/{id}]` |
+| listDispatchableSrs | GET | `/sample-dispatches/dispatchable-srs?buyerId=&dispatchId=` |
+| listDispatchableCustomers | GET | `/sample-dispatches/customers` |
+| markDispatched | POST | `/sample-dispatches/{id}/mark-dispatched` — 409 `INVOICE_REQUIRED` |
+| listInvoices | GET | `/sample-invoices` (answers `{content, totalElements, stats}`) |
+| getInvoice / createInvoice / updateInvoice | GET/POST/PUT | `/sample-invoices[/{id}]` |
+| listEligibleSrs | GET | `/sample-invoices/eligible-srs?type=&consigneeBuyerId=&dispatchId=` |
+| issueInvoice / cancelInvoice / duplicateInvoice | POST | `/sample-invoices/{id}/{issue\|cancel\|duplicate}` |
+| Couriers master | GET/POST/PUT/DELETE | `/couriers[/{id}]` |
+
+Notes: sample issues are `inv_material_issues` rows with `source_type='SAMPLE_REQUEST'` — they
+carry `sourceType`, `sampleRequestId` and `sampleRequestNo` instead of `cuttingPO`/`workOrder`,
+and the bulk registers exclude them. There are no sample POs: material comes off ordinary stock.
+`overseas` is decided server-side against `sys_organisation_info.country`, which also supplies the
+invoice series (`commercial_invoice_series` / `sample_invoice_series`) and the exporter/bank block
+on the printed invoice; buyer country comes from the first active shipping location. Every header
+mutation carries `version`.
+
 ### Files
 | Function | Method | Endpoint |
 |---|---|---|
@@ -294,33 +369,10 @@
 
 ## Controller File Locations (API Repo)
 
-Base: `f:/Ranjith/project/RK/Repos/erp-purchase/src/main/java/com/avarsh/erp/controller/`
-
-| Controller | Sub-package |
-|---|---|
-| AuthController | (root) |
-| UserController | (root) |
-| RoleController | (root) |
-| BuyerController | (root) |
-| SupplierController | (root) |
-| StyleController | (root) |
-| ItemController | (root) |
-| OrderController | (root) |
-| BomController | (root) |
-| PurchaseOrderController | (root) |
-| CostSheetController | `costing/` |
-| ExchangeRateController | `costing/` |
-| FileStorageController | `storage/` |
-| NotificationController | `notification/` |
-| EwayBillController | `ewaybill/` |
-| AiExtractionController | (root) |
-| Report*Controllers | `reporting/` |
-| Master data controllers | (root) |
+Controllers are feature-first under `src/main/java/com/avarsh/erp/<feature>/` — flat for masters (`masterdata/buyer/BuyerController.java`), under `controller/` for layered modules (`order/controller/OrderController.java`, `iam/controller/AuthController.java`, `mobile/approvals/controller/MobileApprovalsController.java`). There is no `erp/controller/` package. Locate one with `find src/main/java -name '<Name>Controller.java'`; the package list is in `codebase-map.md` §1.
 
 ---
 
 ## Service File Locations (UI Repo)
 
-All at: `f:/Ranjith/project/RK/Repos/avarsh-erp-ui/src/services/`
-
-28 service files covering 219 API functions across all modules.
+`src/services/<module>/<name>Service.js` — 104 files across `admin auth bom core costing dashboard expdoc hr inventory master orders po production sr tna` on 2026-09-24 (`ls src/services`). The tables above cover 29 of them; for any other module read the service file and its controller directly.

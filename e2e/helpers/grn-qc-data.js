@@ -1,7 +1,7 @@
 /**
  * GRN & QC Test Data Helpers
  *
- * Provides payload factories and PO lookup helpers for GRN/QC E2E tests.
+ * Provides payload units and PO lookup helpers for GRN/QC E2E tests.
  * Each test file has dedicated seeded POs (V116__seed_grn_qc_masters.sql):
  *
  *   E2E-FG-1/2  — fabric-grn-api tests (single + 3-line, 5000 qty each)
@@ -14,6 +14,18 @@
 const ts = () => Date.now();
 
 export const today = () => new Date().toISOString().split('T')[0];
+
+/**
+ * Variant attributes are free text in the item master — a fabric's width is typically
+ * entered as "72 inch" — but GRNRollDTO.width and .gsm are BigDecimal, so passing the
+ * raw attribute through makes every fabric GRN submit fail deserialization with a 500.
+ * The real form already coerces this way before sending (inventoryService.js:439); the
+ * fixture has to match it or it tests a payload the UI never produces.
+ */
+const toNumberOrNull = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 // ─── PO Lookup ───────────────────────────────────────────────────────────────
 
@@ -111,8 +123,8 @@ async function enrichPOForTest(api, po, matchingLines) {
       uom: li.uomName || 'Mtr',
       color: li.variantAttributes?.color || '',
       size: li.variantAttributes?.size || '',
-      width: li.variantAttributes?.width || null,
-      gsm: li.variantAttributes?.gsm || null,
+      width: toNumberOrNull(li.variantAttributes?.width),
+      gsm: toNumberOrNull(li.variantAttributes?.gsm),
     };
   });
 
@@ -403,10 +415,35 @@ export async function draftQc(api, payload) {
   return data;
 }
 
-/** Approve a QC and return the response. */
-export async function approveQc(api, qcId, reason = 'E2E auto-approve') {
-  const { data, status } = await api.post(`/qc/${qcId}/approve`, { reason });
-  if (!data?.id) throw new Error(`QC approve failed: status=${status}`);
+/**
+ * A second full-permission user for QC decisions. QCService forbids actioning your
+ * own submission, and since the auditor fix (B-059) the creator identity is actually
+ * recorded — so the old pattern of superadmin approving superadmin's QC now correctly
+ * 409s. Cached per process; created on first use.
+ */
+let _qcApprover = null;
+export async function qcApproverClient(api) {
+  if (_qcApprover) return _qcApprover;
+  const { createAuthenticatedClient } = await import('./api-client.js');
+  const { data: users } = await api.get('/users');
+  const list = Array.isArray(users) ? users : users?.content || [];
+  if (!list.some((u) => u.username === 'e2e-director')) {
+    const { data: roles } = await api.get('/roles');
+    const superRole = (Array.isArray(roles) ? roles : roles?.content || []).find((r) => r.name === 'Super Admin');
+    await api.post('/users', {
+      name: 'E2E Director', username: 'e2e-director', password: 'Director@123',
+      email: 'e2e-director@avarsh.com', roleId: superRole.id, isActive: true,
+    });
+  }
+  _qcApprover = await createAuthenticatedClient('e2e-director', 'Director@123');
+  return _qcApprover;
+}
+
+/** Approve a QC (as a second user — the creator cannot action their own) and return it. */
+export async function approveQc(api, qcId, reason = 'E2E auto-approve', extra = {}) {
+  const approver = await qcApproverClient(api);
+  const { data, status } = await approver.post(`/qc/${qcId}/approve`, { reason, ...extra });
+  if (!data?.id) throw new Error(`QC approve failed: status=${status}${data?.message ? ` (${data.message})` : ''}`);
   return data;
 }
 

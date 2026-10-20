@@ -1,0 +1,84 @@
+import { useMemo } from 'react';
+import {
+  Alert, Card, Col, Input, Row, Space, Typography,
+} from 'antd';
+import { FormSelect } from '../../../../components/form';
+import { DOC_TYPE, DOC_TYPE_LABELS } from '../../../../utils/expDocConstants';
+import IdentityPageCard from './IdentityPageCard';
+
+const { Text } = Typography;
+
+/**
+ * Name, buyer and page. Every template belongs to a buyer from the buyer master, or to
+ * none (tenant-wide).
+ */
+const TabIdentity = ({ tpl, patch, locked, buyers = [], codeEditable = false }) => {
+  const isSticker = tpl.docType === DOC_TYPE.STICKER;
+
+  const buyerOptions = useMemo(
+    () => buyers.filter((b) => b.active !== false || b.id === tpl.buyerId).map((b) => ({ value: b.id, label: b.name })),
+    [buyers, tpl.buyerId],
+  );
+
+  return (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} lg={12}>
+        <Card size="small" title="Identity">
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+            <div>
+              <Text type="secondary">Template code</Text>
+              <Input
+                name="templateCode"
+                value={tpl.templateCode || ''}
+                disabled={!codeEditable || locked}
+                onChange={(e) => patch({ templateCode: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') })}
+              />
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                Shared by every version of this template and never changes once saved.
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">Name</Text>
+              <Input name="templateName" value={tpl.name || ''} disabled={locked} onChange={(e) => patch({ name: e.target.value })} />
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                What staff pick from when a buyer has more than one template, e.g. &quot;Packing list — sea&quot;.
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">Document type</Text>
+              <Input name="templateDocType" value={DOC_TYPE_LABELS[tpl.docType] || tpl.docType} disabled />
+            </div>
+            <div>
+              <Text type="secondary">Buyer</Text>
+              <FormSelect
+                variant="default"
+                style={{ width: '100%' }}
+                disabled={locked}
+                value={tpl.buyerId ?? undefined}
+                onChange={(v) => patch({ buyerId: v ?? null, buyerName: buyers.find((b) => b.id === v)?.name || null })}
+                options={buyerOptions}
+                placeholder="Any buyer (tenant-wide)"
+              />
+            </div>
+            <Alert
+              type="info"
+              showIcon
+              title="How this template gets used"
+              description={isSticker
+                ? 'A buyer may keep several sticker templates; staff pick one for each print run.'
+                : 'A buyer may keep several active templates. A new document takes the buyer\'s only one automatically; when there are several, staff pick one by name.'}
+            />
+          </Space>
+        </Card>
+      </Col>
+      {/* A carton sticker has no printed title or page here, and no exporter logo at all. */}
+      {!isSticker && (
+        <Col xs={24} lg={12}>
+          <IdentityPageCard tpl={tpl} patch={patch} locked={locked} />
+        </Col>
+      )}
+    </Row>
+  );
+};
+
+export default TabIdentity;

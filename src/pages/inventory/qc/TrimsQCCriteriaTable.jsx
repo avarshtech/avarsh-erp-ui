@@ -140,7 +140,7 @@ const TrimsQCCriteriaTable = memo(function TrimsQCCriteriaTable({
           }
         />
       ) : (
-        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={10} style={{ width: '100%' }}>
           {rows.map((row, idx) => {
             const status = statusOf(row);
             const description = descriptionById.get(row.id) || '';

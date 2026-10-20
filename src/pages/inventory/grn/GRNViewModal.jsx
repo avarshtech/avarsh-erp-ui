@@ -38,10 +38,15 @@ const HERO_ACCENT = {
 
 const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 };
 
+// The variant is the purchasable identity, so it names the line. `description` alone is
+// the item's derived "Category - Sub-Category", which reads identically for every
+// variant of the same item and tells a store keeper nothing about what arrived.
+const variantLabel = (r) => r.variantName || r.description || '—';
+
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 130 },
-  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 130, render: (v, r) => r.variantCode || '—' },
+  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true, render: (v, r) => variantLabel(r) },
   { title: 'Width', dataIndex: 'width', align: 'center', width: 70 },
   { title: 'GSM', dataIndex: 'gsm', align: 'center', width: 70 },
   { title: 'Receiving Qty', dataIndex: 'receivingQty', align: 'center', width: 110, render: (v) => formatNumber(v, 2) },
@@ -50,8 +55,8 @@ const fabricRollColumns = [
 ];
 
 const accItemColumns = [
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140 },
-  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => r.variantCode || '—' },
+  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true, render: (v, r) => variantLabel(r) },
   { title: 'Color', dataIndex: 'color', align: 'center', width: 90 },
   { title: 'Size', dataIndex: 'size', align: 'center', width: 80 },
   { title: 'Receiving Qty', dataIndex: 'receivingQty', align: 'center', width: 110, render: (v) => formatNumber(v) },
@@ -60,7 +65,7 @@ const accItemColumns = [
 
 const cartonColumns = [
   { title: 'Carton #', dataIndex: 'cartonNumber', align: 'center', width: 100 },
-  { title: 'Item', dataIndex: 'itemDescription', align: 'center', ellipsis: true },
+  { title: 'Item', dataIndex: 'itemDescription', align: 'center', ellipsis: true, render: (v, r) => r.variantName || v || '—' },
   { title: 'Quantity', dataIndex: 'quantity', align: 'center', width: 100, render: (v) => formatNumber(v) },
   { title: 'UOM', dataIndex: 'uom', align: 'center', width: 80 },
 ];
@@ -360,8 +365,8 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
 
             {(grn.referBackReason || grn.reversalReason) && (
               <div style={{ marginBottom: 20 }}>
-                {grn.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} message="Refer-back reason" description={grn.referBackReason} />}
-                {grn.reversalReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} message="Reversal reason" description={grn.reversalReason} />}
+                {grn.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} title="Refer-back reason" description={grn.referBackReason} />}
+                {grn.reversalReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} title="Reversal reason" description={grn.reversalReason} />}
               </div>
             )}
 
@@ -378,7 +383,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={rolls} pagination={false} size="small" scroll={{ x: 900 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${rolls.indexOf(r)}`} columns={fabricRollColumns} dataSource={rolls} pagination={false} size="small" scroll={{ x: 900 }} />
               </Card>
             )}
 
@@ -394,7 +399,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.itemCode}-${i}`} columns={accItemColumns} dataSource={grn.items} pagination={false} size="small" scroll={{ x: 800 }} />
+                <Table rowKey={(r) => `${r.itemCode}-${grn.items.indexOf(r)}`} columns={accItemColumns} dataSource={grn.items} pagination={false} size="small" scroll={{ x: 800 }} />
               </Card>
             )}
 
@@ -410,7 +415,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.cartonNumber}-${i}`} columns={cartonColumns} dataSource={grn.cartons} pagination={false} size="small" scroll={{ x: 600 }} />
+                <Table rowKey={(r) => `${r.cartonNumber}-${grn.cartons.indexOf(r)}`} columns={cartonColumns} dataSource={grn.cartons} pagination={false} size="small" scroll={{ x: 600 }} />
               </Card>
             )}
 

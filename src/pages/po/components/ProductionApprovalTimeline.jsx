@@ -16,7 +16,7 @@ const ACTION_META = {
   CANCEL:     { color: 'red',    icon: <StopOutlined />,        label: 'Cancelled' },
 };
 
-const fmt = (iso) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
+const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-IN'); } catch { return iso; } };
 
 /** Approval / status history timeline (PRD §11 auditability). */
 const ProductionApprovalTimeline = ({ history = [] }) => {

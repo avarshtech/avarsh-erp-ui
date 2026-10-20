@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Row, Col, Input, Skeleton, Card, Tag, Space, Segmented, App } from 'antd';
+import { Row, Col, Input, Skeleton, Card, Tag, Space, Segmented, Button, App } from 'antd';
 import {
   SearchOutlined,
   BarChartOutlined,
   StarOutlined,
   AppstoreOutlined,
-  ClockCircleOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader';
@@ -14,10 +14,16 @@ import EmptyState from '../../components/EmptyState';
 import ModuleReportCard from './components/ModuleReportCard';
 import ReportModuleNav from './components/ReportModuleNav';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
+import ReportDesignerDrawer from './components/ReportDesignerDrawer';
+import PermissionGuard from '../../components/PermissionGuard';
 import useResponsive from '../../hooks/useResponsive';
-import { getReportDefinitions, getSavedReports } from '../../services/core/reportService';
-import { getFilteredReportNavOptions, getModuleColor } from '../../utils/reportConstants';
-import { hasModuleAccess } from '../../utils/permissions';
+import {
+  getReportDefinitions, getSavedReports, deleteReportDefinition,
+} from '../../services/core/reportService';
+import {
+  getFilteredReportNavOptions, getModuleColor, getModuleLabel,
+} from '../../utils/reportConstants';
+import { hasModuleAccess, hasPermission, isSuperuser } from '../../utils/permissions';
 
 const ReportListPage = () => {
   const navigate = useNavigate();
@@ -30,36 +36,62 @@ const ReportListPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState(null);
+  const [designerOpen, setDesignerOpen] = useState(false);
+  const [editingReport, setEditingReport] = useState(null);
   const navOptions = useMemo(() => getFilteredReportNavOptions(hasModuleAccess), []);
+  const canAddReports = hasPermission('reports', 'add');
+  // Reports belong to a role, and a role only ever sees its own — so the owning role is
+  // noise on every card except a superuser's, who is looking at several roles at once.
+  const showOwner = useMemo(() => isSuperuser(), []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [defs, saved] = await Promise.all([
-          getReportDefinitions(),
-          getSavedReports().catch(() => []),
-        ]);
-        if (!cancelled) {
-          setDefinitions(defs || []);
-          setSavedReports(saved || []);
-        }
-      } catch {
-        message.error('Failed to load reports');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [defs, saved] = await Promise.all([
+        getReportDefinitions(),
+        getSavedReports().catch(() => []),
+      ]);
+      setDefinitions(defs || []);
+      setSavedReports(saved || []);
+    } catch {
+      message.error('Failed to load reports');
+    } finally {
+      setLoading(false);
+    }
+  }, [message]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const handleCreate = useCallback(() => {
+    setEditingReport(null);
+    setDesignerOpen(true);
+  }, []);
+
+  const handleEdit = useCallback((report) => {
+    setEditingReport(report);
+    setDesignerOpen(true);
+  }, []);
+
+  const closeDesigner = useCallback(() => {
+    setDesignerOpen(false);
+    setEditingReport(null);
+  }, []);
+
+  const handleDelete = useCallback(async (report) => {
+    try {
+      await deleteReportDefinition(report.id);
+      message.success('Report deleted');
+      reload();
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to delete the report');
+    }
+  }, [message, reload]);
 
   // Module counts for the left nav
   const moduleCounts = useMemo(() => {
     const counts = {};
     definitions.forEach((d) => {
-      const mod = d.module || 'OTHER';
+      const mod = d.moduleName || 'OTHER';
       counts[mod] = (counts[mod] || 0) + 1;
     });
     return counts;
@@ -74,7 +106,7 @@ const ReportListPage = () => {
   const filteredDefs = useMemo(() => {
     let result = definitions;
     if (selectedModule) {
-      result = result.filter((d) => d.module === selectedModule);
+      result = result.filter((d) => d.moduleName === selectedModule);
     }
     if (search.trim()) {
       const lower = search.toLowerCase();
@@ -91,7 +123,7 @@ const ReportListPage = () => {
   const grouped = useMemo(() => {
     const map = {};
     filteredDefs.forEach((d) => {
-      const mod = d.module || 'OTHER';
+      const mod = d.moduleName || 'OTHER';
       if (!map[mod]) map[mod] = [];
       map[mod].push(d);
     });
@@ -130,8 +162,8 @@ const ReportListPage = () => {
 
         {/* Skeleton stat cards */}
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Col xs={12} sm={12} md={6} key={i}>
+          {[1, 2, 3].map((i) => (
+            <Col xs={12} sm={12} md={8} key={i}>
               <StatCard loading />
             </Col>
           ))}
@@ -174,9 +206,10 @@ const ReportListPage = () => {
           />
         </PageHeader>
 
-        {/* Stat cards */}
+        {/* Stat cards — three, not four: "Saved Configs" and "Saved Reports" counted the
+            same array, so the row showed the same number twice under two names. */}
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={8}>
             <StatCard
               title="Total Reports"
               value={definitions.length}
@@ -184,7 +217,7 @@ const ReportListPage = () => {
               color="var(--primary-color)"
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={8}>
             <StatCard
               title="Saved Configs"
               value={savedReports.length}
@@ -192,20 +225,12 @@ const ReportListPage = () => {
               color="var(--warning-color)"
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={24} sm={24} md={8}>
             <StatCard
               title="Modules"
               value={uniqueModuleCount}
               icon={<AppstoreOutlined />}
               color="var(--success-color)"
-            />
-          </Col>
-          <Col xs={12} sm={12} md={6}>
-            <StatCard
-              title="Saved Reports"
-              value={savedReports.length > 0 ? savedReports.length : '—'}
-              icon={<ClockCircleOutlined />}
-              color="var(--info-color)"
             />
           </Col>
         </Row>
@@ -239,14 +264,21 @@ const ReportListPage = () => {
             }}
           >
             <ReportsBreadcrumb items={breadcrumbItems} />
-            <Input
-              prefix={<SearchOutlined />}
-              placeholder={selectedModule ? `Search in ${selectedModule.replace(/_/g, ' ')}...` : 'Search all reports...'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              allowClear
-              style={{ width: 280, flexShrink: 0 }}
-            />
+            <Space wrap>
+              <Input
+                prefix={<SearchOutlined />}
+                placeholder={selectedModule ? `Search in ${getModuleLabel(selectedModule)}...` : 'Search all reports...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                allowClear
+                style={{ width: 280, flexShrink: 0 }}
+              />
+              <PermissionGuard module="reports" operation="add">
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                  New Report
+                </Button>
+              </PermissionGuard>
+            </Space>
           </div>
 
           {/* Mobile module selector */}
@@ -300,8 +332,13 @@ const ReportListPage = () => {
             {grouped.length === 0 ? (
               <EmptyState
                 title="No reports found"
-                description={search ? 'Try a different search term' : 'No reports available in this module'}
+                description={search
+                  ? 'Try a different search term'
+                  : 'Design a report by picking a data source and the columns you need.'}
                 style={{ marginTop: 60 }}
+                showAction={!search && canAddReports}
+                onAction={handleCreate}
+                actionLabel="Create your first report"
               />
             ) : (
               grouped.map(([module, reports]) => (
@@ -309,7 +346,7 @@ const ReportListPage = () => {
                   {/* Module group header — only shown when viewing "All" */}
                   {selectedModule === null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Tag color={getModuleColor(module)}>{module.replace(/_/g, ' ')}</Tag>
+                      <Tag color={getModuleColor(module)}>{getModuleLabel(module)}</Tag>
                       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                         {reports.length} report{reports.length !== 1 ? 's' : ''}
                       </span>
@@ -318,7 +355,13 @@ const ReportListPage = () => {
                   <Row gutter={[16, 16]}>
                     {reports.map((report) => (
                       <Col xs={24} sm={12} lg={8} key={report.id}>
-                        <ModuleReportCard report={report} onOpen={handleOpen} />
+                        <ModuleReportCard
+                          report={report}
+                          showOwner={showOwner}
+                          onOpen={handleOpen}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
                       </Col>
                     ))}
                   </Row>
@@ -328,6 +371,13 @@ const ReportListPage = () => {
           </div>
         </div>
       </div>
+
+      <ReportDesignerDrawer
+        open={designerOpen}
+        editingReport={editingReport}
+        onClose={closeDesigner}
+        onSaved={() => { closeDesigner(); reload(); }}
+      />
     </div>
   );
 };

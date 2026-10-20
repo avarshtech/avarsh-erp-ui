@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Drawer, Table, Divider, Typography, Grid, Row, Col } from 'antd';
+import { Drawer, Table, Divider, Typography, Grid, Row, Col, Tag, Alert, Space } from 'antd';
 import { ActionButton } from '../../../components/buttons';
 import { formatDate, formatNumber } from '../../../utils/formatters';
 import { generateIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
@@ -33,7 +33,7 @@ const fabricRollColumns = [
 ];
 
 const buildAccessoryItemColumns = () => [
-  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center' },
+  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center', render: (v, r) => r.variantCode || v || '—' },
   { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true, align: 'center' },
   { title: 'BOM Qty', dataIndex: 'bomQty', key: 'bomQty', align: 'center', render: (v) => formatNumber(v) },
   { title: 'Issue Qty', dataIndex: 'issuedQty', key: 'issuedQty', align: 'center', render: (v) => formatNumber(v) },
@@ -50,9 +50,18 @@ const buildAccessoryItemColumns = () => [
   },
 ];
 
+/**
+ * What document this issue was raised against. Sample issues ride the same
+ * table as the bulk ones, so the record decides the labels: a sample names its
+ * sample request and its order, never a Cutting PO or a production unit that
+ * it does not have.
+ */
+const SOURCE_SAMPLE = 'SAMPLE_REQUEST';
+
 const IssueViewDrawer = ({ open, onClose, record, type }) => {
   const screens = useBreakpoint();
   const isFabric = type === 'fabric';
+  const isSample = record?.sourceType === SOURCE_SAMPLE;
   // lg+ gets a roomier drawer so the Items table (Item Code + Description +
   // 3 qty columns) doesn't clip the rightmost header. Tablet stays at 820.
   const drawerWidth = screens.lg ? 900 : screens.md ? 820 : '100%';
@@ -61,32 +70,56 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
 
   if (!record) return null;
 
+  const cancelled = record.status === 'CANCELLED';
+
   return (
     <Drawer
-      title={record.issueNumber}
+      title={
+        <Space size={10}>
+          <span>{record.issueNumber}</span>
+          {cancelled
+            ? <Tag color="default" style={{ textDecoration: 'line-through' }}>Cancelled</Tag>
+            : <Tag color="success">Completed</Tag>}
+        </Space>
+      }
       open={open}
       onClose={onClose}
-      width={drawerWidth}
+      size={drawerWidth}
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <ActionButton
-            action="print"
-            text="Print Issue Slip"
-            onClick={() => generateIssueSlipPdf(record, isFabric ? 'fabric' : 'accessories')}
-          />
+        <div style={{ display: 'flex', justifyContent: cancelled ? 'flex-end' : 'space-between', alignItems: 'center' }}>
+          {!cancelled && (
+            <ActionButton
+              action="print"
+              text="Print Issue Slip"
+              onClick={() => generateIssueSlipPdf(record, isFabric ? 'fabric' : 'accessories')}
+            />
+          )}
           <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
       }
     >
+      {cancelled && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 20 }}
+          title={`Cancelled${record.cancelledBy ? ` by ${record.cancelledBy}` : ''}${record.cancelledAt ? ` on ${formatDate(record.cancelledAt)}` : ''} — issued quantities were restored to stock.`}
+          description={record.cancelReason ? `Reason: ${record.cancelReason}` : null}
+        />
+      )}
       <SectionTitle>Issue Information</SectionTitle>
       <Row gutter={[24, 0]}>
         <Col xs={24} sm={12}>
           <InfoField
-            label={isFabric ? 'Cutting PO' : 'Work Order'}
-            value={isFabric ? record.cuttingPO : record.workOrder}
+            label={isSample ? 'Sample Request' : (isFabric ? 'Cutting PO' : 'Work Order')}
+            value={isSample ? record.sampleRequestNo : (isFabric ? record.cuttingPO : record.workOrder)}
           />
         </Col>
-        {isFabric && (
+        {isSample ? (
+          <Col xs={24} sm={12}>
+            <InfoField label="Order" value={record.orderNo} />
+          </Col>
+        ) : isFabric && (
           <Col xs={24} sm={12}>
             <InfoField label="PO Line" value={record.cuttingPOLine} />
           </Col>
@@ -99,9 +132,12 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
             <InfoField label="Fabric" value={record.fabric} />
           </Col>
         )}
-        <Col xs={24} sm={12}>
-          <InfoField label="Production Unit" value={record.productionUnit} />
-        </Col>
+        {/* A sample is made in the sampling room, not on a production line */}
+        {!isSample && (
+          <Col xs={24} sm={12}>
+            <InfoField label="Production Unit" value={record.productionUnit} />
+          </Col>
+        )}
         <Col xs={24} sm={12}>
           <InfoField label="Issue Date" value={formatDate(record.issueDate)} />
         </Col>

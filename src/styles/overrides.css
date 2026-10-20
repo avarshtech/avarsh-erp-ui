@@ -126,6 +126,29 @@
   border-color: var(--primary-color) !important;
 }
 
+/* Badge group beside a page/dialog title: the container owns the spacing via
+   `gap`, so individual tag margins must not add an uneven second gap. */
+.status-badge-group > .ant-tag,
+.status-badge-group > span > .ant-tag {
+  margin-inline-end: 0;
+}
+
+/* Rich option labels (text + a Tag/Badge): the selected value and the dropdown
+   row are line-height boxes, so a flex label stretches its tag to the full
+   control height and the tag's text rides high. Centre them everywhere. */
+.ant-select-selection-item > span,
+.ant-select-item-option-content > span {
+  align-items: center;
+}
+
+.ant-select-selection-item .ant-tag,
+.ant-select-item-option-content .ant-tag,
+.ant-select-selection-item .ant-badge,
+.ant-select-item-option-content .ant-badge {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 
 /* DatePicker / TimePicker - all states */
 .ant-picker,
@@ -228,56 +251,17 @@ textarea.ant-input:active {
   overflow: auto;
 }
 
+/* A register whose rows read on one line: no cell or header wraps; with scroll.x 'max-content' the columns
+   grow to their content and the table scrolls sideways instead */
+.table-nowrap .ant-table-thead > tr > th,
+.table-nowrap .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}
+
 /* Nested tables inside cards should not add extra border/radius */
 .ant-card .ant-table {
   border: none !important;
   border-radius: 0 !important;
-}
-
-/* ============================================================
-   PERMISSIONS MATRIX TABLE STYLES
-   ============================================================ */
-
-/* Compact spacing and visible overflow to avoid badge cutoff */
-.permissions-matrix-table .ant-table-cell {
-  padding: 6px 8px;
-  white-space: nowrap;
-  overflow: visible !important;
-}
-
-.permissions-matrix-table .ant-table-tbody > tr > td {
-  vertical-align: middle;
-}
-
-.permissions-matrix-table .ant-checkbox-wrapper {
-  margin: 0;
-}
-
-/* Slightly smaller checkboxes inside permission table */
-.permissions-matrix-table .ant-checkbox-inner {
-  width: 14px;
-  height: 14px;
-}
-
-/* Media tweak: allow tighter table on small screens */
-@media (max-width: 768px) {
-  .permissions-matrix-table .ant-table-cell {
-    padding: 4px 6px;
-  }
-}
-
-/* Ensure tags/badges inside permissions table are visible and not clipped */
-.permissions-matrix-table .ant-tag,
-.permissions-matrix-table .ant-badge {
-  z-index: 50;
-  position: relative;
-}
-
-/* If any inner wrapper hides overflow, make sure table row allows visible overflow */
-.permissions-matrix-table .ant-table-row,
-.permissions-matrix-table .ant-table-tbody > tr > td,
-.permissions-matrix-table .ant-table-thead > tr > th {
-  overflow: visible !important;
 }
 
 /* ============================================================
@@ -697,6 +681,19 @@ textarea.ant-input:active {
   transition: all 0.2s cubic-bezier(0.12, 0.4, 0.29, 1.46) 0.1s;
 }
 
+/* The rule above hides ::after on every unchecked box, which also hid antd's indeterminate
+   square: a half-ticked "select all" drew as empty. Restore antd 6's own geometry for it. */
+.ant-checkbox-indeterminate .ant-checkbox-inner::after {
+  top: 50%;
+  inset-inline-start: 50%;
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background-color: var(--primary-color);
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
 /* Radio */
 [data-theme="dark"] .ant-radio-inner {
   background-color: var(--input-bg);
@@ -1086,6 +1083,15 @@ textarea.ant-input:active {
 /* Center all table headers for view/preview tables */
 .centered-header-table .ant-table-thead > tr > th {
   text-align: center !important;
+}
+
+/* Roomier document tables (invoice/dispatch registers) — document numbers,
+   dates and status tags need breathing room so nothing clips or wraps.
+   The zero-height measure row rc-table injects for column sizing must keep its
+   inline padding:0 — padding it out leaves a phantom gap under the header. */
+.roomy-table .ant-table-thead > tr > th,
+.roomy-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  padding: 14px 16px !important;
 }
 
 /* Form item additional / extra text — visible below editor with padding */
@@ -1896,3 +1902,433 @@ textarea.ant-input:active {
   background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
 }
 
+
+/* ============================================================
+   EXPORT DOCUMENTATION
+   ============================================================ */
+
+/* Carton rows carrying a structural error (V-02 / V-06). Tinted rather than
+   outlined so the row still reads as editable, and built from the error token
+   via color-mix so it tracks the theme instead of hard-coding a pink. */
+.expdoc-row-error > td {
+  background: color-mix(in srgb, var(--error-color) 8%, transparent) !important;
+}
+.expdoc-row-error:hover > td {
+  background: color-mix(in srgb, var(--error-color) 14%, transparent) !important;
+}
+
+/* Order-vs-packed rows outside the buyer tolerance. Same construction as the
+   carton error row: a token tint, so it tracks the theme. */
+.expdoc-row-warn > td {
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent) !important;
+}
+.expdoc-row-warn:hover > td {
+  background: color-mix(in srgb, var(--warning-color) 14%, transparent) !important;
+}
+
+/* A row offered for context but not for selection — an ineligible packing list in
+   the invoice picker. Muted rather than hidden, because the reason it cannot be
+   picked is more useful than its absence. Opacity only, so the text keeps its own
+   contrast in both themes. */
+.expdoc-row-muted > td {
+  opacity: 0.55;
+}
+
+/* Buyer templates — "Bigger view": the printed page alone over the blurred screen. The
+   global modal rules above paint every modal panel, header and body with !important, so
+   this overlay undoes them for itself only, in both themes. Scoped by the modal's class,
+   which also outranks the [data-theme="dark"] rules. */
+.ant-modal.tpl-preview-overlay .ant-modal-container,
+.ant-modal.tpl-preview-overlay .ant-modal-content,
+.ant-modal.tpl-preview-overlay .ant-modal-header,
+.ant-modal.tpl-preview-overlay .ant-modal-body {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.ant-modal.tpl-preview-overlay .ant-modal-header {
+  padding: 0 44px 10px 0 !important;
+  margin: 0 !important;
+}
+.ant-modal.tpl-preview-overlay .ant-modal-body {
+  padding: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* ── Masked time and date fields ──────────────────────────────────────────
+   The greyed template sits behind the typed digits, so the separator is on
+   screen from the start and never has to be typed. Alignment depends on every
+   glyph being the same width, which is what tabular-nums buys us - without it
+   the ghost drifts a pixel per digit and the colon visibly jumps. */
+.masked-input {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.masked-input .ant-input,
+.masked-input .ant-input-affix-wrapper input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.masked-input-ghost {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-inline: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+}
+/* The already-typed part is reserved as blank space so the rest of the
+   template lines up with the real characters underneath it. */
+.masked-input-ghost-typed {
+  visibility: hidden;
+}
+/* An affix wrapper adds the prefix icon's width, so the ghost starts further in. */
+.masked-input:has(.ant-input-affix-wrapper) .masked-input-ghost {
+  padding-inline-start: 35px;
+}
+.masked-input-disabled .masked-input-ghost {
+  opacity: 0.5;
+}
+[data-theme="dark"] .masked-input-ghost {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── The calendar inside a DateInput ──────────────────────────────────────
+   Scoped to this one popover: AttendanceCalendar and the T&A calendar use the
+   same component full width, where none of this applies. */
+
+/* Year, month and the Month/Year switch on one line. At the popover's width
+   the switch wrapped underneath, which read as a second row of controls
+   rather than as the toggle it is. */
+.date-input-calendar .ant-picker-calendar-header {
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 0 0 8px;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-year-select,
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-month-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-mode-switch {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-mode-switch .ant-radio-button-wrapper {
+  padding-inline: 8px;
+}
+
+/* The tail of the previous month and the head of the next are context, not
+   choices. antd's Calendar colours every date value the same, unlike its
+   DatePicker panel, so without this the 27th of September looks exactly as
+   pickable as the 27th of October. */
+.date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view) .ant-picker-calendar-date-value {
+  color: rgba(0, 0, 0, 0.25);
+}
+.date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view):hover .ant-picker-calendar-date-value {
+  color: rgba(0, 0, 0, 0.45);
+}
+[data-theme="dark"] .date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view) .ant-picker-calendar-date-value {
+  color: rgba(255, 255, 255, 0.28);
+}
+[data-theme="dark"] .date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view):hover .ant-picker-calendar-date-value {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Employee photo ───────────────────────────────────────────────────────
+   Sits beside the name in the page header. Colours live here rather than
+   inline because the dark theme needs its own values and this app has no antd
+   CSS variables to read them from. */
+.employee-photo {
+  position: relative;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.employee-photo .ant-image { display: block; }
+.employee-photo .ant-image img { display: block; border-radius: 0; }
+
+.employee-photo-empty {
+  color: rgba(0, 0, 0, 0.22);
+}
+
+/* The empty-but-addable state is one big target rather than a small button
+   beside a small box. */
+.employee-photo-add {
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  border-style: dashed;
+  border-color: rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.employee-photo-add:hover,
+.employee-photo-add:focus-visible {
+  color: #6366f1;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.06);
+  outline: none;
+}
+.employee-photo-add-label { font-size: 11px; line-height: 1; }
+
+/* The action bar is off the header until the photo is pointed at or tabbed
+   into, so the header reads as a name and a face the rest of the time. */
+.employee-photo-actions {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  padding: 3px 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.42));
+  opacity: 0;
+  transform: translateY(100%);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.employee-photo-filled:hover .employee-photo-actions,
+.employee-photo-filled:focus-within .employee-photo-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+.employee-photo-actions button {
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+}
+.employee-photo-actions button:hover { background: rgba(255, 255, 255, 0.22); }
+.employee-photo-actions button:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.employee-photo-actions button.is-danger:hover { background: rgba(255, 77, 79, 0.85); }
+
+.employee-photo-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .employee-photo {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+[data-theme="dark"] .employee-photo-empty { color: rgba(255, 255, 255, 0.28); }
+[data-theme="dark"] .employee-photo-add {
+  color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+[data-theme="dark"] .employee-photo-busy { background: rgba(0, 0, 0, 0.5); }
+
+/* A verification row somebody has to look at. Tinted rather than badged: the
+   result column already names it, and on a list of three hundred machines the
+   eye wants to find the exceptions without reading every one. */
+.row-needs-attention > td {
+  background: rgba(250, 173, 20, 0.08) !important;
+}
+[data-theme="dark"] .row-needs-attention > td {
+  background: rgba(250, 173, 20, 0.14) !important;
+}
+
+/* The asset-label preview. White paper and black ink in both themes on purpose:
+   this is a picture of a sticker, and a dark-mode "preview" would be a preview
+   of something the printer will never produce. */
+.asset-label-preview {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 5px;
+  background: #fff;
+  color: #000;
+  border: 1px dashed rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.asset-label-preview .all-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.asset-label-preview .co {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-bottom: 1px solid #000;
+  padding-bottom: 1px;
+  margin-bottom: 2px;
+}
+.asset-label-preview .code { font-weight: 800; line-height: 1.05; }
+.asset-label-preview .nm { font-size: 9px; font-weight: 600; line-height: 1.15; }
+.asset-label-preview .sp,
+.asset-label-preview .un { font-size: 8px; line-height: 1.2; }
+.asset-label-preview .un { font-weight: 700; }
+/* Long machine names wrap twice and then stop, exactly as the printed label does. */
+.asset-label-preview .nm,
+.asset-label-preview .sp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-theme="dark"] .asset-label-preview { border-color: rgba(255, 255, 255, 0.35); }
+
+/* A pending-action row on the asset dashboard. Each one is a way into the queue
+   it counts, so the whole row is the target rather than the number alone. */
+.asset-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.asset-pending-row:last-child { border-bottom: 0; }
+.asset-pending-row:hover { background: rgba(22, 119, 255, 0.06); }
+[data-theme="dark"] .asset-pending-row { border-bottom-color: rgba(255, 255, 255, 0.08); }
+[data-theme="dark"] .asset-pending-row:hover { background: rgba(22, 119, 255, 0.14); }
+
+/* A group heading or sub-total in a fixed asset report. Tinted because the rest
+   of the row is deliberately blank, and an untinted blank row reads as a gap in
+   the data rather than as the structure of the report. */
+.asset-report-group > td {
+  background: rgba(0, 0, 0, 0.035) !important;
+  font-weight: 600;
+}
+[data-theme="dark"] .asset-report-group > td {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ============================================================
+   ASSET SETUP — the two-level tables (Category › Sub-category,
+   Section › Lines)
+   ============================================================ */
+
+/* The expanded area is the inside of the row above it, so it drops the card
+   tint and carries a rule down its left edge instead of a border all round.
+   A nested table bordered like the parent reads as a second, unrelated table. */
+.asset-setup-table .ant-table-expanded-row > td {
+  padding: 0 !important;
+}
+.asset-sublist,
+.asset-subtable {
+  border-left: 2px solid var(--primary-color, #6366f1);
+  padding-block: 8px;
+}
+/* A free-form list, so the indent is purely visual. */
+.asset-sublist {
+  margin-left: 46px;
+  padding-left: 14px;
+}
+/* The sub-category table reuses the parent's columns and has no expand column
+   of its own, so its total indent matches that column's width — the child
+   cells then land in the same tracks as the parent's instead of staggering. */
+.asset-subtable {
+  margin-left: 32px;
+  padding-left: 14px;
+}
+
+/* Names the parent, so an expanded block is never ambiguous once two are open. */
+.asset-sublist-head {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 0 0 6px 2px;
+}
+[data-theme='dark'] .asset-sublist-head { color: rgba(255, 255, 255, 0.45); }
+
+/* One line inside a section: name on the left, actions pinned right. */
+.asset-subrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px 5px 2px;
+  border-radius: 4px;
+}
+.asset-subrow + .asset-subrow { margin-top: 2px; }
+.asset-subrow:hover { background: rgba(99, 102, 241, 0.07); }
+[data-theme='dark'] .asset-subrow:hover { background: rgba(255, 255, 255, 0.06); }
+.asset-subrow-name { flex: 1 1 auto; min-width: 0; }
+
+/* The sub-category table keeps the parent's column tracks but none of its
+   chrome — no outer border, no header, no row striping of its own. */
+.asset-subtable .ant-table { background: transparent !important; }
+.asset-subtable .ant-table-tbody > tr > td { border-bottom-color: transparent; }
+
+/* The asset document viewer. A scan of a warranty card is portrait and a
+   photograph of a machine is landscape, so the frame fits either rather than
+   forcing one shape on both. */
+.asset-doc-view {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.asset-doc-view img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+.asset-doc-view iframe {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+}
+
+/* One maintenance job opened out. The prose sits on the left with room to
+   wrap; the dates and who did the work sit in a narrow column beside it, since
+   each is a few characters and a table row has no room for either. */
+.asset-log-table .ant-table-expanded-row > td { padding: 0 !important; }
+.asset-log-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-left: 46px;
+  border-left: 2px solid var(--primary-color, #6366f1);
+  padding: 12px 0 12px 14px;
+}
+.asset-log-main { flex: 1 1 320px; min-width: 0; display: grid; gap: 12px; }
+.asset-log-block p { margin: 2px 0 0; white-space: pre-wrap; }
+.asset-log-block em { opacity: 0.5; }
+.asset-log-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+}
+[data-theme='dark'] .asset-log-label { color: rgba(255, 255, 255, 0.45); }
+
+.asset-log-facts {
+  flex: 0 1 300px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  align-content: start;
+}
+.asset-log-facts dt { font-size: 12px; opacity: 0.6; }
+.asset-log-facts dd { margin: 0; font-size: 13px; }

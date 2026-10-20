@@ -1,0 +1,48 @@
+import { useMemo } from 'react';
+import { Select, Tag } from 'antd';
+
+/**
+ * The "which sample request" control both sample issue forms open with.
+ *
+ * It lists Submitted AND In Production requests: fabric and trims are separate
+ * documents, so the second one is always raised against a request that the
+ * first already moved into production.
+ */
+// `id` is injected by Form.Item and has to reach the Select: antd renders the
+// item's <label for> from the same value, and without it the label points at
+// nothing.
+const SampleIssueSrPicker = ({ id, srs = [], value, onChange, disabled = false }) => {
+  const options = useMemo(() => srs.map((r) => ({
+    value: r.id,
+    // Searched against, so the storekeeper can type a style or a buyer too
+    // Colourway is searchable too: with a style sampled in several colours the
+    // number alone is not how the store person thinks about which one this is.
+    name: `${r.srNo} ${r.styleNo || ''} ${r.garmentName || ''} ${r.buyerName || ''} ${r.sampleTypeName || ''} ${r.colourName || ''}`,
+    label: (
+      // alignItems centres the tag against the text — without it the tag
+      // stretches to the control height and its label rides high
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {r.srNo} · {r.styleNo}{r.colourName ? ` · ${r.colourName}` : ''} — {r.buyerName}
+        </span>
+        <Tag color="purple" style={{ marginInlineEnd: 0, flexShrink: 0 }}>{r.sampleTypeName}</Tag>
+      </span>
+    ),
+  })), [srs]);
+
+  return (
+    <Select
+      id={id}
+      showSearch
+      style={{ width: '100%' }}
+      placeholder="Select a sample request"
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      optionFilterProp="name"
+      options={options}
+    />
+  );
+};
+
+export default SampleIssueSrPicker;

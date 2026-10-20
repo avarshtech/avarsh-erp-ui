@@ -113,6 +113,8 @@ export const DOCUMENT_TYPES = [
 export const RELATIONSHIP_TYPES = ['Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Brother', 'Sister', 'Other'];
 
 export const EMPLOYEE_GRADE = ['A_PLUS', 'A', 'B_PLUS', 'B', 'C'];
+/** How a grade reads: A_PLUS → A+. */
+export const gradeLabel = (grade) => (grade ? grade.replace('_PLUS', '+') : grade);
 
 // ── Attendance & Leave Constants ──
 

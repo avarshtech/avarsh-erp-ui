@@ -2,11 +2,12 @@ import { memo, useMemo } from 'react';
 import { Table, Empty } from 'antd';
 import dayjs from 'dayjs';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
+import { cellCurrency } from '../reportCurrency';
 
 /**
  * Formats a cell value based on the field type from the report definition.
  */
-const formatCellValue = (value, fieldType) => {
+const formatCellValue = (value, fieldType, currency) => {
   if (value === null || value === undefined) return '\u2014';
 
   switch (fieldType) {
@@ -15,7 +16,9 @@ const formatCellValue = (value, fieldType) => {
     case 'DATETIME':
       return dayjs(value).isValid() ? dayjs(value).format('DD-MMM-YYYY HH:mm') : '\u2014';
     case 'CURRENCY':
-      return formatCurrency(value);
+      // The cell's currency symbol (U307: a USD order used to read as rupees; see cellCurrency);
+      // with the currency unknown, the plain number, as the Excel and PDF exports print it
+      return currency ? formatCurrency(value, currency) : formatNumber(value, 2);
     case 'NUMBER':
       return formatNumber(value, 2);
     case 'BOOLEAN':
@@ -31,17 +34,26 @@ const ReportResultsTable = memo(function ReportResultsTable({
   loading = false,
   pagination,
   onTableChange,
+  sourceHasCurrency = false,
 }) {
   const tableColumns = useMemo(() => {
+    const currencyOf = {
+      sourceHasCurrency,
+      currencyInRun: columns.some((col) => col.fieldCode === 'currency'),
+    };
     return columns.map((col) => ({
       title: col.displayName,
       dataIndex: col.fieldCode,
       key: col.fieldCode,
       sorter: col.isSortable !== false,
       ellipsis: true,
-      render: (value) => formatCellValue(value, col.fieldType),
+      render: (value, record) => formatCellValue(value, col.fieldType,
+        col.fieldType === 'CURRENCY' ? cellCurrency(col.fieldCode, record, currencyOf) : null),
     }));
-  }, [columns]);
+  }, [columns, sourceHasCurrency]);
+
+  // A row without an id is keyed by its place on the page (antd's rowKey index parameter is deprecated)
+  const rowKeys = useMemo(() => new Map(data.map((row, i) => [row, i])), [data]);
 
   const tablePagination = useMemo(() => {
     if (!pagination) return false;
@@ -62,7 +74,7 @@ const ReportResultsTable = memo(function ReportResultsTable({
       loading={loading}
       pagination={tablePagination}
       onChange={onTableChange}
-      rowKey={(record, index) => record.id ?? index}
+      rowKey={(record) => record.id ?? rowKeys.get(record)}
       scroll={{ x: 'max-content' }}
       sticky
       size="middle"

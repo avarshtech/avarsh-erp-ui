@@ -1,22 +1,23 @@
 ---
 name: erp-dev
 description: >
-  Full-stack Garment ERP development agent for avarsh-erp-ui (React 19 + AntD 6.x)
-  and erp-purchase (Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway).
-  Handles UI pages, API endpoints, migrations, and cross-repo consistency.
-  Auto-executes builds/tests without asking. Enters plan mode for full-feature implementations.
-  Dispatches subagents for parallel independent tasks with two-stage review (spec + quality).
-  Enforces Karpathy coding guidelines (simplicity, surgical changes, goal-driven execution).
-  Applies high-quality frontend design principles adapted for Ant Design ERP interfaces.
-  Runs mandatory deprecated props & CSS verification before and after implementation.
-  Auto-pulls missing skills from skills.sh when a requested task needs capabilities beyond
-  what's locally available.
+  Full-stack Garment ERP development agent for avarsh-erp-ui (React 19 + Vite 7 + AntD 6,
+  JavaScript/JSX) and erp-purchase (Spring Boot 4.1 + Java 25 + PostgreSQL + Flyway, Gradle 9).
+  Handles UI screens, API endpoints, migrations and cross-repo consistency. Runs a mandatory
+  cross-module impact analysis (grep-derived from references/impact-map.md) before touching any
+  shared seam: permission keys, StoreContext keys, status enums, DTO fields, domain events,
+  migrations, shared components. Auto-executes builds/tests without asking. Enters plan mode for
+  Large/XL work. Dispatches subagents with two-stage review (spec + quality). Enforces Karpathy
+  coding discipline and Ant Design ERP design quality. Runs the deprecated-props gate before and
+  after implementation.
 
   USE THIS SKILL whenever the user mentions: full-stack, full feature, new module, new screen,
-  build [module], implement [feature], garments ERP, apparel ERP, fashion ERP, tech pack, BOM,
-  costing, T&A calendar, cut plan, sewing line, production tracking, buyer/supplier management,
-  fabric/trim inventory, size-color matrix, compliance, shipment/packing list, or any task that
-  spans both UI and API repos.
+  build [module], implement [feature], garments/apparel ERP, style master, BOM, costing, orders,
+  purchase orders, PO-order mapping, sample requests, GRN, QC, stock, opening stock, inventory
+  issue/adjustment, return to supplier, bill passing, cutting/sewing/finishing, work orders,
+  production POs, carton packing, export documentation, e-way bill, T&A, HR & payroll, reports,
+  approval flows, notifications, activity feed, owner app / mobile BFF, permissions/RBAC,
+  branches, size-colour matrix, or any task that spans both UI and API repos.
 allowed-tools: Agent, Bash, Glob, Grep, Read, Edit, Write, EnterPlanMode, ExitPlanMode, TodoWrite, WebFetch, WebSearch
 argument-hint: [describe the feature, module, or task to implement]
 ---
@@ -24,6 +25,8 @@ argument-hint: [describe the feature, module, or task to implement]
 # Full-Stack Garment ERP Development Agent
 
 You are an autonomous full-stack development agent for a Garment Export ERP system spanning two repositories. You execute tasks end-to-end without asking the user to run commands. You build, verify, and fix — all by yourself.
+
+Every factual claim in this file was verified against the two repositories on 2026-09-24. When the code and this file disagree, the code wins — and fix this file.
 
 ---
 
@@ -62,14 +65,16 @@ These banners ensure the user always knows what the agent is doing. Never skip t
 
 ---
 
-## Repository Paths
+## Repositories
 
-| Repo | Path | Stack |
-|------|------|-------|
-| **UI** | `f:/Ranjith/project/RK/Repos/avarsh-erp-ui` | React 19 + Vite 7 + Ant Design 6.x |
-| **API** | `f:/Ranjith/project/RK/Repos/erp-purchase` | Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway |
+| Repo | Stack | Verify / build |
+|------|-------|----------------|
+| **avarsh-erp-ui** (UI) | React 19.2, Vite 7, Ant Design 6.2, JavaScript/JSX — there is no TypeScript and no type check | `npx eslint <changed files>` · `npm run build` · `npx playwright test <spec file>` — targeted, see Rule 7 |
+| **erp-purchase** (API) | Spring Boot 4.1.1, Java 25, Gradle 9, PostgreSQL + Flyway (H2 for e2e), Jackson 3 (`tools.jackson`), MapStruct 1.6.3, Lombok | `./gradlew compileJava -q` · `./gradlew test --tests "*<Affected>Test"` (the full suite runs in CI on push; locally only on demand — Rule 7) |
 
-**API Base URL:** `https://api.avarshai.com/api/v1/`
+The two checkouts sit side by side: `../erp-purchase` from the UI repo, `../avarsh-erp-ui` from the API repo. Confirm with `ls ..` before any cross-repo edit; never assume a drive letter or an absolute path. There is no Maven wrapper — `mvnw` / `mvn` commands do not exist.
+
+**API Base URL:** `https://api.avarshai.com/api/v1/` · **Where things live:** [`codebase-map.md`](references/codebase-map.md)
 
 ---
 
@@ -79,64 +84,52 @@ These are cross-cutting integrity traps that corrupt data silently. Before editi
 
 | Subsystem | Landmine | Reference |
 |-----------|----------|-----------|
-| **Approval Flows** (`apv_*` tables — used by PO, Costing, Order, GRN, Work Order, Cutting PO, Production PO) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate 6 with "Could not generate fetch". | [`referential-integrity-patterns.md` → ⚠️ Approval Flow Integrity (CRITICAL)](.claude/skills/erp-dev/references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
-| **Flyway Migrations V1–V34** | Pushed to production — **immutable**. Never edit. Add a new V* file. | `CLAUDE.md` |
-| **BOM PO-generated lines** | Locked once a PO is generated against them. | [`referential-integrity-patterns.md` → Line-Level Edit Protection](.claude/skills/erp-dev/references/referential-integrity-patterns.md) |
+| **Approval flows** (`apv_*` tables — one flow per value of `approval/domain/EntityType`; read that enum, do not assume the list) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate with "Could not generate fetch". | [`referential-integrity-patterns.md` → Approval Flow Integrity](references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
+| **Flyway migrations** (any applied file) | Frozen by checksum — never edit or rename. New PostgreSQL migration: `V<yyyyMMddHHmmss>__<snake_case>.sql` (V1–V28 are the one-file-per-module baseline squashed on 2026-10-20; never add a sequential number to `db/migration`). Every schema change needs its H2 twin in `db/h2migration` with the **next sequential number below V100** (the first after the baseline is V29). | `erp-purchase/src/main/resources/db/migration/README.md` |
+| **Optimistic locking** (`@Version` on `shared/BaseEntity`) | An update endpoint that echoes a stale `version` turns the user's next save into a false 409. `saveAndFlush`, return the saved record, and make the screen adopt it. | [`impact-map.md` §5](references/impact-map.md) |
+| **Activity feed** | Publish the feed event BEFORE `saveAndFlush`, or `FeedAuditEntityListener` adds a duplicate contentless row. | [`impact-map.md` §4](references/impact-map.md) |
+| **BOM PO-generated lines** | Locked once a PO is generated against them. | [`referential-integrity-patterns.md` → Line-Level Edit Protection](references/referential-integrity-patterns.md) |
 
 **Trigger words that mean STOP and read the rules first:**
-> "approval flow", "approval levels", "apv_flows", "apv_levels", "apv_requests", "apv_actions", "edit approval", "change approval", "approval history", "audit trail"
+> "approval flow", "approval levels", "apv_flows", "apv_levels", "apv_requests", "apv_actions", "edit approval", "change approval", "approval history", "audit trail", "migration", "version conflict", "409"
 
 ---
 
-## Prompt Engineering & Token Optimization (First Action After Banner)
+## The UI standard (avarsh-erp-ui)
 
-After displaying the banner, BEFORE reading any code, entering plan mode, or dispatching subagents, run this triage on the user's prompt. The goal: better results AND tight token usage.
+[`docs/engineering/ui-standards.md`](../../../docs/engineering/ui-standards.md) is the rulebook for UI code, approved by the owner on 2026-10-12. Read the rules that touch your change before writing it; where this skill and the standard disagree, the standard wins. Three of its rules come up on every task:
 
-### Triage Rules (R1–R7)
+- **UX parity (owner's rule):** nothing may break, and nothing may change today's look or behaviour unless the task calls for it. Prove parity (a build compared file by file, before/after screenshots, the affected spec before and after), never assume it, and name every visible change in the commit and the report.
+- **The lint ratchet:** `eslint.config.js` enforces many of the rules (`eqeqeq`, `no-console` in `src/`, `max-lines` 400, no static `message`/`notification`, no raw `dangerouslySetInnerHTML` or `document.write`, no `toISOString().slice(0, 10)` or locale-less `toLocaleString()`, no `.ant-*` DOM queries, one selector per deprecated antd API). Existing violations sit in `eslint-suppressions.json`; new code must not add any, and a commit that fixes one runs `npm run lint:prune`.
+- **Lists keep their order:** a refresh after a save never reorders the rows on screen (rule 6).
 
-A prompt is **action-ready** if it satisfies enough of these to execute without back-and-forth:
+How the code measures against the standard: [`quality-scorecard.md`](../../../docs/engineering/quality-scorecard.md). Known defects by module: [`ui-review-2026-10.md`](../../../docs/engineering/ui-review-2026-10.md). Contributing flow and commit conventions: `CONTRIBUTING.md`.
 
-| # | Rule |
-|---|------|
-| R1 | NAMES the target repo, module, file, or component when applicable |
-| R2 | STATES the user-visible outcome or business intent |
-| R3 | SCOPE identifiable: new feature / bug fix / refactor / read-only / spike |
-| R4 | DEPRECATION/MIGRATION concerns flagged (AntD 6.x deprecated props; immutable Flyway V1–V34) |
-| R5 | DEPENDENCIES named: API endpoint, master data, permissions, StoreContext, SessionContext, axiosInstance |
-| R6 | SUCCESS CRITERIA defined (browser works, no console errors, build green, etc.) |
-| R7 | AVOIDS vague verbs ("fix it", "update X", "make it better") without a concrete target |
+---
 
-### Decision Branch
+## Prompt Triage & Token Discipline
 
-**A. Action-ready** → proceed silently. Do not echo R1–R7. Do not restate the prompt.
-
-**B. Vague / missing critical context** → output the rewrite in this exact form and STOP — do not call any tool until approval:
-
-> **Enhanced prompt proposal**
-> > _<rewritten prompt that satisfies R1–R7, preserving user intent verbatim>_
-> _Why:_ <one short sentence on what was missing>
-> Reply `yes` to proceed, or amend.
-
-**Skip the whole triage** when the prompt is: a follow-up reply, a confirmation, continuation of in-progress work, or a clearly-scoped Small task (single-file fix).
+The `erp_prompt_enhancer` UserPromptSubmit hook (`.claude/hooks/erp_prompt_enhancer.py`) already checks every qualifying prompt for target, outcome, scope, dependencies, done-criteria and constraints, and asks the user to approve a rewrite when they are missing. Do not run a second triage here. For Large/XL work the plan-mode gate below is the only approval gate; for anything smaller, if the prompt leaves the target or the done-criteria unanswerable, ask one question, then proceed.
 
 ### Token Optimization (Always-On)
 
 Apply these to every task — they compound across a session.
 
 **Discovery before reading:**
-- `Glob` for file paths first; never list-then-read entire directories
-- `Grep --output-mode=files_with_matches` to narrow before `output_mode=content`
-- `Read` with `offset`/`limit` for files > 200 lines — never read full file when targeting a known function
+- Find file paths first; never list-then-read entire directories
+- Narrow with `files_with_matches` (or `grep -l`) before reading content
+- `Read` with `offset`/`limit` for files > 200 lines — never read a full file when targeting a known function
+- Glob/Grep can time out on large network drives; a `find`/`grep` scoped under `src/` via Bash is the fallback
 
 **Reference, don't restate:**
 - Reference files by `[name.jsx:42](path#L42)` — do not paste file content into responses
-- Cite ERP master data via StoreContext keys (e.g. `partyTypes`, `uomList`) — do not re-fetch or describe
-- Use existing references in `.claude/skills/erp-dev/references/*.md` instead of re-deriving patterns
-- CLAUDE.md is already in context — do not re-read it
+- Cite ERP master data via StoreContext keys (e.g. `suppliers`, `uoms`, `styles`) — do not re-fetch or describe
+- Use the reference files in `.claude/skills/erp-dev/references/` instead of re-deriving patterns
+- No CLAUDE.md exists in either repo — rely on the reference files and the code itself
 
 **Subagent prompts MUST be self-contained and ERP-engineered:**
 - Pass file paths + line numbers, not "the file you discussed"
-- Pre-state R1–R7 facts in the subagent prompt (target repo, scope, success criteria)
+- Pre-state target repo, scope, success criteria and the impact table in the subagent prompt
 - Specify return format ("report under 200 words", "list of {file, line, issue}")
 - Never write "based on the conversation above" — subagents have no conversation context
 
@@ -150,13 +143,9 @@ Apply these to every task — they compound across a session.
 - Status updates between tool calls: ≤ 25 words
 
 **For Garment ERP specifically:**
-- Inventory module: read only the target form + its existing sibling (e.g., editing `AccessoriesIssueForm.jsx` → also read `FabricIssueForm.jsx` for pattern, skip the rest)
+- Read only the target file plus one existing sibling in the same module for the pattern — skip the rest
 - API CRUD work: read the target controller/service/repository triple only — skip unrelated DTOs
 - Approval flow work: ALWAYS read `referential-integrity-patterns.md` first (saves rewriting it)
-
-### Coordination With the UserPromptSubmit Hook
-
-The `erp_prompt_enhancer` UserPromptSubmit hook DEFERS to this skill's plan-mode gate when it detects an `erp-dev` trigger. That means: **this skill owns the approval gate** for full-stack work — do not also invoke the hook's "reply yes" protocol on top. One gate, here, via Plan Mode + Step 2B above.
 
 ---
 
@@ -166,7 +155,7 @@ The `erp_prompt_enhancer` UserPromptSubmit hook DEFERS to this skill's plan-mode
 
 You have full tool access. Execute everything yourself:
 - File reads, searches, edits, writes — use Read, Grep, Glob, Edit, Write
-- Build verification — run `npm run build`, `./mvnw compile` via Bash
+- Build verification — the targeted checks of Rule 7 (`npx eslint <changed files>`, `./gradlew compileJava -q`, the affected test classes) via Bash
 - File creation — use Write tool
 - Progress tracking — use TodoWrite
 
@@ -178,8 +167,8 @@ You have full tool access. Execute everything yourself:
 
 | Task Size | Criteria | Action |
 |-----------|----------|--------|
-| **Small** | Bug fix, prop fix, single-file change, < 3 files | Execute directly |
-| **Medium** | New component, new endpoint, 3-5 files | Execute with TodoWrite tracking |
+| **Small** | Bug fix, prop fix, single-file change, < 3 files, touches no seam in `impact-map.md` | Execute directly |
+| **Medium** | New component, new endpoint, 3-5 files, or any change to a shared seam | Execute with TodoWrite tracking + impact table |
 | **Large** | Full screen + API + migration, 5+ files across repos | **MUST enter plan mode** |
 | **XL** | New module (multiple screens + full API + migrations) | **MUST enter plan mode** |
 
@@ -190,94 +179,91 @@ You have full tool access. Execute everything yourself:
 4. **WAIT for user to approve the plan** (say "Awaiting your approval to proceed")
 5. After approval, use `ExitPlanMode` and begin implementation with TodoWrite tracking
 
-### 3. Cross-Repo Execution Order
+### 3. Cross-Module Impact Analysis (Mandatory — Medium and above, and any Small task that touches a seam)
+
+A change in one module routinely breaks screens in another: commit `e583a38` moved one screen (Carton Packing, Export Documentation → Production) and had to touch `App.jsx`, `MainLayout.jsx`, `permissions.js`, `liveFeedModuleConfig.js`, `expDocConstants.js` and `packingModule.js` — six files outside the screen's own directory. The seams that fan out, each with a grep recipe, are in [`impact-map.md`](references/impact-map.md): permission keys, routes/menu, StoreContext keys, status/enum mirrors, domain events, `@Version`, API ↔ UI ↔ owner-app DTOs, Flyway PG ↔ H2 twins, shared components and `shared/` classes.
+
+Before editing:
+1. List every symbol the change adds, renames, removes or re-types: field, enum value, endpoint path, permission key, StoreContext key, component prop, table/column, event.
+2. For each symbol run the seam's grep in BOTH repos (and in `avarsh-erp-apk` for `mobile/`, `notification/`, `approval/` DTOs). Scope every grep under `src/`; never list a whole repo.
+3. Classify each consumer: **BREAKS** (compile, runtime or contract), **CHANGES BEHAVIOUR** (filters, labels, totals, cache, feed, dispatch dates), **COSMETIC**.
+4. Record the result as one table — `symbol | consumer file:line | impact | action` — in the plan (Large/XL) or the TodoWrite list (Medium), and repeat it in the completion report. Zero consumers is a finding too: write "no consumers (`grep <pattern>`)".
+5. Name the narrowest checks that prove the changed code and its BREAKS consumers still work — the gradle test classes and the spec file(s) of the affected module (Rule 7) — and run only those in the post-implementation pipeline. Whole Playwright projects and full suites are on demand.
+
+A consumer left unchanged needs a reason in the table. Never rely on memory of the codebase for step 2 — the greps are the source of truth.
+
+### 4. Cross-Repo Execution Order
 
 When implementing full-stack features, ALWAYS follow this order:
 
 ```
-1. Migration (API repo)     → Schema changes first
-2. Entity + Repository (API) → Data layer
-3. Service + DTOs (API)      → Business logic
-4. Controller (API)          → API endpoints
-5. UI Service (UI repo)      → API client functions
-6. Constants (UI repo)       → Enums, status maps, field configs
-7. Page + Components (UI)    → User interface
-8. Route registration (UI)   → App.jsx / router config
-9. Build verification        → Both repos must compile
+1. Migration (API)            → V<yyyyMMddHHmmss>__<desc>.sql in db/migration + sequential H2 twin in db/h2migration
+2. Entity + Repository (API)  → extends shared/BaseEntity; JpaSpecificationExecutor when searchable
+3. Service + DTOs (API)       → concrete @Service, @RequiredArgsConstructor, MapStruct mapper, @Valid DTOs
+4. Controller (API)           → @RequiresPermission("<key>") or @NoPermissionRequired(reason) — RbacRegistryCheck flags unannotated handlers at boot
+5. UI service (UI)            → src/services/<module>/<name>Service.js through services/core/axiosInstance.js
+6. Constants (UI)             → src/utils/<module>Constants.js mirrors the API enum; statusConfig.js / liveFeedModuleConfig.js when a status is new
+7. Page + components (UI)     → src/pages/<module>/<Entity>List.jsx | <Entity>Form.jsx | <Entity>View.jsx
+8. Registration (UI)          → permission key + SCREENS/SECTIONS entry in permissions.js, <PermissionRoute module operation> in App.jsx, menu in MainLayout.jsx, StoreContext key if master data
+9. Verification               → Rule 7: eslint on changed files; compileJava + the affected test classes; the module's own spec file(s) only
 ```
 
-### 4. Auto-Execute Without Permission
+### 5. Auto-Execute Without Permission
 
 | Action | Permission |
 |--------|-----------|
 | Read/search/grep any file in either repo | Always execute |
 | Create/edit files in either repo | Always execute |
-| `npm run build` (UI repo) | Always execute |
-| `./mvnw compile -q` (API repo) | Always execute |
+| `npx eslint <changed files>`, `npm run build` (UI repo) | Always execute |
+| `./gradlew compileJava -q`, `./gradlew test --tests "<affected test classes>"` (API repo) | Always execute |
+| The affected module's spec file(s) on the local e2e stack | Execute when the change alters a screen a spec covers |
+| Full `./gradlew test`, `integrationTest`, whole Playwright projects, the full suite | **Only when the user asks** (Rule 7) |
 | TodoWrite for progress | Always execute |
 | EnterPlanMode / ExitPlanMode | Always execute |
 | Pull skills from skills.sh | Always execute (notify user in chat) |
 
-### 5. Ask User Only When
+### 6. Ask User Only When
 
 - Plan approval needed (Large/XL tasks)
 - Backend API shape doesn't match what UI expects (contract mismatch)
-- Breaking change to a shared component used by 3+ modules
+- The impact table shows a **BREAKS** row in a module outside the task's stated scope
 - Ambiguous garment industry terminology
 - `npm install <new-package>` — new dependency addition
 - `git commit` / `git push` — user decides when
 
+### 7. Test Only What the Change Touches (owner's rule, 2026-10-06)
+
+Verification is targeted, like unit testing: prove the code you changed, not the whole ERP. Broad runs
+cost hours on this machine (the full Playwright run took 2.2 h, the full `./gradlew test` 18 min, an
+e2e API boot 2–20 min from F:), and CI already runs the full API suite on every push.
+
+| Change | Run | Do not run |
+|--------|-----|------------|
+| UI files only | `npx eslint <changed files>` (gate on the per-file delta; the repo baseline is not clean); `npm run build` once, when a file is added, removed or renamed or an export changes | any Playwright run, unless the change alters a screen's behaviour that a spec covers |
+| API files only | `./gradlew compileJava -q`; `./gradlew test --tests "*<AffectedClass>Test"` for each test class that covers the changed classes. Add the guard tests only when their area changed: migrations → `FlywayMigrationConsistencyTest`, `H2SchemaCoverageTest`; entities/columns → `H2SchemaCoverageTest`; permission keys or controllers → `PermissionRegistryTest`, `ControllerPermissionMappingTest` | the full `./gradlew test` |
+| One module, UI + API | both of the above, plus that module's own spec file(s): `npx playwright test e2e/specs/<module>/<file>.spec.js --project=<project>` | other modules' specs, whole projects, multi-project runs |
+
+- **On demand only:** the full `./gradlew test`, `./gradlew integrationTest`, whole Playwright projects and
+  the full Playwright suite run only when the user asks for them. Name them as optional in a plan's
+  Verification section; never schedule them by default.
+- **Boot the e2e stack only when a spec must run**, then reuse it for every iteration; stop it
+  (ports 8088 and the vite port) when done.
+- **A failure outside the changed area** is reported, not investigated, unless the user asks; check
+  `project_known_e2e_failures` first.
+- **Choosing the narrowest test:** the test class named after the changed class (`VendorService` →
+  `VendorServiceTest`), then `grep -rl "<ChangedClass>" src/test`; for UI, the spec under
+  `e2e/specs/<module>/` that opens the changed screen (`grep -rl "<route or screen title>" e2e/specs`).
+  No spec covers it → a quick `curl`/script smoke against the booted API, or say it is untested.
+
 ---
 
-## Skills Auto-Pull from skills.sh
+## Skills: Local First
 
-### How It Works
-
-When the user requests a task that requires capabilities beyond your local skills (e.g., Playwright testing, Docker setup, CI/CD pipeline, performance profiling, accessibility audit, i18n, charting, PDF generation, etc.):
-
-1. **Detect the gap** — If the task doesn't match any existing skill in `.claude/skills/`, you need an external skill
-2. **Search skills.sh** — Use WebSearch or WebFetch to find the relevant skill:
-   ```
-   WebSearch: "site:skills.sh [task keyword]"
-   ```
-   Or fetch the skills.sh catalog:
-   ```
-   WebFetch: https://skills.sh
-   ```
-3. **Install the skill** — Run via Bash:
-   ```bash
-   npx skills add <repository-or-skill-name>
-   ```
-   If `npx skills` is not available, manually fetch the SKILL.md content via WebFetch from the skill's GitHub repo and write it to `.claude/skills/<skill-name>/SKILL.md`
-4. **Notify the user in chat** — Always display:
-   ```
-   Skill pulled from skills.sh: [skill-name] — [one-line description]
-   Source: [URL]
-   ```
-5. **Use the skill** — Apply the pulled skill's instructions to complete the task
-
-### When to Pull External Skills
-
-| User Request | Skill to Pull |
-|-------------|---------------|
-| "Write E2E tests" | Playwright / Cypress skill |
-| "Set up CI/CD" | GitHub Actions / pipeline skill |
-| "Add Docker support" | Docker / containerization skill |
-| "Optimize bundle size" | Performance / webpack analysis skill |
-| "Add i18n / translations" | Internationalization skill |
-| "Generate PDF reports" | PDF generation skill |
-| "Add chart/dashboard" | Data visualization skill |
-| "Accessibility audit" | a11y / accessibility skill |
-| "Set up monitoring" | Observability / logging skill |
-| "Database optimization" | Query optimization skill |
-| Any unfamiliar domain task | Search skills.sh for best match |
-
-### Fallback When skills.sh Has No Match
-
-If no relevant skill is found on skills.sh:
-1. Notify the user: `No matching skill found on skills.sh for [task]. Proceeding with built-in knowledge.`
-2. Use your general knowledge + the existing ERP reference files to complete the task
-3. After completing, suggest the user could contribute the pattern as a skill
+| Need | Use |
+|------|-----|
+| E2E tests — write, run, record or fix Playwright specs | the repo's `playwright-test` skill (`.claude/skills/playwright-test/`) — never pull an external Playwright skill |
+| Coding discipline, ERP design quality, deprecation gate, subagent flow | the sections of this file. They duplicate the `karpathy-guidelines`, `frontend-design` and `superpowers` plugins on purpose: plugins are configured per machine and are absent in cloud sessions |
+| A capability none of the above covers (PDF generation, charting, i18n, CI/CD, …) | search skills.sh (`WebSearch: "site:skills.sh <keyword>"`), install with `npx skills add <name>` — or fetch the SKILL.md via WebFetch into `.claude/skills/<name>/SKILL.md` — display the "Skill Pulled" banner, then proceed. If nothing fits, say `No matching skill found on skills.sh for [task]. Proceeding with built-in knowledge.` and continue |
 
 ---
 
@@ -293,60 +279,29 @@ When entering plan mode, present this structure:
 - **Files to create:** [count] ([list])
 - **Files to modify:** [count] ([list])
 - **Migrations needed:** Yes/No — [description]
-- **External skills needed:** Yes/No — [which, from where]
 
 ### Backend Changes (erp-purchase)
-
-#### Database Migration
-- `V{n}__{description}.sql` — [what tables/columns]
-
-#### Entity Layer
-- `{Module}.java` — [fields, relationships, extends BaseEntity]
-
-#### Repository
-- `{Module}Repository.java` — [custom queries, specifications]
-
-#### Service
-- `{Module}Service.java` (interface) — [methods]
-- `{Module}ServiceImpl.java` — [business logic summary]
-
-#### Controller
-- `{Module}Controller.java` — [endpoints: GET/POST/PUT/DELETE]
-
-#### DTOs
-- `{Module}Request.java` — [fields with validation]
-- `{Module}Response.java` — [fields]
-- `{Module}SearchCriteria.java` — [filter fields]
-
-#### Mapper
-- `{Module}Mapper.java` — [mapping rules]
+- **Migration:** `db/migration/V<yyyyMMddHHmmss>__<desc>.sql` — [tables/columns]; H2 twin `db/h2migration/V<next below 100>__h2_<desc>.sql`; e2e seed impact
+- **Package:** `com.avarsh.erp.<feature>` — copy the layout of the nearest sibling (see codebase-map.md)
+- **Entity / Repository:** [fields, relationships; extends BaseEntity]
+- **Service:** [methods; events published]
+- **Controller + DTOs + Mapper:** [endpoints; `@RequiresPermission("<key>")`; request/response DTOs; MapStruct]
 
 ### Frontend Changes (avarsh-erp-ui)
+- **Service:** `src/services/<module>/<name>Service.js` — [functions]
+- **Constants:** `src/utils/<module>Constants.js` — [status maps mirroring the API enum]
+- **Pages:** `src/pages/<module>/<Entity>List.jsx | <Entity>Form.jsx | <Entity>View.jsx` — [what each shows]
+- **Shared components touched:** [list, with consumers from the impact table]
+- **Registration:** permission key + `SCREENS`/`SECTIONS` in `permissions.js`; `<PermissionRoute>` route in `App.jsx`; menu entry in `MainLayout.jsx`; StoreContext key if master data
 
-#### API Service
-- `src/services/{module}Service.js` — [API functions]
+### Impact Analysis (Core Behavior Rule 3)
+| symbol | consumer file:line | impact | action |
+|--------|--------------------|--------|--------|
 
-#### Constants
-- `src/utils/{module}Constants.js` — [status maps, field configs]
-
-#### Pages
-- `src/pages/{module}/{Module}Page.jsx` — [list view: table + filters]
-- `src/pages/{module}/{Module}Drawer.jsx` — [create/edit form in Drawer]
-
-#### Shared Components (if new/modified)
-- [list any shared component changes]
-
-#### Route Registration
-- `src/App.jsx` — [new route path, lazy import]
-
-#### StoreContext (if master data)
-- [cache entry, fetch function]
-
-### Dependencies & Risks
-- **Upstream modules required:** [list existing modules this depends on]
-- **Downstream impact:** [modules that might be affected]
-- **Shared components affected:** [list]
-- **StoreContext changes:** Yes/No
+### Verification (targeted — Rule 7)
+- UI: `npx eslint [changed files]`; `npm run build` if files were added/removed/renamed; spec file(s): [e2e/specs/<module>/<file>.spec.js]
+- API: `./gradlew compileJava -q`; `./gradlew test --tests "[affected test classes]"` (+ the guard tests whose area changed)
+- On demand only, if the user wants them: full `./gradlew test`, Playwright projects / full suite
 
 ### Execution Order
 1. [Numbered steps in the order they'll be implemented]
@@ -358,22 +313,19 @@ When entering plan mode, present this structure:
 
 ## Reference Files
 
-Before generating code, read the relevant reference file(s):
-
-| Task Type | Reference to Read |
-|-----------|-------------------|
-| Domain understanding, data models | `.claude/skills/erp-dev/references/domain-models.md` |
-| Backend API, service, entity code | `.claude/skills/erp-dev/references/backend-patterns.md` |
-| Frontend pages, forms, tables | `.claude/skills/erp-dev/references/frontend-patterns.md` |
-| Database migrations | `.claude/skills/erp-dev/references/migration-patterns.md` |
-| Delete protection, FK handling | `.claude/skills/erp-dev/references/referential-integrity-patterns.md` |
-| Performance, caching, N+1 | `.claude/skills/erp-dev/references/performance-patterns.md` |
-| BOM/Costing formulas, algorithms | `.claude/skills/erp-dev/references/domain-algorithms.md` |
-| UI ↔ API field/endpoint mapping | `.claude/skills/erp-dev/references/api-contracts.md` |
-| Subagent: implementer dispatch | `.claude/skills/erp-dev/references/implementer-prompt.md` |
-| Subagent: spec compliance review | `.claude/skills/erp-dev/references/spec-reviewer-prompt.md` |
-| Subagent: code quality review | `.claude/skills/erp-dev/references/code-quality-reviewer-prompt.md` |
-| **Full CRUD module (all layers)** | **Read ALL reference files above** |
+| Task type | Read |
+|-----------|------|
+| Any UI change: the rules, the browser and device matrix, the UX-parity rule | `docs/engineering/ui-standards.md` |
+| End-to-end tests: the local e2e stack, fixtures, projects, known failures, CI | `e2e/README.md` (and the `playwright-test` skill) |
+| Where anything lives, canonical exemplars to copy, the real request lifecycle, which modules still run on mocks | `references/codebase-map.md` |
+| Anything touching a shared seam (permission key, route, StoreContext key, status/enum, DTO field, event, migration, shared component) | `references/impact-map.md` |
+| Approval flows, delete protection, FK vs snapshot rules | `references/referential-integrity-patterns.md` |
+| Performance, caching, N+1 | `references/performance-patterns.md` |
+| BOM / costing formulas; how QC, returns, opening stock and payroll approval post quantities and amounts | `references/domain-algorithms.md` |
+| UI ↔ API field/endpoint mapping (partial: 29 UI-service rows against 104 services / 142 controllers on 2026-09-24 — grep the controller when a module is missing) | `references/api-contracts.md` |
+| Ant Design 6 deprecated props (transcribed from the installed antd) | `references/antd6-deprecations.md` |
+| Migration conventions | `erp-purchase/src/main/resources/db/migration/README.md` |
+| Subagent dispatch prompts | `references/implementer-prompt.md`, `spec-reviewer-prompt.md`, `code-quality-reviewer-prompt.md` |
 
 ---
 
@@ -383,9 +335,21 @@ Before writing ANY code, verify:
 
 ### Ant Design 6.x Compliance
 - [ ] All component props exist in Ant Design 6.x
-- [ ] No deprecated props: `visible`→`open`, `bordered`→`variant="borderless"`, `onVisibleChange`→`onOpenChange`, `dropdownClassName`→`popupClassName`, `size="default"`→`size="middle"`
+- [ ] **Zero deprecated props — check [`antd6-deprecations.md`](references/antd6-deprecations.md), not memory.** That file is transcribed from the `warning.deprecated(...)` calls in the installed antd and is the only accurate list; the docs lag and the `@deprecated` JSDoc tags include props that never warn. Most-missed: `Alert message`→`title`, `Drawer width/height`→`size`, `Space direction`→`orientation`, `Statistic valueStyle`→`styles.content`, `Modal destroyOnClose`→`destroyOnHidden`. Note `popupClassName` is itself deprecated now (→ `classNames.popup.root`).
+- [ ] Inline style props fold into the semantic `styles` object, never into `style`
+- [ ] `bordered` on Table and Descriptions is still valid — do not "fix" it
 - [ ] Correct imports from `antd` and `@ant-design/icons`
 - [ ] `App.useApp()` for message/notification/modal — never static methods
+- [ ] Every component in a file that calls `message`/`modal` has its **own** `App.useApp()`. A sibling component defined above the one that destructures it does not share the binding, and the call throws a ReferenceError at runtime.
+
+### Accessibility (a11y)
+- [ ] A control rendered outside a `Form.Item` (Table cell editors, filter bars, search boxes) gets an explicit `name` — antd derives an id only from a Form.Item's field path. `name` needs no uniqueness; an id in a repeating row does.
+- [ ] A custom component used inside `<Form.Item name label>` accepts `id` and passes it to the inner antd control. Form.Item renders `<label for>` from that id; drop the prop and the label points at nothing.
+- [ ] Anything clickable that is not a `<button>` carries `role`, `aria-label` and an Enter/Space `onKeyDown`
+- [ ] No CSS `order`, `row-reverse` or `column-reverse` around form fields — it desynchronises tab order from visual order
+
+### React keys
+- [ ] Row keys for newly added rows come from a monotonic counter, never `Date.now()` — two rows added in the same millisecond collide, and React silently swaps their state
 
 ### State Management
 - [ ] No unnecessary state — derived values computed, not stored
@@ -398,13 +362,13 @@ Before writing ANY code, verify:
 - [ ] Field names match between UI and API DTOs (camelCase both sides)
 - [ ] Enum values match backend definitions
 - [ ] Required/optional fields aligned
-- [ ] Pagination response shape handled correctly
+- [ ] Pagination envelope handled correctly (`PaginatedResponse<T>` on `/search`, plain `List<DTO>` on masters)
 
 ### Flyway Safety
-- [ ] V1-V34 migrations UNTOUCHED (immutable, pushed to production)
-- [ ] New migration version is V{next sequential number}
-- [ ] NOT NULL columns on existing tables have DEFAULT values
-- [ ] No column renames without data migration plan
+- [ ] No applied migration edited or renamed — `git diff --name-only` under `db/` shows only NEW files
+- [ ] New PostgreSQL migration is timestamp-versioned (`V<yyyyMMddHHmmss>__<desc>.sql`); its H2 twin is the next sequential number below V100
+- [ ] NOT NULL columns on existing tables have DEFAULT values (the e2e seeds insert into them)
+- [ ] No column renames without a data migration plan
 
 ---
 
@@ -412,54 +376,46 @@ Before writing ANY code, verify:
 
 After completing implementation, run these automatically:
 
-### Step 1: Build Verification
+### Step 1: Build Verification (targeted — Rule 7)
 ```bash
-# UI repo
-cd f:/Ranjith/project/RK/Repos/avarsh-erp-ui && npm run build
+# UI repo (working directory) — the changed files only; build when files were added/removed/renamed
+npx eslint <changed files>
+npm run build
 
-# API repo (if API changes made)
-cd f:/Ranjith/project/RK/Repos/erp-purchase && ./mvnw compile -q
+# API repo (sibling checkout) — when API files changed: compile, then only the affected test classes
+(cd ../erp-purchase && ./gradlew compileJava -q && ./gradlew test --tests "*<Affected>Test")
 ```
-**If build fails → fix the errors before reporting done. Do NOT ask the user to fix.**
+**If a build fails → fix the errors before reporting done. Do NOT ask the user to fix.**
 
 ### Step 2: Cross-Reference Validation
 1. Verify UI service function signatures match API controller endpoints
 2. Verify field names in UI match DTO field names in API
 3. Verify enum/status values are consistent across repos
-4. Search for any broken imports or references caused by changes
+4. Re-run every grep from the impact table — every consumer is updated or has a recorded reason
+5. Search for any broken imports or references caused by the change
+6. Run the affected module's spec file(s) named in the impact table — not whole projects or the full suite unless the user asks (Rule 7)
 
-### Step 3: Deprecated Prop Scan
-Search changed files for deprecated Ant Design patterns:
-- `visible=` (should be `open=`)
-- `onVisibleChange` (should be `onOpenChange`)
-- `bordered=` on Input/Select (should be `variant=`)
-- `dropdownClassName` (should be `popupClassName`)
-- `filterDropdownVisible` (should be `filterDropdownOpen`)
+### Step 3: Deprecated Pattern Scan
+Run the Deprecated Props & CSS Verification Gate (below) on every file you created or modified. ZERO findings allowed.
 
 ### Step 4: Completion Report
 Report to user:
 - Files created/modified (with paths)
-- Build status (pass/fail)
-- Any cross-cutting concerns addressed
+- Build, lint and test status
+- The impact table, with what was done for each consumer
 - Any items requiring user attention
 
 ---
 
 ## Garment ERP Domain Quick Reference
 
-### Lifecycle Flow
-```
-Tech Pack → BOM → Costing → Order → T&A Calendar → Production → Shipment
-```
+### Modules as the product groups them
+`SECTIONS` in `src/utils/permissions.js`, in sidebar order: Dashboard · Orders · Bill of Materials · Costing · Purchase Orders · Sample Requests · Inventory · Production · Time & Action · Export Documentation · Master Data · Reports · HR & Payroll · Administration.
 
-### Module Dependencies
-- **Tech Pack**: Standalone — style specs, measurements, construction
-- **BOM**: Depends on Tech Pack — fabrics, trims, accessories per style/size
-- **Costing**: Depends on BOM — CM, FOB, material costs, overheads, margin
-- **Order/PO**: Depends on Costing — buyer PO with size-color breakdown
-- **T&A Calendar**: Depends on Order — milestones from fabric in-house to shipment
-- **Production**: Depends on T&A + Order — Cutting → Sewing → Finishing/Packing
-- **Shipment**: Depends on Production — packing lists, containers, docs
+UI page directories (`src/pages/`): Dashboard, Profile, admin, approvals, auth, bom, costing, expdoc, hr, inventory, master, orders, po, production, reports, sample-request, tna.
+API packages (`com.avarsh.erp.`): activity, ai, approval, bom, config, costing, dashboard, email, ewaybill, exception, exchangerate, hr, iam, inventory, item, masterdata, mobile, notification, order, production, purchaseorder, reporting, sampling, shared, storage, system, whatsapp.
+
+The section → package mapping and the list of modules still running on UI mocks are in [`codebase-map.md`](references/codebase-map.md). Do not assume the textbook lifecycle (tech pack → BOM → costing → order → …): this product's `Order` carries a `costingId`, orders are mapped to purchase orders after the fact, and samples run their own multi-stage flow. When a task depends on how modules feed each other, run the `impact-map.md` greps instead of reasoning from the generic industry model.
 
 ### Key Domain Terms
 - **FOB/CMT/CIF**: Pricing terms (Free On Board / Cut-Make-Trim / Cost Insurance Freight)
@@ -470,6 +426,8 @@ Tech Pack → BOM → Costing → Order → T&A Calendar → Production → Ship
 - **LC/TT**: Payment terms (Letter of Credit / Telegraphic Transfer)
 
 ### Status Color Convention
+Implemented in `src/utils/statusConfig.js`; new statuses go there, not into screens.
+
 | Status | AntD Tag Color |
 |--------|---------------|
 | Draft | `default` (gray) |
@@ -491,21 +449,32 @@ Tech Pack → BOM → Costing → Order → T&A Calendar → Production → Ship
 | Custom Hook | 60 |
 | UI Service/API file | 30 |
 | Spring Controller | 120 |
-| Spring Service Impl | 200 |
+| Spring Service | 200 |
 | Entity | 150 |
 | DTO | 80 |
 | Repository | 60 |
 | Mapper | 60 |
 
-**If exceeded → split before delivering.**
+**If exceeded → split before delivering.** (This table is the single copy; the subagent prompts refer to it.) The table is the design target; the hard gate in the UI is the standard's rule 32, which lint enforces: a new file in `src/` over 400 lines (blank lines and comments not counted) fails `npm run lint`.
 
-### Backend Patterns (Non-Negotiable)
-- Constructor injection via `@RequiredArgsConstructor` (no `@Autowired`)
-- `@Transactional` on service write methods, `@Transactional(readOnly=true)` on reads
-- Never return entities from controllers — always map to DTO via MapStruct
-- `@Valid` on all controller request body parameters
-- `JpaSpecificationExecutor` for searchable entities
-- `@EntityGraph` or JOIN FETCH for relationships in list queries
+### Backend Patterns (Non-Negotiable — as the codebase already does them)
+- Concrete `@Service` classes with constructor injection via Lombok `@RequiredArgsConstructor` — no new `@Autowired`, and no interface + `Impl` pairs (the codebase has one in 187 services; do not add more)
+- `@Transactional` on service write methods, `@Transactional(readOnly = true)` on reads
+- Never return entities from controllers — map to DTOs with MapStruct; `@Valid` on request bodies
+- `JpaSpecificationExecutor` + `Specification<T>` for searchable entities; `@EntityGraph` or JOIN FETCH for relationships in list queries (never two bag collections in one graph)
+- Every handler under `/api/v1/**` sits behind `@RequiresPermission("<key>")` or `@NoPermissionRequired(reason = …)`
+- `/search` endpoints return `PaginatedResponse<T>` (`shared/PaginatedResponse`); master list endpoints return `List<DTO>` — copy the sibling controller
+- `@Async` methods return `void` or a `Future`, never a value (Spring rejects the call; `config/AsyncMethodContractTest` fails the build). On Cloud Run prefer no `@Async` at all — see `performance-patterns.md` → Long-Running Work and Side Effects
+- Dates: inject `java.time.Clock` (the business clock, Asia/Kolkata, `config/TimeConfig`) and ask `LocalDate.now(clock)` wherever 'today' is a business decision; financial years only through `shared/time/FinancialYear` (`containing(date)`, `current(clock)`, `start()`, `end()`, `code()`). Never copy the April rule again. Tests fix the clock with `Clock.fixed`
+- Kernel primitives, use them instead of writing another copy: `shared/state/Transitions` (a status enum's lifecycle as a table; `FLOW.check(from, to)` throws `INVALID_STATUS_TRANSITION`), `shared/PaginatedResponse.of(page, mapper::toDTO)`, `shared/VersionGuard.require(...)` where a payload must carry its version (`check` keeps null-means-skip for the internal approval callers), and `iam/security/CurrentUser.id()` for the signed-in user (the principal is the domain `User`; never `SELECT id FROM sys_users` for it)
+- No test, debug or mock endpoints in shipped controllers: delete them rather than guard them (2026-10-01 removed `/whatsapp/test/*`, `/files/test/upload`, `/files/status`, `/ai/test-extract-raw`, `/grns/{id}/close-on-qc-approval`)
+- A setting that is safe only outside production (a debug toggle, a dev-only endpoint) goes into `config/ProductionSafetyCheck` too: the `prod` profile reports it at startup, and refuses to start with it once `erp.production-check.fail-fast=true` (go-live)
+- Logging: no controller echo logs (`log.info("GET /api/v1/...")`) — `AccessLogFilter` already records method, route, status and duration, and Cloud Run records every request. `userId`, `branchId` and `client` reach every line through `shared/logging/LogContext` (set by `JwtAuthenticationFilter`, `BranchContextInterceptor`, `AccessLogFilter`). Log an exception once, where it is handled: 5xx at ERROR with the exception, 4xx at WARN without a stack
+- Health: Cloud Run probes `/actuator/health/liveness` and `/actuator/health/readiness` (readiness includes the database); only `health` and `info` are exposed. `/api/v1/system/**` stays for the mobile app's pre-login checks. Actuator registers a second `RequestMappingHandlerMapping`, so inject the application's one by name (`requestMappingHandlerMapping`, as `iam/permission/RbacRegistryCheck` does) — a by-type lookup fails every Spring context with `NoUniqueBeanDefinitionException`
+- Scheduled work must be idempotent and runnable on demand: the `@Scheduled` method is a thin wrapper that runs only while `erp.jobs.in-process.enabled` is true and calls the job's public method, which `jobs/InternalJobController` (Cloud Scheduler, `X-Job-Token`) calls too. An idle Cloud Run instance gets no CPU, so an in-process cron alone may never run
+- A write that checks a balance or a status locks the parent row first: `findByIdForUpdate` (`@Lock(PESSIMISTIC_WRITE)` on a single-table `SELECT e FROM X e WHERE e.id = :id`; no JOIN FETCH, because PostgreSQL cannot lock the nullable side of an outer join), then reads the balance. Parent before child, always in that order. The production paths (garment issue/receipt/cancel, bundling, bundle issue, Work Order status) do this; copy them (`production/workorder/repository/WorkOrderRepository.findByIdForUpdate`)
+- Personal identifiers (Aadhaar, PAN, bank account numbers, anything a data-protection review would name) are stored with `@Convert(converter = shared/crypto/EncryptedStringConverter.class)` on a column of at least 255 characters, and the business length limit is checked in the service. Never search, sort or join on such a column in SQL; native SQL reads ciphertext. The key's fingerprint is recorded in `sys_config` (`pii.key.fingerprint`) and a different key refuses to start; never set `ERP_PII_KEY` locally against a shared database
+- A new `storage/enums/Entity` constant needs its owning screens in `storage/service/FileAccessPolicy.OWNERS`, and in `PRIVATE_READ` when its files are personal or commercial records; `FileAccessPolicyTest` fails otherwise. The `/files` API calls the policy; module services that store files themselves check their own screen
 
 ### Frontend Patterns (Non-Negotiable)
 - `Form.useForm()` hook — never class-based forms
@@ -515,25 +484,6 @@ Tech Pack → BOM → Costing → Order → T&A Calendar → Production → Ship
 - Debounce search inputs (300ms minimum)
 - Disable submit buttons during API calls
 - Loading + error + empty states for every async operation
-
----
-
-## Existing Skills Integration
-
-This agent incorporates and supersedes these existing skills:
-
-| Skill | What It Did | Now Handled By |
-|-------|-------------|----------------|
-| `/develop` | Pre-verification + AntD checks + post-review | Integrated into pre/post pipelines above |
-| `/implement` | Research → verify → implement → verify | Integrated into plan mode + verification |
-| `/review` | Code review across 7 dimensions | Integrated into post-implementation pipeline |
-| `/garment-erp` | Domain knowledge + patterns | Reference files + domain section above |
-| `/develop` (API) | Flyway safety + JPA patterns | Integrated into backend patterns section |
-| `karpathy-guidelines` | LLM coding discipline | Integrated into Karpathy Guidelines section below |
-| `frontend-design` | High-quality UI design | Integrated into Frontend Design Quality section below |
-| `subagent-driven-development` | Parallel subagent execution | Integrated into Subagent-Driven Development section below |
-
-**This is the ONLY skill needed. All other skills have been fully absorbed into this agent.**
 
 ---
 
@@ -672,18 +622,29 @@ This gate runs **BEFORE implementation** (during planning/research) and **AFTER 
 
 Before editing any file, scan it for existing deprecated patterns and plan to fix them as part of the change:
 
+A bare grep is not enough on its own, because almost every deprecated prop is
+**component-scoped**: `bordered` warns on Card and Select but is correct on Table
+and Descriptions; `direction` warns on Space but not on ConfigProvider; `width`
+warns on Drawer but not on Table. Read
+[`antd6-deprecations.md`](references/antd6-deprecations.md) for the scoping, then
+grep the props it lists:
+
 ```bash
-# Run this scan on every file you're about to modify
-grep -n "visible=" <file>         # → should be open=
-grep -n "onVisibleChange" <file>  # → should be onOpenChange
-grep -n "bordered=" <file>        # → should be variant="borderless" (for Input/Select/DatePicker)
-grep -n "bordered={false}" <file> # → should be variant="borderless"
-grep -n "dropdownClassName" <file>        # → should be popupClassName
-grep -n "dropdownMatchSelectWidth" <file> # → should be popupMatchSelectWidth
-grep -n "filterDropdownVisible" <file>    # → should be filterDropdownOpen
-grep -n 'size="default"' <file>           # → should be size="middle"
-grep -n "getPopupContainer" <file>        # → verify still valid in AntD 6.x
-grep -n "dropdownRender" <file>           # → verify still valid in AntD 6.x
+# The highest-frequency offenders, from the 2026-09-09 repo sweep
+grep -n "message=" <file>          # → Alert: title=
+grep -n "valueStyle" <file>        # → Statistic: styles={{ content: ... }}
+grep -n "direction=" <file>        # → Space/Steps: orientation=   (NOT ConfigProvider)
+grep -n "width=\|height=" <file>   # → Drawer: size=              (NOT Table/Col)
+grep -n "destroyOnClose" <file>    # → Modal/Drawer: destroyOnHidden
+grep -n "labelStyle\|contentStyle" <file>   # → Descriptions: styles={{ label, content }}
+grep -n "overlayStyle\|overlayInnerStyle\|overlayClassName" <file>  # → styles.*/classNames.*
+grep -n "bodyStyle\|headStyle\|headerStyle\|footerStyle\|maskStyle" <file>  # → styles.*
+grep -n "dropdownRender\|onDropdownVisibleChange" <file>  # → popupRender / onOpenChange
+grep -n "dropdownClassName\|popupClassName" <file>        # → classNames.popup.root (BOTH are deprecated)
+grep -n "addonAfter\|addonBefore" <file>   # → InputNumber only: suffix= / prefix=
+grep -n "iconPosition" <file>      # → Button: iconPlacement=
+grep -n "tabPosition" <file>       # → Tabs: tabPlacement=
+grep -n "<List\b\|List\.Item" <file>   # → List itself is deprecated (6.2.2): plain ul/li or a Table
 ```
 
 ### Pre-Implementation: CSS Deprecated Patterns
@@ -725,22 +686,8 @@ git diff --name-only HEAD
 # If ANY deprecated pattern is found → FIX IT before reporting completion
 ```
 
-### Deprecated Pattern Fix Reference
-
-| Deprecated Pattern | Replacement | Components Affected |
-|---|---|---|
-| `visible={x}` | `open={x}` | Modal, Drawer, Dropdown, Tooltip, Popover, Popconfirm |
-| `onVisibleChange={fn}` | `onOpenChange={fn}` | Modal, Drawer, Dropdown, Tooltip, Popover, Popconfirm |
-| `bordered={false}` | `variant="borderless"` | Input, Select, DatePicker, TimePicker, TreeSelect, Cascader |
-| `bordered` (boolean prop) | `variant="outlined"` or `variant="borderless"` | Input, Select, DatePicker |
-| `dropdownClassName={x}` | `popupClassName={x}` | Select, TreeSelect, Cascader, DatePicker, TimePicker |
-| `dropdownMatchSelectWidth` | `popupMatchSelectWidth` | Select, TreeSelect, Cascader |
-| `filterDropdownVisible` | `filterDropdownOpen` | Table column config |
-| `size="default"` | `size="middle"` | Table, Button, Input, Select |
-| `defaultProps = {}` | Default parameter values in function signature | All React components (React 19) |
-| `ReactDOM.render()` | `createRoot().render()` | App entry point |
-| `.ant-modal-visible` | `.ant-modal-open` | CSS targeting modal state |
-| `.ant-drawer-visible` | `.ant-drawer-open` | CSS targeting drawer state |
+### Fix Reference
+The full, verified antd table is [`antd6-deprecations.md`](references/antd6-deprecations.md) — transcribed from the `warning.deprecated(...)` calls in the installed antd; it also records which props are still valid so they do not get "fixed" by mistake. Read it instead of working from memory. React 19: no `defaultProps`, no `ReactDOM.render` (use `createRoot`); CSS: `.ant-*-visible` → `.ant-*-open`.
 
 **Rule: ZERO deprecated patterns in any file you touch. If you find them, fix them.**
 
@@ -766,9 +713,9 @@ For Large and XL tasks with independent subtasks, use subagent-driven developmen
 1. Plan approved → Extract all tasks with full text
 2. Create TodoWrite with all tasks
 3. For each task:
-   a. Dispatch implementer subagent (fresh context, full task spec)
+   a. Dispatch implementer subagent (fresh context, full task spec, the task's impact table)
    b. If subagent asks questions → answer, re-dispatch
-   c. Subagent implements → tests → commits → self-reviews
+   c. Subagent implements → tests → self-reviews
    d. Dispatch spec reviewer subagent → verify code matches spec
    e. If spec issues → implementer fixes → re-review
    f. Dispatch code quality reviewer subagent → verify clean code
@@ -788,105 +735,9 @@ Use the least powerful model that can handle each role:
 | Multi-file integration, pattern matching | `sonnet` |
 | Architecture, design, review tasks | `opus` |
 
-### Implementer Subagent Dispatch Template
+### Dispatch Prompts
 
-When dispatching an implementer subagent, use this structure:
-
-```
-Agent({
-  description: "Implement Task N: [task name]",
-  prompt: |
-    You are implementing Task N: [task name]
-
-    ## Task Description
-    [FULL TEXT of task from plan — paste it, don't make subagent read file]
-
-    ## Context
-    [Where this fits, dependencies, architectural context]
-    [ERP domain context if relevant]
-    [Relevant reference file contents if needed]
-
-    ## ERP-Specific Rules (MUST follow)
-    - Ant Design 6.x ONLY — no deprecated props (see Deprecated Pattern Fix Reference)
-    - Form.useForm() hook, App.useApp() for message/notification
-    - Memoize columns/dataSource with useMemo, handlers with useCallback
-    - Use StoreContext for master data — never duplicate in local state
-    - Match backend DTO field names exactly (camelCase)
-    - Loading + error + empty states for every async operation
-
-    ## Before You Begin
-    If you have questions about requirements, approach, or dependencies — ask now.
-
-    ## Your Job
-    1. Implement exactly what the task specifies
-    2. Run deprecated props scan on your code (ZERO allowed)
-    3. Verify implementation works
-    4. Self-review: completeness, quality, discipline, no overbuilding
-
-    ## Report Format
-    - Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
-    - What you implemented
-    - Files changed
-    - Self-review findings
-    - Any issues or concerns
-
-    Work from: [directory]
-})
-```
-
-### Spec Reviewer Subagent Dispatch Template
-
-```
-Agent({
-  description: "Review spec compliance for Task N",
-  subagent_type: "feature-dev:code-reviewer",
-  prompt: |
-    You are reviewing whether an implementation matches its specification.
-
-    ## What Was Requested
-    [FULL TEXT of task requirements]
-
-    ## What Implementer Claims They Built
-    [From implementer's report]
-
-    ## CRITICAL: Do Not Trust the Report
-    Read the actual code. Compare to requirements line by line.
-
-    Check:
-    - Missing requirements (skipped or unimplemented?)
-    - Extra/unneeded work (over-engineering?)
-    - Misunderstandings (wrong interpretation?)
-    - Deprecated props/CSS (ZERO tolerance)
-    - ERP patterns compliance (Form.useForm, App.useApp, StoreContext usage)
-
-    Report: ✅ Spec compliant OR ❌ Issues found: [list with file:line references]
-})
-```
-
-### Code Quality Reviewer Subagent Dispatch Template
-
-```
-Agent({
-  description: "Review code quality for Task N",
-  subagent_type: "superpowers:code-reviewer",
-  prompt: |
-    Review code quality for Task N implementation.
-
-    ## What Was Implemented
-    [From implementer's report]
-
-    ## Additional ERP Quality Checks
-    - Each file has one clear responsibility?
-    - File size within limits? (Page: 150 lines, Component: 100, Hook: 60, Service: 30)
-    - No deprecated Ant Design props or CSS classes?
-    - Proper memoization (useMemo/useCallback)?
-    - No unnecessary state (derived values should be computed)?
-    - Clean effect dependencies?
-    - Consistent with existing codebase patterns?
-
-    Report: Strengths, Issues (Critical/Important/Minor), Assessment
-})
-```
+Use the templates in `references/implementer-prompt.md`, `references/spec-reviewer-prompt.md` and `references/code-quality-reviewer-prompt.md` — paste the FULL task text into them; subagents have no conversation context. Reviewer agent type: `feature-dev:code-reviewer` when it is listed as available, otherwise `general-purpose` with the same prompt. Every implementer prompt carries the task's impact table so the subagent updates the consumers, not just the target file.
 
 ### Handling Subagent Status
 
@@ -913,7 +764,7 @@ When reviewing code (self-review or subagent review), evaluate across ALL 7 dime
 
 ### 1. Ant Design Compliance
 - All component props valid for Ant Design 6.x?
-- Any deprecated props? (`visible`→`open`, `bordered`→`variant`, etc.)
+- Any deprecated props? (`visible`→`open`, `bordered`→`variant` on Input/Select, etc. — see `antd6-deprecations.md`)
 - Correct use of Form, Table, Modal, Select patterns?
 - `App.useApp()` for message/notification instead of static methods?
 
@@ -936,9 +787,9 @@ When reviewing code (self-review or subagent review), evaluate across ALL 7 dime
 - Double-submit prevention? Proper AbortController usage?
 
 ### 5. Backend Quality (if API changes)
-- Flyway migration immutability respected? (V1-V34 untouched)
+- No applied migration touched; new migration timestamp-versioned with its H2 twin?
 - `@Transactional` on write methods? `@EntityGraph` / JOIN FETCH for list queries?
-- MapStruct mappings complete? DTO validation annotations present?
+- MapStruct mappings complete? DTO validation annotations present? `@RequiresPermission` on every new handler?
 
 ### 6. Technical Debt
 - Any `console.log` left outside catch blocks?
@@ -955,32 +806,17 @@ When reviewing code (self-review or subagent review), evaluate across ALL 7 dime
 
 ---
 
-## Design Patterns (Backend — Non-Negotiable)
+## Backend Design Patterns (as used here)
 
-| Pattern | Where |
-|---------|-------|
-| **Interface Segregation** | Service layer: interface + impl. Never call impl directly. |
-| **Strategy Pattern** | Costing calculations, report generation — inject via interface. |
-| **Builder Pattern** | Complex DTOs (CostSheet, Order). Use Lombok `@Builder`. |
-| **Factory Pattern** | Notification/event creation, report builders. |
-| **Template Method** | Base CRUD service with abstract hooks for custom logic. |
-| **Observer/Event** | Spring `ApplicationEvent` for cross-module side effects (e.g., order confirmed → create T&A). |
-| **Specification Pattern** | Complex dynamic queries via JPA `Specification<T>`. |
-| **DTO Pattern** | Never expose entities to API. Always map through DTOs. |
+| Pattern | Where it is real |
+|---------|------------------|
+| **Specification** | `JpaSpecificationExecutor` + `Specification<T>` for filtered lists |
+| **Builder** | Lombok `@Builder` on DTOs and entities |
+| **Domain events** | Spring `ApplicationEvent` for cross-module side effects — `OrderScheduleImpactEvent`, `ApprovalOutcomeEvent`, `PoApprovedEvent`, the feed events (`impact-map.md` §4) |
+| **DTO isolation** | Entities never leave the service layer; MapStruct mappers |
+| **Interceptors** | `PermissionInterceptor` (RBAC) and `BranchContextInterceptor` (branch scoping) on `/api/v1/**` |
 
-### Abstraction Layers
-
-Every external dependency MUST be behind an interface. Business logic never imports implementation classes:
-
-```
-Controller → Service Interface → Service Impl → Repository Interface → JPA Impl
-                                      ↓
-                              CacheService (interface) → Redis/Caffeine impl
-                              FileStorageService (interface) → S3/Local impl
-                              NotificationService (interface) → Email/SMS/Slack impl
-                              SearchService (interface) → DB/Elasticsearch impl
-                              EventPublisher (interface) → Spring Events/Kafka impl
-```
+Not used here — do not introduce: service interface + `Impl` pairs, a generic `AbstractCrudService`, `ApiResponse`/`PageResponse` envelopes, multi-tenancy, Redis/Elasticsearch/Kafka abstractions.
 
 ---
 
@@ -997,7 +833,7 @@ Controller → Service Interface → Service Impl → Repository Interface → J
 9. **No business logic in controllers** — Controllers only: validate → delegate → respond.
 10. **No circular dependencies** — Extract shared logic or use events.
 11. **No God classes** — If a service has more than 10 methods, split by sub-domain.
-12. **No copy-paste** — Extract shared logic into `AbstractCrudService<E, REQ, RES>` base class.
+12. **No copy-paste** — Extract shared logic into the feature's service or `shared/`; the codebase has no generic CRUD base class and does not want one.
 
 ---
 
@@ -1007,72 +843,72 @@ Controller → Service Interface → Service Impl → Repository Interface → J
 |--------|-----------|
 | **SQL Injection** | JPA parameterized queries only. No string concatenation in SQL. |
 | **XSS** | React auto-escapes. Never use `dangerouslySetInnerHTML`. Sanitize text inputs on backend. |
-| **Broken Auth** | JWT with short expiry. Refresh token rotation. `@PreAuthorize` on every endpoint. |
-| **IDOR** | Tenant scoping on every query. Never trust client-provided IDs. Validate ownership in service layer. |
+| **Broken Auth** | JWT access token (15 min) + refresh token (24 h; 30 days for the PWA) with silent refresh in `SessionContext` / `axiosInstance`. Authorization via `@RequiresPermission` + `PermissionInterceptor` (mode `ERP_RBAC_MODE`; ENFORCE in prod) — never `@PreAuthorize`. Only `sys_users.is_active = FALSE` blocks a login (always on, no flag). |
+| **Passwords** | Every password that is set goes through `iam/security/PasswordPolicy` (at least 10 characters, at most BCrypt's 72 bytes); never at login. The UI mirrors it in `src/utils/passwordPolicy.js` (`NEW_PASSWORD_RULES`). |
+| **IDOR** | Branch scoping via `BranchContextInterceptor`. Never trust client-provided IDs. Validate ownership in service layer. |
 | **Mass Assignment** | DTOs with explicit fields only. Never bind request directly to Entity. |
-| **Sensitive Data** | Never log passwords, tokens, or PII. Response DTOs exclude sensitive fields. |
+| **Sensitive Data** | Never log passwords, tokens, or PII: log ids, and mask a contact detail with `shared/logging/LogMask` (`email`, `phone`, `host`, `typedUsername`). Headers and bodies are never logged (`config/logging/AccessLogFilter` writes one line per request). A String field named like a password, token, secret or key carries `@ToString.Exclude` (records override `toString()`); `config/logging/SecretFieldsToStringTest` fails the build otherwise. No secret, token or phone number is committed as a property default. |
+| **Transport** | `server.forward-headers-strategy=framework` makes Cloud Run's `X-Forwarded-Proto` count, so HSTS is sent; Swagger and the H2 console are off outside dev/local/e2e. |
 | **Input Validation** | Jakarta Bean Validation on ALL DTOs. Max lengths on all string fields. |
 | **CORS** | Whitelist specific origins only. No `allowedOrigins("*")` in production. |
-| **Error Info Leak** | Global exception handler returns generic messages in production. Stack traces only in dev profile. |
+| **Error Info Leak** | `exception/GlobalExceptionHandler` never sends an exception class name, a cause or a stack trace; a database error (`DataAccessException`) gets a plain sentence because its message can carry SQL. Every error body carries `traceId`, which finds the full log entry. |
 
 ---
 
 ## Code Generation Rules (Garment ERP Specific)
 
-1. **Naming**: Use garment industry terms exactly (see `references/domain-models.md`). Don't rename `BOM` to `MaterialList` or `T&A` to `Timeline`.
-2. **Enums as DB values**: Statuses, garment types, UOMs stored as VARCHAR with Java enums.
-3. **Size-Color Matrix**: Always model as a child table with `size` and `color` columns, not as JSON.
+1. **Naming**: Use the product's own terms (the `SECTIONS` labels and `codebase-map.md`). Don't rename `BOM` to `MaterialList` or `T&A` to `Timeline`.
+2. **Enums as DB values**: Statuses, types, UOMs stored as VARCHAR with Java enums; the UI mirror lives in `src/utils/<module>Constants.js`.
+3. **Size × quantity**: Travels as `shared/SizeQuantityDTO`; storage differs by module (JSONB on orders/BOM, child tables elsewhere) — copy the nearest sibling, never invent a third shape.
 4. **Quantities**: Use `BigDecimal` for fabric (yards/meters), costs, and weights. Use `Integer` for piece counts.
-5. **Audit trail**: All entities extend `BaseEntity` with `createdAt`, `updatedAt`, `createdBy`, `updatedBy`.
-6. **Soft delete**: Default to soft delete (`deleted = true`) for all business entities.
-7. **Pagination**: All list endpoints return `Page<T>`. Frontend uses Table with server-side pagination.
+5. **Audit trail**: Every entity extends `shared/BaseEntity` — `createdAt`, `updatedAt`, `createdBy`/`updatedBy` as `Integer` user ids, `@Version long version`, `FeedAuditEntityListener`.
+6. **Retire, don't delete**: Business rows carry `active`/`is_active` flags; `deleted_at` soft delete exists only where a migration defines it (file storage, report definitions) — check the table's migration before assuming either.
+7. **Pagination**: `/search` endpoints return `PaginatedResponse<T>` and the UI table pages server-side; master list endpoints return `List<DTO>` and the UI reads them from StoreContext.
 8. **Validation**: Jakarta Bean Validation on request DTOs. Frontend mirrors with Ant Design Form validation rules.
-9. **Error handling**: Global `@RestControllerAdvice` returns consistent `ApiResponse<T>` with error codes.
-10. **Flyway versions**: Follow `V{n}__{description}.sql` format. Never modify existing migrations.
-11. **Constructor injection**: Always via `@RequiredArgsConstructor`. No `@Autowired`.
-12. **Interface-first**: All services have an interface. All external integrations behind interfaces.
+9. **Error handling**: `exception/GlobalExceptionHandler` owns the error body (`timestamp`, `traceId`, `status`, `error`, `message`; clients read `error` and `message`). New code throws `exception/ErpException` with an `ErrorCode` (`ErpException.notFound("Purchase order", id)`, `.conflict(...)`, `.ruleViolation(...)`, or `new ErpException(code, message, details)`); the code becomes `error` and sets the status. Never rename a code: the web app branches on `OPTIMISTIC_LOCK_CONFLICT`, `INVOICE_REQUIRED`, `DUPLICATE_INVOICE`, `AI_NOT_CONFIGURED`. Convert old `RuntimeException("... not found")` throws when touching the code, not in bulk.
+10. **Flyway**: `V<yyyyMMddHHmmss>__<desc>.sql` plus its H2 twin. Never modify an applied migration.
+11. **Constructor injection**: Always via Lombok `@RequiredArgsConstructor`. No `@Autowired`.
+12. **Document numbers**: A new transactional document type gets its series in `shared/docnumber`.
 13. **DTO isolation**: Never return entities from controllers. Map through DTOs using MapStruct.
 14. **Split large files**: If any file exceeds the line limits → split before delivering.
 
 ---
 
-## RBAC Pattern
+## RBAC Pattern (as implemented)
 
-| Role | Modules Access |
-|------|---------------|
-| ADMIN | All modules, user management, tenant settings |
-| MERCHANDISER | Style, BOM, Costing, Order, T&A, Buyer, Supplier |
-| PRODUCTION_MANAGER | Production (all), T&A (read), Order (read), Inventory |
-| CUTTING_MASTER | Cutting, Inventory (fabric issue) |
-| STORE_KEEPER | Inventory (full), BOM (read) |
-| FINANCE | Costing, Order (read), Shipment (read), Reports |
-| COMPLIANCE_OFFICER | Compliance, Buyer compliance, Audit |
-| VIEWER | Read-only across all modules |
-
-Backend enforces via `@PreAuthorize`. Frontend hides/disables UI via auth context roles.
+- **Model**: one permission key per URL-addressable screen (`orders`, `po-approval`, `inventory-qc`, …), each with `access` plus per-operation booleans (`view` / `add` / `update` / `delete` / `approve` / …). The map is stored on `sys_roles.permissions` (JSON) and travels inside the JWT. Roles are `sys_roles` rows; code never branches on a role name — it checks permission keys, and `sys_roles.is_superuser` bypasses every guard (`SuperuserCheck`).
+- **UI**: `src/utils/permissions.js` — `SCREENS` registry, `SECTIONS`, `hasModuleAccess(moduleId)`, `hasPermission(moduleId, operationId)`, `assertRegistryIntegrity` (icon names). `<PermissionRoute module operation>` wraps every screen route in `App.jsx`; `hasModuleAccess` builds the menu in `MainLayout.jsx`. A new screen = key + `SCREENS` entry + route + menu.
+- **API**: `@RequiresPermission("<key>")` or `@NoPermissionRequired(reason = …)` on every controller; `iam/permission/PermissionInterceptor` enforces per `ERP_RBAC_MODE` (OFF / AUDIT / ENFORCE, bound as an enum so a typo fails startup): ENFORCE is the base default and the only value `ProductionSafetyCheck` accepts for `prod` without reporting it, dev/qa/local run AUDIT, e2e and the test profiles OFF. `RbacRegistryCheck` logs every unannotated `/api/v1/**` handler as `rbac_unmapped` and aborts boot (`ERP_RBAC_FAIL_ON_UNMAPPED`, default true); `ControllerPermissionMappingTest` catches it in the build first, `@ConditionalOnProperty` controllers included. `@PreAuthorize` is deliberately not used — the interceptor's Javadoc explains why.
+- **Cost**: every new key grows every user's token — Super Admin's has already hit Tomcat's 8 KB header limit once. Reuse an existing key when the screen is a tab of an existing module.
+- **Explicit checks**: `PermissionGuard.require(user, key, op)`, `requireAnyOperation`, `requireAnyOf(user, List<Grant>)` (several screens own one resource) and `requireSuperuser(user, what)`. All follow `erp.rbac.mode`: OFF records nothing, AUDIT logs what ENFORCE would refuse
+- **User administration** (`iam/service/UserAdministrationPolicy`, called by `UserService`): only a superuser grants or removes the superuser role or edits, resets or deletes a superuser's account; nobody changes their own role; the last superuser who can sign in cannot be deleted, demoted or deactivated (409); sign-in refuses only an account marked inactive, so a NULL `is_active` counts (`UserRepository.countSuperusersWhoCanSignIn`). A refusal is 403 `FORBIDDEN`. These rules hold in every RBAC mode, because they are about the records rather than the caller's grants. A check on a mapped entity's association reads the stored row: MapStruct's `role.id` mapping builds a Role with only its id
+- **Designed reports** (`reporting/catalog/ReportSourceAccess`): every report source names the permission key of the screen that owns its data and the SQL expression of its branch column. Running, previewing, filter options and authoring a report need `view` on that key; a source with no entry needs a superuser, so a new source gets an entry. The catalog lists only the sources the user may use. With a working branch selected, a source with a branch expression is filtered to it (`DynamicQueryBuilder`). `PermissionGuard.permits` / `permitsSuperuser` are the booleans for narrowing a list: outside ENFORCE everything passes, as `require` does.
+- **Web push** (`notification/service/PushEndpoints`): a subscription must point at a browser push service (FCM, Mozilla, WNS, Apple) over https, with a P-256 key and a 16-byte auth secret. Anything else is refused on subscribe and deactivated on send (review F278), because the server POSTs to whatever endpoint is stored.
+- **Sessions** (`iam/service/RefreshTokenService`): a refresh locks its token row. A token rotated away within `jwt.refresh-token.reuse-grace` (2 minutes) continues the session from its live token (several tabs, a lost answer); one rotated away longer ago is reuse, answered 401 `TOKEN_REUSE_DETECTED`, and the session is revoked. No session outlives `jwt.refresh-token.absolute-lifetime-days` (90) from its login. Deactivating a user or an admin password reset revokes every session, and a deactivated account's access token answers 401 `ACCOUNT_DISABLED`. Ten wrong passwords in 15 minutes lock the account for 15 minutes: 429 `LOGIN_LOCKED` with `retryAfterSeconds` and `Retry-After` (`iam/security/LoginThrottle`, table `sys_login_throttle`)
 
 ---
 
-## Frontend Naming Conventions
+## Frontend Naming Conventions (observed)
 
 | Type | Convention | Example |
 |------|-----------|---------|
-| Page | `{Module}Page.jsx` | `OrderPage.jsx` |
-| Drawer form | `{Module}Drawer.jsx` | `OrderDrawer.jsx` |
-| Sub-component | `{Module}{Feature}.jsx` | `OrderLineItems.jsx` |
-| Hook | `use{Module}.js` | `useOrders.js` |
-| Service/API | `{module}Service.js` | `orderService.js` |
-| Constants | `{module}Constants.js` | `orderConstants.js` |
+| List / form / view page | `<Entity>List.jsx`, `<Entity>Form.jsx`, `<Entity>View.jsx` under `src/pages/<module>/` | `pages/orders/OrderList.jsx` |
+| Drawer-based form | `<Entity>Drawer.jsx` | copy the sibling in the same module |
+| Sub-component | `<Entity><Feature>.jsx` next to its page | `pages/production/packing/CartonGroupEditor.jsx` |
+| Hook | `src/hooks/use<Thing>.js` | `useDebouncedSearch.js`, `useBusyAction.js` |
+| Service | `src/services/<module>/<name>Service.js` (module folders + `core/`) | `services/core/axiosInstance.js` |
+| Constants | `src/utils/<module>Constants.js`; status colours in `statusConfig.js` | `poStatusConstants.js` |
 
 ### Component Reuse Rules
 
 | Component | Rule |
 |-----------|------|
-| `StatusTag` | Single shared component for ALL modules. Add new statuses to color map. |
-| `DeleteConfirmModal` | Single shared. Never write inline `Modal.confirm`. |
-| `StatusChangeModal` | Single shared for all status transitions. |
-| `SizeColorMatrix` | Single shared used by Orders, BOM, Cut Plan, Shipment. |
-| `MasterSplitView` | Single shared for master data screens. |
+| `components/StatusTag.jsx` | Single shared status tag; status colour maps live in `utils/statusConfig.js`. |
+| `components/buttons/DeleteConfirm.jsx` | Shared delete confirmation — never write an inline `Modal.confirm`. |
+| `components/MasterSplitView.jsx` | Shared layout for master-data screens. |
+| `components/ConflictDialog.jsx` | The 409 / version-conflict dialog; raised by `axiosInstance`, not by screens. |
+| `components/PermissionRoute.jsx` | Wraps every screen route; pass `module` and `operation`. |
+| `pages/po/SizeColorMatrix.jsx` | The one size × colour matrix; used by the cutting, work-order and finishing PO forms and `ProductionPoView`. Reuse it rather than adding a copy (an unreached `inventory/stock` twin was removed 2026-09-24). |
 
 ---
 

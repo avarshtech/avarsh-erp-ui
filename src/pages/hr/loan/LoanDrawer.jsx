@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Drawer, Form, Select, DatePicker, InputNumber, Input, Button, Space } from 'antd';
+import { App, Drawer, Form, Select, InputNumber, Input, Button, Space } from 'antd';
+import DateInput from '../../../components/DateInput';
 import dayjs from 'dayjs';
 import { createLoan } from '../../../services/hr/loanService';
 import { searchEmployees } from '../../../services/hr/employeeService';
+import { employeeOptions } from '../../../utils/hrLabels';
 
 const LoanDrawer = ({ open, onClose, onSuccess }) => {
   const { message } = App.useApp();
@@ -24,11 +26,11 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       const result = await searchEmployees({ status: 'ACTIVE', size: 1000 });
       setEmployees(result?.content || []);
     } catch {
-      message.error('Failed to load employees');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setEmpLoading(false);
     }
-  }, [message]);
+  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -45,7 +47,7 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       onSuccess?.();
     } catch (err) {
       if (err?.errorFields) return; // validation error
-      message.error(err?.response?.data?.message || 'Failed to create loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }
@@ -56,8 +58,8 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       title="New Loan"
       open={open}
       onClose={onClose}
-      width={480}
-      destroyOnClose
+      size={480}
+      destroyOnHidden
       extra={
         <Space>
           <Button onClick={onClose}>Cancel</Button>
@@ -74,20 +76,17 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={employees.map((e) => ({
-              value: e.id,
-              label: `${e.employeeNo} - ${e.firstName} ${e.lastName || ''}`.trim(),
-            }))}
+            options={employeeOptions(employees)}
           />
         </Form.Item>
         <Form.Item name="loanDate" label="Loan Date" rules={[{ required: true, message: 'Select loan date' }]}>
-          <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          <DateInput style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="amount" label="Loan Amount" rules={[{ required: true, message: 'Enter amount' }]}>
           <InputNumber style={{ width: '100%' }} min={1} prefix={'\u20B9'} formatter={(v) => v ? Number(v).toLocaleString('en-IN') : ''} />
         </Form.Item>
         <Form.Item name="dueStartDate" label="EMI Start Date" rules={[{ required: true, message: 'Select start date' }]}>
-          <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          <DateInput style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="emiAmount" label="EMI Amount" rules={[{ required: true, message: 'Enter EMI amount' }]}>
           <InputNumber style={{ width: '100%' }} min={1} prefix={'\u20B9'} formatter={(v) => v ? Number(v).toLocaleString('en-IN') : ''} />

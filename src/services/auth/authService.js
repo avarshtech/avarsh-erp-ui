@@ -2,6 +2,7 @@ import axios from 'axios';
 import axiosInstance from '../core/axiosInstance';
 import { getEmptyPermissions } from '../../utils/permissions';
 import { fetchAndCacheOrganisation } from '../admin/organisationService';
+import { getMyPermissions } from './permissionsService';
 import {
   setAccessToken,
   getAccessToken,
@@ -14,7 +15,10 @@ import {
   hasSessionActiveFlag,
   clearAll,
   executeTokenRefresh,
+  announceLogout,
 } from './sessionStore';
+import { applyUpdate, checkForUpdate } from '../../utils/swRegistration';
+import { unsubscribePush } from '../core/notificationService';
 
 // ── PWA Detection ───────────────────────────────────────────────────────────
 
@@ -61,13 +65,24 @@ const normalizeTokenPermissions = (raw) => {
 
 /**
  * Build a user session object from a JWT and optional fallback user data.
+ *
+ * Permissions no longer travel in the JWT (they pushed the Authorization header past
+ * Tomcat's 8 KB limit); they are fetched from GET /me/permissions and passed in here.
+ *
+ * The same call carries the role's id and its superuser flag. Both are kept: the client
+ * used to infer "is this an admin" by string-matching the role NAME, which disagrees with
+ * the server the moment a role is renamed, and screens that show who owns a record need the
+ * id rather than the label.
+ *
  * @param {string} token - JWT access token
  * @param {object|null} fallbackUser - Existing user data to merge with
+ * @param {object|null} identity - The /me/permissions payload
+ *   ({ role, roleId, isSuperuser, permissions }). Falls back to the cached user when omitted.
  * @returns {object} User session object
  */
-const buildUserSession = (token, fallbackUser = null) => {
+const buildUserSession = (token, fallbackUser = null, identity = null) => {
   const payload = decodeToken(token);
-  const rawPermissions = payload.permissions || {};
+  const rawPermissions = identity?.permissions ?? fallbackUser?.permissions ?? {};
   const normalizedPermissions = normalizeTokenPermissions(rawPermissions);
 
   return {
@@ -76,6 +91,10 @@ const buildUserSession = (token, fallbackUser = null) => {
     name: payload.name || fallbackUser?.name || '',
     email: payload.email || fallbackUser?.email || '',
     role: payload.role || fallbackUser?.role || '',
+    roleId: identity?.roleId ?? fallbackUser?.roleId ?? null,
+    defaultBranchId: identity?.defaultBranchId ?? fallbackUser?.defaultBranchId ?? null,
+    branchIds: identity?.branchIds ?? fallbackUser?.branchIds ?? [],
+    isSuperuser: identity?.isSuperuser ?? fallbackUser?.isSuperuser ?? false,
     permissions: normalizedPermissions,
     idleTimeoutMinutes: payload.idleTimeoutMinutes || 30,
     idleWarningSeconds: payload.idleWarningSeconds || 120,
@@ -107,11 +126,32 @@ export const authenticateUser = async (username, password) => {
       return { success: false, message: 'Invalid response from server (missing token)' };
     }
 
-    const userSession = buildUserSession(token, { username, email: `${username}@avarsh.com` });
-
-    // Store token in memory (NOT in sessionStorage)
+    // Store token in memory (NOT in sessionStorage) BEFORE any authenticated call —
+    // the axios request interceptor reads it to attach the Authorization header.
     setAccessToken(token);
-    // Cache user display info in sessionStorage (token field is stripped automatically)
+
+    // Permissions are no longer a JWT claim; the session is not usable without them.
+    let identity;
+    try {
+      identity = await getMyPermissions();
+    } catch {
+      // Fail the login rather than proceed with an empty permission set — that would
+      // render an app with no menu and no reachable routes, which reads as a broken
+      // app rather than a failed sign-in.
+      clearAll();
+      return {
+        success: false,
+        message: "Signed in, but couldn't load your permissions. Please try again.",
+      };
+    }
+
+    const userSession = buildUserSession(
+      token,
+      { username, email: `${username}@avarsh.com` },
+      identity
+    );
+
+    // Cache user display info in localStorage (token field is stripped automatically)
     cacheUserDisplay(userSession);
     // Mark that this tab has an active session (for page-refresh bootstrap)
     setSessionActiveFlag();
@@ -160,8 +200,37 @@ export const getToken = () => getAccessToken();
  * Calls the backend logout endpoint to revoke the refresh token and clear the HttpOnly cookie,
  * then clears the client-side session. Errors from the backend call are handled silently
  * to ensure the client-side cleanup always runs.
+ *
+ * Logout is also the update boundary for browser tabs: if a new build is waiting in
+ * the service worker it is activated here, so the next login always runs the latest
+ * code. When that happens the browser navigates to /login and nothing after the
+ * applyUpdate() call runs — callers must not rely on this resolving.
  */
-export const logoutUser = async () => {
+/**
+ * Stop this browser's push notifications going to the user who is leaving. The browser keeps its
+ * subscription; the next user's login binds it to them (usePushNotification). Never holds up a
+ * logout: no service worker means nothing to do, and a slow answer is not waited for.
+ */
+const unbindPush = () => Promise.race([
+  (async () => {
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration?.();
+      const subscription = await registration?.pushManager?.getSubscription();
+      if (subscription?.endpoint) await unsubscribePush(subscription.endpoint, { silent: true });
+    } catch {
+      // Not subscribed, or the server refused: the session ends regardless
+    }
+  })(),
+  new Promise((resolve) => { setTimeout(resolve, 3000); }),
+]);
+
+/**
+ * End the session everywhere it lives: push notifications are unbound from the user, the server
+ * revokes the refresh token and clears its cookie, this tab forgets the session (clearAll), and
+ * this browser's other tabs are told to do the same. Used by logout and by the idle timeout.
+ */
+export const endSession = async () => {
+  await unbindPush();
   // Attempt server-side logout to revoke refresh token and clear the HttpOnly cookie.
   try {
     await axiosInstance.post('/auth/logout');
@@ -171,6 +240,17 @@ export const logoutUser = async () => {
 
   clearAll();
   window.dispatchEvent(new Event('authChange'));
+  announceLogout();
+};
+
+export const logoutUser = async () => {
+  await endSession();
+
+  // Ask the server one last time rather than trusting the background check —
+  // a build deployed minutes ago may not have been picked up yet.
+  if (await checkForUpdate()) {
+    applyUpdate('/login');
+  }
 };
 
 // ── Session State Checks ────────────────────────────────────────────────────
@@ -238,11 +318,31 @@ export const refreshSession = async () => {
 
     if (!newToken) return false;
 
-    const currentUser = getCurrentUser();
-    const updatedUser = buildUserSession(newToken, currentUser);
-
-    // Store new token in memory
+    // Store new token in memory BEFORE any authenticated call — the axios request
+    // interceptor reads it to attach the Authorization header.
     setAccessToken(newToken);
+
+    const currentUser = getCurrentUser();
+
+    // Refetched on every refresh cycle, deliberately.
+    //
+    // These used to be reused from the login cache, on the reasoning that permissions
+    // "only change on re-login". That was true only while the server ignored them. Once
+    // the API enforces, a role edited by an admin has to reach the user: otherwise they
+    // keep seeing screens the server now refuses, and every click 403s. A PWA session
+    // survives up to 30 days (jwt.refresh-token.pwa-expiration-hours defaults to 720, and
+    // SessionContext disables the idle timeout there), so the stale window was that long.
+    //
+    // The cost is nil: this runs on the refresh cycle, not per request, and MeController
+    // reads the permissions straight off the EAGER-loaded principal — no extra query.
+    //
+    // A failure here throws to the outer catch, which returns false; initializeSession
+    // then clears the session. That is the right outcome — a session whose permissions
+    // cannot be established should not continue.
+    const identity = await getMyPermissions();
+
+    const updatedUser = buildUserSession(newToken, currentUser, identity);
+
     // Update cached user display info
     cacheUserDisplay(updatedUser);
     // Ensure the session active flag is set

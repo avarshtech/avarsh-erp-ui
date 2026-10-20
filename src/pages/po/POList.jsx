@@ -7,6 +7,7 @@ import {
   App,
   Space,
 } from 'antd';
+import { LinkOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchPurchaseOrders,
@@ -17,7 +18,7 @@ import { PO_STATUS, getStatusLabel } from '../../utils/poStatusConstants';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
-import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import useServerList from '../../hooks/useServerList';
 import PageHeader from '../../components/PageHeader';
 import SearchFilterBar from '../../components/SearchFilterBar';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
@@ -27,49 +28,71 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 import EmptyState from '../../components/EmptyState';
 import POView from './POView';
 import POVersionHistory from './POVersionHistory';
+import PoOrderMappingWorkspace from './order-mapping/PoOrderMappingWorkspace';
+import { useBranch } from '../../context/BranchContext';
 
 const { Text } = Typography;
+
+const PO_FILTERS = { status: undefined, poType: null, poDateRange: null, deliveryDateRange: null };
+const PO_LIST_OPTIONS = {
+  defaultSort: { field: 'id', order: 'descend' },
+  urlState: true,
+  filterTypes: { poDateRange: 'dateRange', deliveryDateRange: 'dateRange' },
+};
+
+// The list's own query; the working branch travels as X-Branch-Id, so it is not a parameter here.
+const fetchPoPage = ({ page, size, search, sort, direction, status, poType, poDateRange, deliveryDateRange }) => {
+  const params = { page: page - 1, size, sort, direction };
+  if (search) params.search = search;
+  if (status) params.status = status;
+  if (poType) params.poType = poType;
+  if (poDateRange && poDateRange.length === 2) {
+    params.poDateStart = poDateRange[0].format('YYYY-MM-DD');
+    params.poDateEnd = poDateRange[1].format('YYYY-MM-DD');
+  }
+  if (deliveryDateRange && deliveryDateRange.length === 2) {
+    params.deliveryDateStart = deliveryDateRange[0].format('YYYY-MM-DD');
+    params.deliveryDateEnd = deliveryDateRange[1].format('YYYY-MM-DD');
+  }
+  return searchPurchaseOrders(params);
+};
 
 const POList = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState([]);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
-  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [statusFilter, setStatusFilter] = useState(undefined);
-  const [poTypeFilter, setPoTypeFilter] = useState(null);
-  const [poDateRange, setPoDateRange] = useState(null);
-  const [deliveryDateRange, setDeliveryDateRange] = useState(null);
-  const [sortField, setSortField] = useState('id');
-  const [sortDirection, setSortDirection] = useState('desc');
+  // Deliver-to branch: a column on multi-branch, and the list follows the header switcher (X-Branch-Id)
+  const { isMultiBranch } = useBranch();
+  // Page, sort, search and filters live in the URL, so a refresh or the way back from a form keeps them;
+  // with no column sorter the list is newest first (id descending), as it always was.
+  const list = useServerList(fetchPoPage, PO_FILTERS, 'Failed to load purchase orders', PO_LIST_OPTIONS);
+  const { load: reload, sortOrderFor } = list;
 
   // Delete loading state
   const [deletingId, setDeletingId] = useState(null);
 
-  // View modal state
-  const [viewModalVisible, setViewModalVisible] = useState(false);
-  const [viewingPO, setViewingPO] = useState(null);
-  const [pendingAction, setPendingAction] = useState(null);
-
-  // Handle deep link from push notification (?viewId=X&action=approve)
+  // Deep link from a push notification (?viewId=X&action=approve): the PO opens on the first render,
+  // and the two parameters then leave the address (the list's own parameters stay).
   const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
+  const [deepLink] = useState(() => {
     const viewId = searchParams.get('viewId');
-    const action = searchParams.get('action');
-    if (viewId) {
-      setViewingPO({ id: parseInt(viewId) });
-      setViewModalVisible(true);
-      if (action) setPendingAction(action);
-      searchParams.delete('viewId');
-      searchParams.delete('action');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return viewId ? { id: parseInt(viewId), action: searchParams.get('action') } : null;
+  });
+  useEffect(() => {
+    if (!deepLink) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('viewId');
+      next.delete('action');
+      return next;
+    }, { replace: true });
+  }, [deepLink, setSearchParams]);
+
+  // View modal state
+  const [viewModalVisible, setViewModalVisible] = useState(!!deepLink);
+  // General PO → customer order mapping workspace
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [viewingPO, setViewingPO] = useState(deepLink ? { id: deepLink.id } : null);
+  const [pendingAction, setPendingAction] = useState(deepLink?.action || null);
 
   // History modal state
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -79,76 +102,6 @@ const POList = () => {
   const canView = hasPermission('purchase-orders', 'view');
   const canUpdate = hasPermission('purchase-orders', 'update');
   const canDelete = hasPermission('purchase-orders', 'delete');
-
-  // Fetch data using search API
-  const fetchData = useCallback(
-    async (page, pageSize, sort, direction) => {
-      setLoading(true);
-      try {
-        const params = {
-          page: (page || pagination.current) - 1,
-          size: pageSize || pagination.pageSize,
-          sort: sort || sortField,
-          direction: direction || sortDirection,
-        };
-
-        // Add search text
-        if (debouncedSearch) params.search = debouncedSearch;
-
-        // Add status filter
-        if (statusFilter) params.status = statusFilter;
-
-        // Add PO type filter
-        if (poTypeFilter) params.poType = poTypeFilter;
-
-        // Add PO date range
-        if (poDateRange && poDateRange.length === 2) {
-          params.poDateStart = poDateRange[0].format('YYYY-MM-DD');
-          params.poDateEnd = poDateRange[1].format('YYYY-MM-DD');
-        }
-
-        // Add delivery date range
-        if (deliveryDateRange && deliveryDateRange.length === 2) {
-          params.deliveryDateStart = deliveryDateRange[0].format('YYYY-MM-DD');
-          params.deliveryDateEnd = deliveryDateRange[1].format('YYYY-MM-DD');
-        }
-
-        const response = await searchPurchaseOrders(params);
-        setData(response.content || []);
-        setPagination((prev) => ({
-          ...prev,
-          current: page || prev.current,
-          pageSize: pageSize || prev.pageSize,
-          total: response.totalElements || 0,
-        }));
-      } catch {
-        message.error('Failed to load purchase orders');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]
-  );
-
-  // Re-fetch when any filter (including debounced search) changes
-  useEffect(() => {
-    fetchData(1, pagination.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]);
-
-  // Handle table change (pagination, sorting)
-  const handleTableChange = (pag, _filters, sorter) => {
-    const newSort = sorter.field || sortField;
-    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
-    setSortField(newSort);
-    setSortDirection(newDirection);
-    fetchData(pag.current, pag.pageSize, newSort, newDirection);
-  };
-
-  // Filter change handlers — just update state; useEffect triggers fetch
-  const handleStatusFilter = (value) => setStatusFilter(value);
-  const handlePoDateRangeChange = (dates) => setPoDateRange(dates);
-  const handleDeliveryDateRangeChange = (dates) => setDeliveryDateRange(dates);
 
   // View PO
   const handleView = useCallback((record) => {
@@ -160,7 +113,7 @@ const POList = () => {
   const handleStatusActionComplete = () => {
     setViewModalVisible(false);
     setViewingPO(null);
-    fetchData(pagination.current, pagination.pageSize);
+    reload();
   };
 
   const columns = useMemo(() => [
@@ -171,6 +124,7 @@ const POList = () => {
       fixed: 'left',
       width: 150,
       sorter: true,
+      sortOrder: sortOrderFor('poNumber'),
       render: (text, record) => (
         <RecordLink text={text} onClick={() => handleView(record)} />
       ),
@@ -181,6 +135,7 @@ const POList = () => {
       key: 'poDate',
       width: 120,
       sorter: true,
+      sortOrder: sortOrderFor('poDate'),
       render: (date) => formatDate(date),
     },
     {
@@ -191,6 +146,7 @@ const POList = () => {
       ellipsis: true,
       render: (text) => <Text strong>{text || '-'}</Text>,
     },
+    ...(isMultiBranch ? [{ title: 'Deliver To', dataIndex: 'deliveryBranchName', key: 'deliveryBranchName', width: 150, ellipsis: true, render: (v) => v || '—' }] : []),
     {
       title: 'PO Type',
       dataIndex: 'poType',
@@ -207,7 +163,15 @@ const POList = () => {
       key: 'deliveryDate',
       width: 120,
       sorter: true,
-      render: (date) => formatDate(date),
+      sortOrder: sortOrderFor('deliveryDate'),
+      // Shows the date the PO is actually tracking to; the original stays visible,
+      // struck through, so a revision is never mistaken for a data-entry change.
+      render: (date, record) => (record.revisedDeliveryDate ? (
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+          <span>{formatDate(record.revisedDeliveryDate)}<Tag color="warning" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>Revised</Tag></span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(date)}</span>
+        </div>
+      ) : formatDate(date)),
     },
     {
       title: 'Items',
@@ -223,6 +187,7 @@ const POList = () => {
       width: 140,
       align: 'right',
       sorter: true,
+      sortOrder: sortOrderFor('grandTotal'),
       render: (amount) => <CurrencyDisplay amount={amount} />,
     },
     {
@@ -259,7 +224,7 @@ const POList = () => {
             <ActionButton
               action="edit"
               size="small"
-              onClick={() => navigate(`/purchase-orders/edit/${record.id}`)}
+              onClick={() => navigate(`/purchase-orders/supplier-po/edit/${record.id}`)}
             />
           )}
           {record.status === PO_STATUS.DRAFT && canDelete && (
@@ -271,7 +236,7 @@ const POList = () => {
                 return deletePurchaseOrder(record.id)
                   .then(() => {
                     message.success(`${record.poNumber} deleted successfully`);
-                    fetchData(pagination.current, pagination.pageSize);
+                    reload();
                   })
                   .catch(() => message.error('Failed to delete purchase order'))
                   .finally(() => setDeletingId(null));
@@ -287,34 +252,45 @@ const POList = () => {
         </Space>
       ),
     },
-  ], [handleView, navigate, fetchData, pagination.current, pagination.pageSize, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, navigate, reload, sortOrderFor, deletingId, canView, canUpdate, canDelete, isMultiBranch, message]);
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Purchase Orders">
-        {hasPermission('purchase-orders', 'add') && (
-          <ActionButton
-            action="create"
-            text="New Purchase Order"
-            onClick={() => navigate('/purchase-orders/new')}
-          />
-        )}
+      <PageHeader title="Supplier PO">
+        <Space>
+          {canView && (
+            <ActionButton
+              action="custom"
+              icon={<LinkOutlined />}
+              text="Order Mapping"
+              tooltip="Link General POs to customer orders"
+              onClick={() => setMappingOpen(true)}
+            />
+          )}
+          {hasPermission('purchase-orders', 'add') && (
+            <ActionButton
+              action="create"
+              text="New Supplier PO"
+              onClick={() => navigate('/purchase-orders/supplier-po/new')}
+            />
+          )}
+        </Space>
       </PageHeader>
 
       <Card>
         <SearchFilterBar
-          searchText={searchText}
-          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchText={list.searchText}
+          onSearchChange={(e) => list.setSearchText(e.target.value)}
           searchPlaceholder="Search PO number, supplier..."
-          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          onRefresh={reload}
           filters={[
             {
               type: 'select',
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
               props: {
                 placeholder: 'Status',
-                value: statusFilter,
-                onChange: handleStatusFilter,
+                value: list.filters.status,
+                onChange: list.setFilter('status'),
                 options: Object.keys(PO_STATUS_CONFIG).map((s) => ({
                   label: getStatusLabel(s),
                   value: s,
@@ -326,8 +302,8 @@ const POList = () => {
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
               props: {
                 placeholder: 'PO Type',
-                value: poTypeFilter,
-                onChange: (val) => setPoTypeFilter(val),
+                value: list.filters.poType,
+                onChange: list.setFilter('poType'),
                 options: [
                   { value: 'General', label: 'General' },
                   { value: 'Regular', label: 'Regular' },
@@ -340,8 +316,8 @@ const POList = () => {
               span: { xs: 24, sm: 12, md: 6, lg: 5 },
               props: {
                 placeholder: ['PO Date From', 'PO Date To'],
-                value: poDateRange,
-                onChange: handlePoDateRangeChange,
+                value: list.filters.poDateRange,
+                onChange: list.setFilter('poDateRange'),
               },
             },
             {
@@ -349,8 +325,8 @@ const POList = () => {
               span: { xs: 24, sm: 12, md: 6, lg: 5 },
               props: {
                 placeholder: ['Delivery From', 'Delivery To'],
-                value: deliveryDateRange,
-                onChange: handleDeliveryDateRangeChange,
+                value: list.filters.deliveryDateRange,
+                onChange: list.setFilter('deliveryDateRange'),
               },
             },
           ]}
@@ -359,17 +335,17 @@ const POList = () => {
 
         <Table
           columns={columns}
-          dataSource={data}
-          loading={loading}
+          dataSource={list.rows}
+          loading={list.loading}
           rowKey="id"
           scroll={{ x: 1200 }}
-          onChange={handleTableChange}
-          pagination={getTablePagination(pagination, 'purchase orders')}
+          onChange={list.onTableChange}
+          pagination={getTablePagination({ ...list.pagination, total: list.total }, 'supplier PO')}
           locale={{
             emptyText: (
               <EmptyState
-                title="No Purchase Orders"
-                description="No purchase orders found matching your criteria."
+                title="No Supplier PO"
+                description="No supplier PO found matching your criteria."
               />
             ),
           }}
@@ -387,7 +363,7 @@ const POList = () => {
           setPendingAction(null);
         }}
         onStatusChange={handleStatusActionComplete}
-        onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+        onRefresh={reload}
       />
 
       {/* PO Version History Modal */}
@@ -397,6 +373,8 @@ const POList = () => {
         poId={historyPO?.id}
         poNumber={historyPO?.poNumber}
       />
+
+      <PoOrderMappingWorkspace open={mappingOpen} onClose={() => setMappingOpen(false)} />
     </div>
   );
 };

@@ -1,0 +1,58 @@
+/**
+ * Carton packing REST client (/api/v1/packing). Every entry comes back through
+ * decorateEntry, so the screens read the same derived totals and issues the mock
+ * used to hand them.
+ */
+import axiosInstance from '../core/axiosInstance';
+import { decorateEntry } from '../../utils/packingEntryIssues';
+
+const BASE = '/packing';
+
+/** Screens read `e.message`; axiosInstance puts the backend's text on `errorMessage`. */
+const call = (request) =>
+  request.then((res) => res.data).catch((e) => {
+    e.message = e.errorMessage || e.message;
+    throw e;
+  });
+
+/**
+ * Groups are rebuilt server-side: new rows carry `tmp-…` ids and derived fields are recomputed.
+ * `endCustomer` is never sent — the business has no end-customer concept (the column goes in
+ * the API phase), and a value loaded from an older entry is cleared on its next save.
+ */
+const toPayload = ({ groups = [], ...rest }) => ({
+  ...rest,
+  groups: groups.map(({
+    id: _id, cartonCount: _c, piecesPerCarton: _p, totalPieces: _t, cbm: _cbm, endCustomer: _ec, ...g
+  }) => g),
+});
+
+/** `config` for a caller that degrades on its own (the export-docs mirror): `silent`, `timeout`. */
+export const searchPackingEntries = async (params = {}, config = {}) => {
+  const page = await call(axiosInstance.get(`${BASE}/entries`, { params, ...config }));
+  return { ...page, content: (page.content || []).map(decorateEntry) };
+};
+
+export const getPackingEntry = async (id) =>
+  decorateEntry(await call(axiosInstance.get(`${BASE}/entries/${id}`)));
+
+export const createPackingEntry = async (payload) =>
+  decorateEntry(await call(axiosInstance.post(`${BASE}/entries`, toPayload(payload))));
+
+export const updatePackingEntry = async (id, payload) =>
+  decorateEntry(await call(axiosInstance.put(`${BASE}/entries/${id}`, toPayload(payload))));
+
+const STATUS_COMMAND = { COMPLETED: 'complete', OPEN: 'reopen' };
+
+/** Completes (COMPLETED) or reopens (OPEN) an entry by its own command, sent the version the screen holds. */
+export const setPackingEntryStatus = async (id, status, version) => {
+  const command = STATUS_COMMAND[status];
+  if (!command) throw new Error(`A packing entry is completed or reopened, not set to ${status}`);
+  return decorateEntry(await call(axiosInstance.post(`${BASE}/entries/${id}/${command}`, { version })));
+};
+
+export const deletePackingEntry = (id) => call(axiosInstance.delete(`${BASE}/entries/${id}`));
+
+/** Cartons and pieces packed on `date` (YYYY-MM-DD), one row per order/style. */
+export const getDailyPackingSummary = (date) =>
+  call(axiosInstance.get(`${BASE}/daily-summary`, { params: { date } }));

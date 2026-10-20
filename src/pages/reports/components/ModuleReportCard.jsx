@@ -1,15 +1,23 @@
 import { memo } from 'react';
-import { Card, Tag, Button, Typography } from 'antd';
-import { getModuleColor, getModuleIcon } from '../../../utils/reportConstants';
+import { Card, Tag, Button, Typography, Space, Tooltip } from 'antd';
+import { EditOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
+import { getModuleColor, getModuleIcon, getModuleLabel } from '../../../utils/reportConstants';
+import PermissionGuard from '../../../components/PermissionGuard';
+import { DeleteConfirm } from '../../../components/buttons';
 
 const { Paragraph } = Typography;
 
 // Re-export for backward compatibility
 export { getModuleColor };
 
-const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
-  const Icon = getModuleIcon(report.module);
-  const color = getModuleColor(report.module);
+const ModuleReportCard = memo(function ModuleReportCard({
+  report, showOwner, onOpen, onEdit, onDelete,
+}) {
+  // moduleName, not module: that is the field the API sends (ReportDefinitionResponse).
+  // Reading `report.module` made every card fall through to the default icon and colour,
+  // hid the module tag entirely, and left the left-hand nav filtering on undefined.
+  const Icon = getModuleIcon(report.moduleName);
+  const color = getModuleColor(report.moduleName);
 
   // Map Ant Design tag color names to CSS color values for the accent bar
   const accentColorMap = {
@@ -65,16 +73,25 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
             flexShrink: 0,
           }}
         >
+          {/* getModuleIcon is a lookup into a module-level table, so Icon is always
+              one of a fixed set of stable components and never remounts. The rule
+              cannot see through the call and assumes one is built per render. */}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <Icon />
         </div>
         <span style={{ fontWeight: 600, fontSize: 15 }}>{report.displayName}</span>
       </div>
 
-      {report.module && (
-        <Tag color={color} style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-          {report.module.replace(/_/g, ' ')}
-        </Tag>
-      )}
+      <Space size={4} wrap style={{ marginBottom: 8 }}>
+        {report.moduleName && (
+          <Tag color={color}>{getModuleLabel(report.moduleName)}</Tag>
+        )}
+        {showOwner && (
+          <Tag icon={<TeamOutlined />} color={report.ownerRoleName ? 'default' : 'warning'}>
+            {report.ownerRoleName || 'No role'}
+          </Tag>
+        )}
+      </Space>
 
       <Paragraph
         type="secondary"
@@ -84,9 +101,38 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
         {report.description || 'No description available.'}
       </Paragraph>
 
-      <Button type="primary" block onClick={() => onOpen(report.id)}>
-        Open Report
-      </Button>
+      <Space.Compact block>
+        {/* flex:1 rather than `block` — `block` forces 100% width inside a compact
+            group and squeezes the edit/delete buttons out of view entirely. */}
+        <Button type="primary" style={{ flex: 1 }} onClick={() => onOpen(report.id)}>
+          Open Report
+        </Button>
+        {onEdit && (
+          <PermissionGuard module="reports" operation="update">
+            <Tooltip title="Edit report">
+              <Button icon={<EditOutlined />} onClick={() => onEdit(report)} />
+            </Tooltip>
+          </PermissionGuard>
+        )}
+        {onDelete && (
+          <PermissionGuard module="reports" operation="delete">
+            <DeleteConfirm
+              title="Delete Report"
+              recordLabel={report.displayName}
+              // Spelled out because it used to be untrue: deleting a report cascaded onto
+              // rpt_saved_reports and destroyed every user's saved configurations built on
+              // it, while the dialog said only "are you sure?".
+              description={`Remove "${report.displayName}" from the reports list? `
+                + 'Saved configurations built on it are kept.'}
+              onConfirm={() => onDelete(report)}
+            >
+              {/* Native title rather than <Tooltip>: nesting Tooltip inside Popconfirm
+                  interferes with the trigger that opens the confirmation. */}
+              <Button danger icon={<DeleteOutlined />} title="Delete report" />
+            </DeleteConfirm>
+          </PermissionGuard>
+        )}
+      </Space.Compact>
     </Card>
   );
 });

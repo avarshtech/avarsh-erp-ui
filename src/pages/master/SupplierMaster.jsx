@@ -35,15 +35,10 @@ import {
 } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
+import { useMasterAssistant } from './genie/masterGenieContext';
+import { EMAIL_REGEX, GSTIN_REGEX, IFSC_REGEX, PAN_REGEX, SWIFT_REGEX } from '../../utils/partyValidation';
 
 const { Text, Title } = Typography;
-
-// Validation patterns
-const PAN_REGEX = /^[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z]$/;
-const GSTIN_REGEX = /^[0-9]{2}[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-const SWIFT_REGEX = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 
 const SupplierMaster = () => {
   const { message, modal } = App.useApp();
@@ -97,7 +92,7 @@ const SupplierMaster = () => {
       }
       setSuppliers(data);
       setData('suppliers', data);
-    } catch (error) {
+    } catch {
       message.error('Failed to load suppliers');
       setSuppliers([]);
     } finally {
@@ -202,7 +197,7 @@ const SupplierMaster = () => {
     try {
       const values = await form.validateFields();
 
-      // Additional custom validations
+      // A supplier supplies material; job workers are in the Vendor master.
       if (!values.suppliesFabric && !values.suppliesTrims) {
         message.error('At least one supply product (Fabric or Trims) must be selected');
         return;
@@ -261,12 +256,12 @@ const SupplierMaster = () => {
       // Invalidate cache and refresh supplier list to ensure table reflects latest data
       try {
         invalidateCache && invalidateCache('suppliers');
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await fetchSuppliers(true);
-      } catch (e) {
+      } catch {
         // ignore - fetchSuppliers already handles errors
       }
 
@@ -408,6 +403,14 @@ const SupplierMaster = () => {
       ),
     },
   ];
+
+  // Laya AI on the Master Data page (see ./genie): the list, the search and the supplier form.
+  useMasterAssistant({
+    rows: filteredSuppliers, columns, searchText, search: setSearchText,
+    openNew: canAdd ? handleAdd : undefined, openRecord: handleEdit, close: doCloseSupplierModal,
+    isOpen: modalVisible, recordId: editingSupplier?.id ?? null,
+    form, markDirty: () => setSupplierUnsaved(true), refresh: () => fetchSuppliers(true),
+  });
 
   return (
     <Card
@@ -611,7 +614,7 @@ const SupplierMaster = () => {
           onValuesChange={() => setSupplierUnsaved(true)}
         >
           {/* --- Supplier Information --- */}
-          <Divider orientation="left" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Supplier Information</Divider>
+          <Divider titlePlacement="start" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Supplier Information</Divider>
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item
@@ -758,7 +761,7 @@ const SupplierMaster = () => {
           </Row>
 
           {/* --- Tax & Compliance --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>Tax & Compliance</Divider>
+          <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>Tax & Compliance</Divider>
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item
@@ -803,8 +806,20 @@ const SupplierMaster = () => {
             </Col>
           </Row>
 
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="paymentTerms"
+                label="Payment Terms"
+                tooltip="Printed on the bill passing voucher accounts key into Tally."
+              >
+                <Input placeholder="e.g., 45 Days Credit" maxLength={100} />
+              </Form.Item>
+            </Col>
+          </Row>
+
           {/* --- Bank Details --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
+          <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>
             <BankOutlined style={{ marginRight: 6 }} />Bank Details
           </Divider>
           <Row gutter={16}>

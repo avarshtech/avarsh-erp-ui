@@ -9,6 +9,7 @@ import ReportFilterBar from './components/ReportFilterBar';
 import ReportResultsTable from './components/ReportResultsTable';
 import ReportExportBar from './components/ReportExportBar';
 import SaveReportDrawer from './components/SaveReportDrawer';
+import { sourceHasCurrency } from './reportCurrency';
 import {
   getReportDefinition,
   executeReport,
@@ -16,6 +17,7 @@ import {
   getSavedReports,
 } from '../../services/core/reportService';
 import { getModuleColor } from '../../utils/reportConstants';
+import { reportFiltersOf, toServerFilters } from './reportFilters';
 
 const ReportBuilderPage = () => {
   const { id } = useParams();
@@ -23,6 +25,8 @@ const ReportBuilderPage = () => {
   const { message } = App.useApp();
 
   const [definition, setDefinition] = useState(null);
+  // Designer reports keep their filters on their fields; raw definitions in definition.filters
+  const reportFilters = useMemo(() => reportFiltersOf(definition), [definition]);
   const [loading, setLoading] = useState(true);
   const [executing, setExecuting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -89,7 +93,7 @@ const ReportBuilderPage = () => {
       const res = await executeReport({
         reportDefId: Number(id),
         selectedFieldCodes: selectedFields,
-        filters: filterValues,
+        filters: toServerFilters(filterValues, reportFilters),
         sortColumn: sorter?.field || null,
         sortDirection: sorter?.direction || null,
         page: page - 1,
@@ -103,7 +107,7 @@ const ReportBuilderPage = () => {
     } finally {
       setExecuting(false);
     }
-  }, [id, selectedFields, filterValues, sortConfig]);
+  }, [id, selectedFields, filterValues, reportFilters, sortConfig]);
 
   const handleTableChange = useCallback((pag, _filters, sorter) => {
     const newSort = sorter?.field
@@ -119,7 +123,7 @@ const ReportBuilderPage = () => {
       const blob = await exportReport({
         reportDefId: Number(id),
         selectedFieldCodes: selectedFields,
-        filters: filterValues,
+        filters: toServerFilters(filterValues, reportFilters),
         sortColumn: sortConfig?.field || null,
         sortDirection: sortConfig?.direction || null,
         format,
@@ -139,7 +143,7 @@ const ReportBuilderPage = () => {
     } finally {
       setExporting(false);
     }
-  }, [id, selectedFields, filterValues, sortConfig, definition?.displayName, message]);
+  }, [id, selectedFields, filterValues, reportFilters, sortConfig, definition?.displayName, message]);
 
   // Steps indicator
   const currentStep = useMemo(() => {
@@ -153,8 +157,9 @@ const ReportBuilderPage = () => {
   // Breadcrumb
   const breadcrumbItems = useMemo(() => {
     const items = [];
-    if (definition?.module) {
-      items.push(definition.module.replace(/_/g, ' '));
+    // moduleName, not module: the API's field name. See ModuleReportCard.
+    if (definition?.moduleName) {
+      items.push(definition.moduleName.replace(/_/g, ' '));
     }
     items.push(definition?.displayName || 'Report');
     return items;
@@ -191,8 +196,8 @@ const ReportBuilderPage = () => {
         title={definition?.displayName || 'Report'}
         subtitle={definition?.description}
         backPath="/reports/list"
-        status={definition?.module
-          ? <Tag color={getModuleColor(definition.module)} style={{ fontSize: 13 }}>{definition.module.replace(/_/g, ' ')}</Tag>
+        status={definition?.moduleName
+          ? <Tag color={getModuleColor(definition.moduleName)} style={{ fontSize: 13 }}>{definition.moduleName.replace(/_/g, ' ')}</Tag>
           : undefined
         }
       />
@@ -240,7 +245,7 @@ const ReportBuilderPage = () => {
                 </Col>
                 <Col xs={24} md={16}>
                   <ReportFilterBar
-                    filters={definition?.filters || []}
+                    filters={reportFilters}
                     values={filterValues}
                     onChange={handleFilterChange}
                     onClear={handleClearFilters}
@@ -271,7 +276,7 @@ const ReportBuilderPage = () => {
             )}
             {hasResults && (
               <Tag color="var(--primary-color)" style={{ fontSize: 13, padding: '2px 10px' }}>
-                {pagination.total.toLocaleString()} records
+                {pagination.total.toLocaleString('en-IN')} records
               </Tag>
             )}
           </Space>
@@ -288,6 +293,7 @@ const ReportBuilderPage = () => {
         loading={executing}
         pagination={pagination}
         onTableChange={handleTableChange}
+        sourceHasCurrency={sourceHasCurrency(definition)}
       />
 
       <SaveReportDrawer

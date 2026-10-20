@@ -1,0 +1,62 @@
+/** Work Order (Sewing PO) API — real Spring Boot endpoints with mock fallback. */
+import axiosInstance from '../../core/axiosInstance';
+import { USE_MOCK_PRODUCTION_DATA } from './productionEnv';
+import * as mockApi from './mockApi';
+import { sendProductionPoCommand } from './productionPoCommand';
+
+const BASE = '/work-order';
+
+export const listWorkOrders = async (params = {}) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.listWorkOrders(params);
+  const { data } = await axiosInstance.get(BASE, { params });
+  return data;
+};
+
+export const getWorkOrder = async (id) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.getWorkOrder(id);
+  const { data } = await axiosInstance.get(`${BASE}/${id}`);
+  return data;
+};
+
+export const createWorkOrder = async (payload) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.createWorkOrder(payload);
+  const { data } = await axiosInstance.post(BASE, payload);
+  return data;
+};
+
+export const updateWorkOrder = async (id, payload) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.updateWorkOrder(id, payload);
+  const { data } = await axiosInstance.put(`${BASE}/${id}`, payload);
+  return data;
+};
+
+/** Submit, refer back or cancel: `payload` carries the Work Order's current `version` and the `reason`. */
+export const changeWorkOrderStatus = async (id, action, payload = {}) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.changeWorkOrderStatus(id, action, payload);
+  return sendProductionPoCommand(BASE, id, action, payload);
+};
+
+/** Everything the Work Order print sheet shows — order details, fabrics, size grid, accessories. */
+export const getWorkOrderPrint = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/${id}/print`);
+  return data;
+};
+
+export const getApprovedWorkOrders = async (orderId) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.getApprovedWorkOrders(orderId);
+  const { data } = await axiosInstance.get(`${BASE}/approved`, { params: { orderId } });
+  return data || [];
+};
+
+/** The order's Cut Panel / Garment processes with no job-work PO raised yet; a Work Order waits for them. */
+export const getWorkOrderJobWorkGaps = async (orderId) => {
+  if (USE_MOCK_PRODUCTION_DATA) return [];
+  const { data } = await axiosInstance.get(`${BASE}/job-work-gaps`, { params: { orderId } });
+  return data || [];
+};
+
+export const getWorkOrderCoverage = async (orderId, excludeId) => {
+  if (USE_MOCK_PRODUCTION_DATA) return mockApi.getOrderCoverage('WORK_ORDER', orderId, excludeId);
+  const { data } = await axiosInstance.get(`${BASE}/coverage`, { params: { orderId, excludeId } });
+  return data;
+};

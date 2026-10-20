@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
+import { Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getAllPayrollRuns } from '../../../services/hr/payrollService';
 import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(PAYROLL_STATUS.map((s) => [s.value, s]));
 
@@ -14,11 +16,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const PayrollList = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -32,11 +30,11 @@ const PayrollList = () => {
       const result = await getAllPayrollRuns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load payroll runs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -54,13 +52,13 @@ const PayrollList = () => {
         key: 'monthYear',
         width: 140,
         render: (_, r) => `${MONTH_NAMES[(r.month || 1) - 1]} ${r.year}`,
-        sorter: (a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month),
+        sorter: thenById((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month)),
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
       },
       {
@@ -76,7 +74,7 @@ const PayrollList = () => {
         key: 'totalGross',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Total Net',
@@ -84,7 +82,7 @@ const PayrollList = () => {
         key: 'totalNet',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',
@@ -107,7 +105,7 @@ const PayrollList = () => {
             icon={<EyeOutlined />}
             onClick={(e) => { e.stopPropagation(); navigate(`/hr/payroll/${r.id}`); }}
           >
-            View
+            {['DRAFT', 'PROCESSED'].includes(r.status) ? 'Resume' : 'View'}
           </Button>
         ),
       },

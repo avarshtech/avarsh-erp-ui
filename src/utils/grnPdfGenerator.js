@@ -128,8 +128,8 @@ const buildRows = (grn, poLineItemsByPli) => {
 
     return {
       sl: idx + 1,
-      itemCode: li.itemCode || poLi.itemCode || '',
-      description: li.description || poLi.description || poLi.itemName || '',
+      itemCode: li.variantCode || poLi.variantCode || '',
+      description: li.variantName || poLi.variantName || li.description || poLi.description || '',
       color: li.color || '',
       size: li.size || '',
       hsn,
@@ -719,7 +719,9 @@ export const generateGRNPdf = async (grnData, options = {}) => {
     });
 
     // Determine tax regime from PO
-    const isIgst = Boolean(po?.isIgstApplicable || po?.igstApplicable);
+    // The PO from the API has no IGST flag: an inter-state PO is one whose lines carry IGST (as POView decides).
+    const isIgst = Boolean(po?.isIgstApplicable || po?.igstApplicable
+      || (po?.items || po?.lineItems || []).some((li) => parseFloat(li.igst || li.igstPercent || 0) > 0));
 
     const rows = buildRows(grnData, poLineItemsByPli);
     const totals = computeTotals(rows, isIgst);

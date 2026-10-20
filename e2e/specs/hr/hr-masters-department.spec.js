@@ -3,7 +3,7 @@
  *
  * What this tests:
  *   - Department list page loads at /hr/masters when Departments is selected in left nav
- *   - Create a new department (required fields: Department Code, Department Name, Factory)
+ *   - Create a new department (required fields: Department Code, Department Name, Unit)
  *   - Edit an existing department (modify name, verify update succeeds)
  *   - Toggle active/inactive status
  *   - Form validation — required field errors shown when saved empty
@@ -11,8 +11,8 @@
  *   - Search filters the department table
  *
  * Prerequisites:
- *   - Backend running with /api/v1/hr/departments and /api/v1/factories/active endpoints
- *   - At least one active factory must exist (Department requires a factory selection)
+ *   - Backend running with /api/v1/hr/departments and /api/v1/units/active endpoints
+ *   - At least one active unit must exist (Department requires a unit selection)
  *   - Authenticated session (global-setup.js saves e2e/.auth/user.json)
  *   - User has hr-masters add/update/delete permissions (superadmin role)
  */
@@ -93,8 +93,8 @@ test.describe('HR Masters — Departments', () => {
     await antFormFill(page, 'Department Code', deptCode);
     await antFormFill(page, 'Department Name', deptName);
 
-    // Select factory — pick the first available option
-    await antFormSelect(page, 'Factory', null, { first: true });
+    // Select unit — pick the first available option
+    await antFormSelect(page, 'Unit', null, { first: true });
 
     // Save and wait for POST to departments endpoint
     const [saveResp] = await Promise.all([
@@ -102,7 +102,7 @@ test.describe('HR Masters — Departments', () => {
         (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
 
     expect(saveResp.status()).toBeGreaterThanOrEqual(200);
@@ -124,12 +124,12 @@ test.describe('HR Masters — Departments', () => {
     await page.getByRole('heading', { name: 'New Department' }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Submit with no fields filled
-    await page.getByRole('button', { name: /^Save$/i }).click();
+    await page.getByRole('button', { name: /^(save\s+)?save$/i }).click();
 
     // Inline validation messages for all required fields
     await expect(page.getByText(/Please enter a department code/i)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText(/Please enter a department name/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/Please select a factory/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Please select a unit/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('edit existing department — modify name and save', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('HR Masters — Departments', () => {
     await page.getByRole('heading', { name: /Edit Department|View Department/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Check edit is available
-    const saveBtn = page.getByRole('button', { name: /^Save$/i });
+    const saveBtn = page.getByRole('button', { name: /^(save\s+)?save$/i });
     const isReadOnly = await saveBtn.isHidden().catch(() => true);
     test.skip(isReadOnly, 'Department form is read-only for this user');
 
@@ -184,14 +184,14 @@ test.describe('HR Masters — Departments', () => {
 
     await antFormFill(page, 'Department Code', `DS-${stamp}`);
     await antFormFill(page, 'Department Name', `E2E Status Dept ${stamp}`);
-    await antFormSelect(page, 'Factory', null, { first: true });
+    await antFormSelect(page, 'Unit', null, { first: true });
 
     const [createResp] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(createResp.status()).toBeGreaterThanOrEqual(200);
     expect(createResp.status()).toBeLessThan(300);
@@ -204,9 +204,18 @@ test.describe('HR Masters — Departments', () => {
 
     await page.getByRole('heading', { name: /Edit Department/i }).waitFor({ state: 'visible', timeout: 8000 });
 
-    // Toggle the Active switch OFF
+    // Toggle the Active switch OFF. The form ignores changes for a moment after it opens, so a flip in
+    // that moment leaves Save disabled: flip back and forth (ending OFF) until the change registers.
     const activeSwitch = page.locator('.ant-form-item').filter({ hasText: 'Active' }).first().locator('.ant-switch');
+    const save = page.getByRole('button', { name: /^(save\s+)?save$/i });
     await activeSwitch.click();
+    await expect(async () => {
+      if (await save.isEnabled()) return;
+      await activeSwitch.click();
+      await activeSwitch.click();
+      await expect(save).toBeEnabled({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+    await expect(activeSwitch).toHaveAttribute('aria-checked', 'false');
 
     // Save the status change
     const [updateResp] = await Promise.all([
@@ -214,7 +223,7 @@ test.describe('HR Masters — Departments', () => {
         (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'PUT',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(updateResp.status()).toBeGreaterThanOrEqual(200);
     expect(updateResp.status()).toBeLessThan(300);
@@ -238,14 +247,14 @@ test.describe('HR Masters — Departments', () => {
 
     await antFormFill(page, 'Department Code', `DD-${stamp}`);
     await antFormFill(page, 'Department Name', `E2E Delete Dept ${stamp}`);
-    await antFormSelect(page, 'Factory', null, { first: true });
+    await antFormSelect(page, 'Unit', null, { first: true });
 
     const [createResp] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(createResp.status()).toBeGreaterThanOrEqual(200);
     expect(createResp.status()).toBeLessThan(300);
@@ -262,13 +271,14 @@ test.describe('HR Masters — Departments', () => {
     await page.getByRole('button', { name: /Delete/i }).click();
 
     // Confirm via Ant Design modal
-    await antModalConfirm(page, { buttonText: /Delete/i });
-
-    // Wait for DELETE API call
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'DELETE',
-      { timeout: 20000 }
-    );
+    // Listen for the DELETE before confirming: a fast response would otherwise be gone already
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/v1/hr/departments') && r.request().method() === 'DELETE',
+        { timeout: 20000 }
+      ),
+      antModalConfirm(page, { buttonText: /Delete/i }),
+    ]);
 
     // Success toast
     await antMessageContains(page, /deleted|success/i);

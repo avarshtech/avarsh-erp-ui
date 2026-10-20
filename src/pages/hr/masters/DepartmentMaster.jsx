@@ -3,7 +3,8 @@ import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { getAllDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 
@@ -14,6 +15,8 @@ const MODULE_ID = 'hr-masters';
 const DepartmentMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -25,22 +28,22 @@ const DepartmentMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
 
-  const factoryOptions = useMemo(() =>
-    factories.map(f => ({ value: f.id, label: `${f.factoryCode} - ${f.factoryName}` })),
-  [factories]);
+  const unitOptions = useMemo(() =>
+    units.map(f => ({ value: f.id, label: f.unitName })),
+  [units]);
 
-  const factoryMap = useMemo(() => {
+  const unitMap = useMemo(() => {
     const map = {};
-    factories.forEach(f => { map[f.id] = f.factoryName; });
+    units.forEach(f => { map[f.id] = f.unitName; });
     return map;
-  }, [factories]);
+  }, [units]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -50,41 +53,38 @@ const DepartmentMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load departments');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchFactories = useCallback(async () => {
+  const fetchUnits = useCallback(async () => {
     try {
-      const result = await getActiveFactories();
+      const result = await getActiveUnits(activeBranchId || undefined);
       const list = Array.isArray(result) ? result : (result?.data || []);
-      setFactories(list);
+      setUnits(list);
     } catch {
-      // Silent — factory dropdown will just be empty
+      // Silent — unit dropdown will just be empty
     }
-  }, []);
+  }, [activeBranchId]);
 
-  useEffect(() => { fetchData(); fetchFactories(); }, [fetchData, fetchFactories]);
+  useEffect(() => { fetchData(); fetchUnits(); }, [fetchData, fetchUnits]);
 
   const columns = [
     {
-      title: 'Code',
-      dataIndex: 'code',
-      width: 100,
-      sorter: (a, b) => (a.code || '').localeCompare(b.code || ''),
+      // The unit leads: a department's name only identifies it inside its unit,
+      // so "Sewing" on its own does not say which department this is.
+      title: 'Unit',
+      dataIndex: 'unitId',
+      width: 180,
+      sorter: (a, b) => (unitMap[a.unitId] || '').localeCompare(unitMap[b.unitId] || ''),
+      render: (val) => unitMap[val] || '—',
     },
     {
-      title: 'Name',
+      title: 'Department',
       dataIndex: 'name',
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
-    },
-    {
-      title: 'Factory',
-      dataIndex: 'factoryId',
-      width: 140,
-      render: (val) => factoryMap[val] || '—',
     },
     {
       title: 'Status',
@@ -178,7 +178,6 @@ const DepartmentMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.code?.toLowerCase().includes(lower) ||
         item.name?.toLowerCase().includes(lower)
       )
     );
@@ -187,7 +186,7 @@ const DepartmentMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Departments"
       subtitle="Organization"
       addLabel="Add Department"
@@ -221,7 +220,7 @@ const DepartmentMaster = ({ onDirtyChange }) => {
                 {selectedId ? (isReadOnly ? 'View Department' : 'Edit Department') : 'New Department'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the department details below' : 'Create a new department under a factory'}
+                {selectedId ? 'Modify the department details below' : 'Create a new department under a unit'}
               </Text>
             </div>
             <Space>
@@ -258,14 +257,18 @@ const DepartmentMaster = ({ onDirtyChange }) => {
               disabled={isReadOnly}
               onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
-              <Form.Item name="code" label="Department Code" rules={[{ required: true, message: 'Please enter a department code' }]}>
-                <Input placeholder="e.g. PROD" maxLength={20} />
+              {/* Unit first: a department is created inside a unit, so the form reads
+                  in the order the thing is built. */}
+              <Form.Item
+                name="unitId"
+                label="Unit"
+                extra="The department belongs to this unit. The same name may be used again in another unit."
+                rules={[{ required: true, message: 'Please select the unit this department belongs to' }]}
+              >
+                <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" />
               </Form.Item>
               <Form.Item name="name" label="Department Name" rules={[{ required: true, message: 'Please enter a department name' }]}>
-                <Input placeholder="e.g. Production" maxLength={200} />
-              </Form.Item>
-              <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
-                <Select placeholder="Select factory" options={factoryOptions} showSearch optionFilterProp="label" allowClear />
+                <Input placeholder="e.g. Finishing" maxLength={200} />
               </Form.Item>
               <Form.Item name="isActive" label="Active" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />

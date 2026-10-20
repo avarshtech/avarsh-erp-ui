@@ -1,0 +1,129 @@
+import { useMemo, useState } from 'react';
+import { Button, Result, Skeleton } from 'antd';
+import { HistoryOutlined, PrinterOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
+import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useActionRunner from '../../../hooks/useActionRunner';
+import useEditParam from '../../../hooks/useEditParam';
+import { useBranch } from '../../../context/BranchContext';
+import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
+import { validateCpp } from '../../../utils/cutPanelPoCalc';
+import { revisionChanges, ISSUED_FIELDS, REVISION_FIELDS } from '../../../utils/cutPanelPoRevision';
+import { refetchCppLines } from '../../../utils/jobWorkRefetch';
+import { getCppAudit } from '../../../services/po/cutPanelPo/cutPanelPoService';
+import JobWorkStatusBanner from '../jobWork/JobWorkStatusBanner';
+import JobWorkPoHero from '../jobWork/JobWorkPoHero';
+import JobWorkApprovalPanel from '../jobWork/JobWorkApprovalPanel';
+import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
+import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
+import useJobWorkMasters from '../jobWork/useJobWorkMasters';
+import useJobWorkRefetch from '../jobWork/useJobWorkRefetch';
+import useJobWorkUnits from '../jobWork/useJobWorkUnits';
+import useCutPanelPo from './useCutPanelPo';
+import useCppContext from './useCppContext';
+import useCppView from './useCppView';
+import useCppHandlers from './useCppHandlers';
+import useCppRequirementLookup from './useCppRequirementLookup';
+import useCppDraftActions from './useCppDraftActions';
+import useCppFlowActions from './useCppFlowActions';
+import { CPP_DIALOGS } from './cppDialogs';
+import CppHeaderSection from './CppHeaderSection';
+import CppRequirementSection from './CppRequirementSection';
+import CppVendorSection from './CppVendorSection';
+import CppGridSection from './CppGridSection';
+import CppDeliverySection from './CppDeliverySection';
+import CppAdvisories from './CppAdvisories';
+import CppRevisionHistory from './CppRevisionHistory';
+import CppActionBar from './CppActionBar';
+
+const LIST = `${JOB_WORK_PO_PATH.CPP}/list`;
+const pick = (src, fields) => Object.fromEntries(fields.map((f) => [f, src[f]]));
+const AMENDABLE = new Set(REVISION_FIELDS);
+
+/**
+ * Cut Panel PO — one scrolling screen in the Supplier PO view's look (a hero, titled sections) and a sticky action bar
+ * (PRD §18.1); no wizard. Everything is the API: the PO, its ledger and approval (the approval engine), the
+ * requirements, vendors, processes, payment terms, branches and units.
+ */
+const CutPanelPoForm = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const po = useCutPanelPo(id);
+  const { clearDirty } = useUnsavedChanges(po.dirty);
+  const { allowedBranches, activeBranch, defaultBranch } = useBranch();
+  const [editing, setEditing] = useEditParam();
+  const baseView = useCppView(po, null, editing);
+  const working = baseView?.working ?? null;
+  const masters = useJobWorkMasters('Cut Panel', { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery || baseView?.edit.terms) });
+  const units = useJobWorkUnits(po.doc?.branchId ?? (activeBranch || defaultBranch)?.id, { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery) });
+  const ctx = useCppContext(working, masters.jobWorkers);
+  const view = useCppView(po, ctx, editing);
+  const checks = useMemo(() => (ctx && working ? validateCpp(working, ctx) : null), [working, ctx]);
+  const lookup = useCppRequirementLookup({ enabled: Boolean(view?.edit.draft), label: po.doc?.process?.label, refresh: po.doc?.lines.length });
+  const runner = useActionRunner(id ?? 'new');
+  const draft = useCppDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch, liveVendor: ctx?.liveVendor });
+  const flow = useCppFlowActions({ ...po, clearDirty, runner });
+  const h = useCppHandlers({ ...po, view, masters });
+  const refetch = useJobWorkRefetch({ lines: po.doc?.lines, ctx, dispatch: po.dispatch, rebuild: refetchCppLines, enabled: Boolean(view?.edit.draft) });
+  const [dialog, setDialog] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  if (po.loading) return <Skeleton active paragraph={{ rows: 14 }} />;
+  if (!po.doc) return <Result status="404" title="Cut Panel PO not found" extra={<Button onClick={() => navigate(LIST)}>Back to list</Button>} />;
+  const { doc, dispatch } = po;
+  // While an amendment is open, its fields go to the amendment, never to the live PO.
+  const patch = (p) => dispatch({ type: po.rev && Object.keys(p).every((k) => AMENDABLE.has(k)) ? 'COMMERCIAL' : 'PATCH', patch: p });
+  const on = {
+    ...flow, edit: () => setEditing(true), save: draft.save, remove: draft.remove,
+    submit: () => (checks?.blocking.length ? runner.setErrors(checks.blocking) : draft.submit()),
+    // Nothing changed: Save changes just leaves edit mode; saved, it leaves it too
+    saveDetails: async () => {
+      if (!po.docDirty || await flow.saveDetails(pick(doc, [...ISSUED_FIELDS, 'instructions']))) setEditing(false);
+    },
+  };
+
+  return (
+    <div className="animate-fade-in-up">
+      <JobWorkPoHero
+        doc={working} typeLabel="Cut Panel PO" total={view.value.rounded} totalLabel="PO value" dueDate={working.requiredDeliveryDate}
+        subtitle="Job work on cut panels against a submitted Cut Panel Requirement — who does it, how much, at what rate"
+        onBack={() => navigate(LIST)}
+        actions={doc.id && (
+          <>
+            {doc.status !== 'DRAFT' && <Button icon={<PrinterOutlined />} loading={h.printing} onClick={h.print}>Print vendor copy</Button>}
+            <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>
+          </>
+        )}
+      />
+      <JobWorkStatusBanner doc={doc} flags={view.flags} refetch={refetch} />
+      <CppHeaderSection doc={working} editable={view.edit.draft} branches={allowedBranches} unit={activeBranch || defaultBranch} onPatch={patch} />
+      <CppRequirementSection
+        doc={working} editable={view.edit.draft} lookup={lookup} selection={po.selection} adding={h.adding}
+        onProcess={h.chooseProcess} onSelection={(p) => dispatch({ type: 'SELECTION', patch: p })} onAdd={h.addToGrid}
+        masterNote={view.edit.draft && masters.denied.includes('Processes') ? 'SAC 998821, GST 5% and Piece are assumed: the Processes master is not readable with your permissions.' : null}
+      />
+      <CppVendorSection doc={working} editable={{ vendor: view.edit.delivery, terms: view.edit.terms }} masters={masters} eligibility={ctx?.eligibility} onPatch={patch} />
+      <CppGridSection doc={working} editable={view.edit.lines} ctx={ctx} rates={{ byKey: ctx?.lastRates, recent: ctx?.recentRates }} selectedKeys={po.selectedKeys} h={h.grid} />
+      <CppDeliverySection doc={working} ctx={ctx} value={view.value} units={units} onPatch={patch}
+        can={{ delivery: view.edit.delivery, terms: view.edit.terms, notes: view.edit.notes, commercial: view.edit.commercial }}
+        onCommercial={(p) => dispatch({ type: 'COMMERCIAL', patch: p })} />
+      <CppAdvisories doc={working} advisories={checks?.advisories.filter((a) => a.code !== 'RATE_VARIANCE' || !a.resolved)} editable={view.edit.draft || view.edit.commercial} onPatch={patch} />
+      {(doc.status !== 'DRAFT' || doc.overrides.length > 0 || doc.revisionNo > 0) && (
+        <JobWorkApprovalPanel
+          entityType="CUT_PANEL_PO" doc={doc} docLabel="Cut Panel PO" onDecided={po.reload}
+          overrides={doc.overrides} busy={runner.busy === 'authorise'} onAuthorise={draft.authorise}
+          lineLabel={(k) => { const l = doc.lines.find((x) => x.key === k); return l ? `${l.cprNo} ${l.colorName} ${l.size}` : k; }}
+          canAuthorise={(o) => o.status === 'REQUESTED' && doc.status === 'DRAFT' && view.can.override && (String(o.requestedById) !== String(view.userId) || view.superuser)}
+        />
+      )}
+      <CppRevisionHistory revisions={doc.revisions} pending={doc.pendingRevision && { ...doc.pendingRevision, changes: revisionChanges(doc, po.rev || doc.pendingRevision) }} />
+      <CppActionBar doc={working} ctx={ctx} value={view.value} buttons={view.buttons} busy={runner.busy} errors={runner.errors} on={on} openDialog={(k) => setDialog(k)} />
+      <JobWorkReasonDialog dialog={dialog && { open: true, ...CPP_DIALOGS[dialog] }} onSubmit={(r) => on[dialog](r)} onClose={() => setDialog(null)} />
+      <OverrideRequestDialog request={h.overrideRequest} onSubmit={draft.requestOverride} onClose={h.closeOverride} />
+      <DocumentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.poNo} loadAudit={getCppAudit} />
+    </div>
+  );
+};
+
+export default CutPanelPoForm;

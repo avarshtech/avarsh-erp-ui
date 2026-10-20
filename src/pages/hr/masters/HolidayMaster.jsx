@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
-import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select, DatePicker } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getHolidaysByYear, createHoliday, updateHoliday, deleteHoliday } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
-import { HOLIDAY_TYPES } from '../../../utils/hrConstants';
 
 const { Text } = Typography;
 
@@ -16,6 +15,7 @@ const MODULE_ID = 'hr-masters';
 const HolidayMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
 
+  // Units of the working branch only; "All branches" lists every unit
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,29 +27,12 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const [factories, setFactories] = useState([]);
   const [filterYear, setFilterYear] = useState(dayjs().year());
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
-
-  const factoryOptions = useMemo(() =>
-    factories.map(f => ({ value: f.id, label: `${f.factoryCode} - ${f.factoryName}` })),
-  [factories]);
-
-  const factoryMap = useMemo(() => {
-    const map = {};
-    factories.forEach(f => { map[f.id] = f.factoryName; });
-    return map;
-  }, [factories]);
-
-  const holidayTypeMap = useMemo(() => {
-    const map = {};
-    HOLIDAY_TYPES.forEach(t => { map[t.value] = t; });
-    return map;
-  }, []);
 
   // Generate year options (current year -1 to +2)
   const yearOptions = useMemo(() => {
@@ -68,24 +51,13 @@ const HolidayMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load holidays');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
   }, [filterYear]);
 
-  const fetchFactories = useCallback(async () => {
-    try {
-      const result = await getActiveFactories();
-      const list = Array.isArray(result) ? result : (result?.data || []);
-      setFactories(list);
-    } catch {
-      // Silent
-    }
-  }, []);
-
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { fetchFactories(); }, [fetchFactories]);
 
   const columns = [
     {
@@ -99,21 +71,6 @@ const HolidayMaster = ({ onDirtyChange }) => {
       title: 'Name',
       dataIndex: 'name',
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
-    },
-    {
-      title: 'Type',
-      dataIndex: 'holidayType',
-      width: 140,
-      render: (val) => {
-        const ht = holidayTypeMap[val];
-        return ht ? <Tag color={ht.color}>{ht.label}</Tag> : (val || '—');
-      },
-    },
-    {
-      title: 'Factory',
-      dataIndex: 'factoryId',
-      width: 120,
-      render: (val) => factoryMap[val] || 'All',
     },
     {
       title: 'Paid',
@@ -243,7 +200,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MasterSplitView
+        <MasterSplitView orderBy="id"
           title="Holidays"
           subtitle="Work Schedule"
           addLabel="Add Holiday"
@@ -318,13 +275,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
                     <Input placeholder="e.g. Republic Day" maxLength={200} />
                   </Form.Item>
                   <Form.Item name="holidayDate" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
-                    <DatePicker format="DD MMM YYYY" style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Form.Item name="holidayType" label="Holiday Type" rules={[{ required: true, message: 'Please select a type' }]}>
-                    <Select placeholder="Select type" options={HOLIDAY_TYPES} allowClear />
-                  </Form.Item>
-                  <Form.Item name="factoryId" label="Factory" tooltip="Leave empty if applicable to all factories">
-                    <Select placeholder="All factories" options={factoryOptions} showSearch optionFilterProp="label" allowClear />
+                    <DateInput style={{ width: '100%' }} />
                   </Form.Item>
                   <Form.Item name="isPaid" label="Paid Holiday" valuePropName="checked">
                     <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />

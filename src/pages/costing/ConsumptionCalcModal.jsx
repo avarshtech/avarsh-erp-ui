@@ -235,7 +235,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           {fabricRow && (
             <Alert
               type="info" showIcon style={{ marginBottom: 16 }}
-              message={
+              title={
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <Text strong style={{ fontSize: 13 }}>Fabric row:</Text>
                   <Text style={{ fontSize: 13 }}>{fabricRow.fabricType || fabricRow.description || '—'}</Text>
@@ -336,7 +336,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
 
           <Alert
             type="info" showIcon
-            message="How it works"
+            title="How it works"
             description={
               <>
                 AI reads your measurement chart, identifies garment panels, and applies standard
@@ -373,7 +373,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           {result.assumptions && (
             <Alert
               type="info" showIcon style={{ marginBottom: 16 }}
-              message="AI Analysis"
+              title="AI Analysis"
               description={
                 <Paragraph style={{ margin: 0, fontSize: 12 }}>
                   {result.assumptions}
@@ -411,7 +411,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 title="Smallest size"
                 value={minVal}
                 suffix={result.uom}
-                valueStyle={{ fontSize: 15 }}
+                styles={{ content: { fontSize: 15 } }}
               />
             </Col>
             <Col span={8}>
@@ -419,7 +419,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 title="Average"
                 value={avg}
                 suffix={result.uom}
-                valueStyle={{ fontSize: 15, color: 'var(--primary-color)' }}
+                styles={{ content: { fontSize: 15, color: 'var(--primary-color)' } }}
               />
             </Col>
             <Col span={8}>
@@ -427,7 +427,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 title="Largest size"
                 value={maxVal}
                 suffix={result.uom}
-                valueStyle={{ fontSize: 15 }}
+                styles={{ content: { fontSize: 15 } }}
               />
             </Col>
           </Row>
@@ -452,7 +452,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
               <Divider style={{ margin: '12px 0' }} />
               <Alert
                 type="warning" showIcon style={{ marginBottom: 12 }}
-                message="Separate lining fabric detected"
+                title="Separate lining fabric detected"
                 description="This garment has a distinct lining. The shell consumption above excludes lining — add a lining fabric row and apply its consumption below."
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

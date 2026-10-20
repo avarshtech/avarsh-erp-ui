@@ -17,7 +17,17 @@ const EDITABLE_STATUSES = new Set([
   GRN_STATUS.REVERSED,
 ]);
 
-const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
+// Cancel is a pre-QC action: Draft or QC_Pending (server also blocks once any
+// QC inspection exists against the GRN).
+const CANCELLABLE_STATUSES = new Set([
+  GRN_STATUS.DRAFT,
+  GRN_STATUS.QC_PENDING,
+]);
+
+// canDelete defaults to false: deleting a draft GRN was rendered for anyone who
+// could open the list, so the safe default is to hide it unless the caller says
+// the role holds the right.
+const getGRNListColumns = ({ onView, onEdit, onDelete, onCancel, canCancel = false, canDelete = false }) => [
   {
     title: 'GRN Number',
     dataIndex: 'grnNumber',
@@ -96,7 +106,7 @@ const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
         <Space size="small">
           <ActionButton action="view" onClick={() => onView(record)} />
           {canEdit && <ActionButton action="edit" onClick={() => onEdit(record)} />}
-          {isDraft && (
+          {isDraft && canDelete && (
             <Popconfirm
               title="Delete draft GRN"
               description={`Are you sure you want to delete ${record.grnNumber}?`}
@@ -107,6 +117,9 @@ const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
             >
               <ActionButton action="delete" />
             </Popconfirm>
+          )}
+          {canCancel && CANCELLABLE_STATUSES.has(record.status) && (
+            <ActionButton action="cancel" onClick={() => onCancel?.(record)} />
           )}
         </Space>
       );

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antTableWaitForData, antModalConfirm, antPopconfirmYes, antDatePickerToday } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
+import { antTableWaitForData } from '../../helpers/antd-helpers.js';
+import { ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
 
 let api;
 let createdRoleId;
@@ -66,7 +66,7 @@ test.describe('Role Management — API Tests', () => {
     expect(createdRoleId).toBeDefined();
 
     const res = await api.delete(`/roles/${createdRoleId}`);
-    expect(res.status).toBe(200);
+    expect([200, 204]).toContain(res.status); // controller returns 204 No Content
     createdRoleId = null;
   });
 
@@ -78,6 +78,28 @@ test.describe('Role Management — API Tests', () => {
 });
 
 test.describe('Role Management — UI Tests', () => {
+  // Role names take letters and spaces only, so the run's timestamp is spelled in letters
+  const UI_ROLE = `Role View ${String(Date.now()).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])}`;
+  let uiApi;
+  let uiRoleId;
+
+  test.beforeAll(async () => {
+    uiApi = await createAuthenticatedClient();
+    const res = await uiApi.post('/roles', {
+      name: UI_ROLE,
+      description: 'View and edit e2e',
+      status: 'ACTIVE',
+      permissions: { dashboard: { access: true, operations: { view: true } } },
+    });
+    expect(res.status, JSON.stringify(res.data)).toBe(200);
+    uiRoleId = res.data.id;
+  });
+
+  test.afterAll(async () => {
+    if (uiRoleId) await uiApi.delete(`/roles/${uiRoleId}`);
+    await uiApi?.dispose();
+  });
+
   test('List page at /admin/roles loads with table', async ({ page }) => {
     await goToListPage(page, '/admin/roles');
     await antTableWaitForData(page);
@@ -86,18 +108,42 @@ test.describe('Role Management — UI Tests', () => {
     await expect(table).toBeVisible();
   });
 
-  test('Permission checkboxes visible in role detail/edit', async ({ page }) => {
+  test('a role opens read-only in the view dialog; Edit opens the editor, and Cancel discards', async ({ page }) => {
     await goToListPage(page, '/admin/roles');
-    await antTableWaitForData(page);
+    await page.getByPlaceholder('Search by role name or description...').fill(UI_ROLE);
+    const row = page.locator('.ant-table-row').filter({ hasText: UI_ROLE });
+    await expect(row).toHaveCount(1, { timeout: 20000 });
+    await row.getByRole('button', { name: UI_ROLE }).click();
 
-    // Click on first role row or edit button
-    const editBtn = page.locator('.ant-table-tbody tr').first().locator('button, a').first();
-    await editBtn.click();
-    await page.waitForTimeout(1000);
+    // View: ticks, never boxes
+    const dialog = page.locator('.ant-modal').filter({ hasText: UI_ROLE });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('img', { name: 'View on Dashboard', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
 
-    // Verify permission checkboxes are rendered
-    const checkboxes = page.locator('.ant-checkbox, .ant-checkbox-wrapper');
-    const count = await checkboxes.count();
-    expect(count).toBeGreaterThan(0);
+    // Edit: the editor page, with boxes
+    await dialog.getByRole('button', { name: /Edit$/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/roles/edit/${uiRoleId}$`));
+    await expect(page.getByRole('checkbox', { name: 'View on Dashboard', exact: true })).toBeChecked();
+
+    await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: /^Orders,/ }).click();
+    await page.getByRole('checkbox', { name: 'View on Orders', exact: true }).check();
+    await expect(page.getByText('1 unsaved change', { exact: true })).toBeVisible();
+
+    // Cancel asks first, then returns to the dialog with nothing saved
+    await page.getByRole('button', { name: /Cancel$/ }).click();
+    await page.locator('.ant-modal-confirm').filter({ hasText: 'Unsaved Changes' }).getByRole('button', { name: 'Leave' }).click();
+    const reopened = page.locator('.ant-modal').filter({ hasText: UI_ROLE });
+    await expect(reopened).toBeVisible({ timeout: 20000 });
+    await expect(reopened.getByRole('img', { name: 'View on Orders', exact: true })).toHaveCount(0);
+
+    // The hero's back arrow goes to the list and leaves the dialog closed
+    await reopened.getByRole('button', { name: /Edit$/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/roles/edit/${uiRoleId}$`));
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/roles$/);
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 20000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.ant-modal').filter({ hasText: UI_ROLE })).toHaveCount(0);
   });
 });

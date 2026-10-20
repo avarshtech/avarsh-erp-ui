@@ -14,7 +14,6 @@ import {
   SwapOutlined,
   ClearOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import {
   getAllCostSheetSummaries,
   getCostSheetById,
@@ -32,7 +31,6 @@ const { Text, Title } = Typography;
 
 const CostComparison = () => {
   const { message } = App.useApp();
-  const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [allSheets, setAllSheets] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -245,7 +243,7 @@ const CostComparison = () => {
                 </tr>
               </thead>
               <tbody>
-                {comparisonFields.map((field, idx) => {
+                {comparisonFields.map((field) => {
                   const allValues = comparisonData.map((s) => s[field.key]);
                   const isSectionBreak = ['Fabric Cost', 'Total Making Price', 'Total Price'].includes(field.label);
 

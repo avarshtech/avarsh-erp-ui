@@ -166,7 +166,8 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Sub Categories"
       subtitle="Item"
       addLabel="Add Sub Category"

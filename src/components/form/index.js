@@ -4,3 +4,4 @@ export { default as FormDatePicker } from './FormDatePicker';
 export { default as FormInputNumber } from './FormInputNumber';
 export { default as FormSection } from './FormSection';
 export { default as FormSwitch } from './FormSwitch';
+export { default as IsoDatePicker } from './IsoDatePicker';

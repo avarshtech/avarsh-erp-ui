@@ -13,9 +13,9 @@
  */
 
 import { request as playwrightRequest } from '@playwright/test';
-import process from 'process';
+import { E2E_API_URL, E2E_PASSWORD, E2E_USERNAME } from '../config/env.js';
 
-const API_BASE = process.env.E2E_API_URL || 'http://localhost:8088/api/v1';
+const API_BASE = E2E_API_URL;
 
 export class ApiClient {
   constructor(requestContext, ownsContext = false) {
@@ -25,8 +25,8 @@ export class ApiClient {
   }
 
   async login(username, password) {
-    const user = username || process.env.E2E_USERNAME || 'superadmin';
-    const pass = password || process.env.E2E_PASSWORD || 'admin123';
+    const user = username || E2E_USERNAME;
+    const pass = password || E2E_PASSWORD;
 
     const response = await this.request.post(`${API_BASE}/auth/login`, {
       data: { username: user, password: pass },
@@ -41,50 +41,64 @@ export class ApiClient {
     return data;
   }
 
-  headers() {
+  /**
+   * `extra` merges per-request headers onto the auth header — the branch suites
+   * send `X-Branch-Id` this way, which is how the server picks a working branch.
+   */
+  headers(extra) {
     if (!this.token) throw new Error('Not authenticated. Call login() first.');
-    return { Authorization: `Bearer ${this.token}` };
+    return { Authorization: `Bearer ${this.token}`, ...(extra || {}) };
   }
 
-  async get(path, params) {
+  /**
+   * Parse the body whether or not the response is 2xx: error bodies carry the
+   * error/message contract (REFERENCE_CONSTRAINT, OPTIMISTIC_LOCK_CONFLICT, …) that
+   * the validation suites assert on. Discarding them made every such assertion a
+   * TypeError instead of a meaningful failure.
+   */
+  async #result(response) {
+    let data = null;
+    try { data = await response.json(); } catch { /* non-JSON response */ }
+    return { response, data, status: response.status() };
+  }
+
+  async get(path, params, extraHeaders) {
     const url = params
       ? `${API_BASE}${path}?${new URLSearchParams(params)}`
       : `${API_BASE}${path}`;
-    const response = await this.request.get(url, { headers: this.headers() });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    const response = await this.request.get(url, { headers: this.headers(extraHeaders) });
+    return this.#result(response);
   }
 
-  async post(path, data) {
+  async post(path, data, extraHeaders) {
     const response = await this.request.post(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
-    let resData = null;
-    try { resData = await response.json(); } catch { /* non-JSON response */ }
-    return { response, data: resData, status: response.status() };
+    return this.#result(response);
   }
 
-  async put(path, data) {
+  async put(path, data, extraHeaders) {
     const response = await this.request.put(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    return this.#result(response);
   }
 
-  async patch(path, data) {
+  async patch(path, data, extraHeaders) {
     const response = await this.request.patch(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    return this.#result(response);
   }
 
-  async delete(path) {
+  async delete(path, extraHeaders) {
     const response = await this.request.delete(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
     });
-    return { response, status: response.status() };
+    return this.#result(response);
   }
 
   /**

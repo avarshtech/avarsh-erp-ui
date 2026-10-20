@@ -10,8 +10,10 @@ export const searchOrders = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search)         query.append('search',         params.search);
   if (params.status)         query.append('status',         params.status);
+  if (params.orderType)      query.append('orderType',      params.orderType);
   if (params.orderDateStart) query.append('orderDateStart', params.orderDateStart);
   if (params.orderDateEnd)   query.append('orderDateEnd',   params.orderDateEnd);
+  if (params.branchId)       query.append('branchId',       params.branchId);
   if (params.page  !== undefined) query.append('page',  params.page);
   if (params.size  !== undefined) query.append('size',  params.size);
   if (params.sort)           query.append('sort',      params.sort);
@@ -31,8 +33,8 @@ export const searchOrders = async (params = {}) => {
 /**
  * Get order by ID. GET /api/v1/orders/{id}
  */
-export const getOrderById = async (id) => {
-  const response = await axiosInstance.get(`${BASE}/${id}`);
+export const getOrderById = async (id, config = {}) => {
+  const response = await axiosInstance.get(`${BASE}/${id}`, config);
   return response.data;
 };
 

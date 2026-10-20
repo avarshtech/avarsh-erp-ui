@@ -5,12 +5,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormDatePicker, FormInputNumber, FormSelect, FormSection } from '../../../components/form';
+import useBusyAction from '../../../hooks/useBusyAction';
 import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from '../components/MaterialStockPanel';
+import ReferBackNotice from '../components/ReferBackNotice';
 import { FINISHING_PROCESS, getProcessLabel, PO_ACTION, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getFinishingPo, updateFinishingPo, changeFinishingPoStatus, getStockByBom, getPpApprovalStatus, getProcessingUnits,
-} from '../../../services/po/productionService';
+  getFinishingPo, updateFinishingPo, changeFinishingPoStatus,
+} from '../../../services/po/production/finishingPoService';
+import {
+  getStockByBom, getPpApprovalStatus, getProcessingUnits,
+} from '../../../services/po/production/productionLookupService';
 
 const { Text } = Typography;
 
@@ -27,20 +32,24 @@ const FinishingPoForm = () => {
   const [units, setUnits] = useState([]);
   const [hasShortage, setHasShortage] = useState(false);
   const [booting, setBooting] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { getProcessingUnits('UNIT').then(setUnits); }, []);
+  // The form renders only once the PO has loaded, so its values go in as initialValues: setting them on the
+  // instance while the spinner shows warns that it is not connected to any Form
+  const [initialValues, setInitialValues] = useState(null);
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => {
     getFinishingPo(id).then(async (record) => {
       if (!record) { message.error('Finishing PO not found'); return navigate('/purchase-orders/finishing-po/list'); }
       setPo(record);
+      // Only the units of the branch this PO is made at (it follows its work order)
+      getProcessingUnits('UNIT', record.branchId).then(setUnits);
       setItems(record.items || []);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-        setStock(await getStockByBom(record.orderId, 'packing'));
+        setStock(await getStockByBom(record, 'packing', { plannedQty: record.totalPlannedQty, branchId: record.branchId }));
       }
-      form.setFieldsValue({
+      setInitialValues({
         plannedStartDate: record.plannedStartDate ? dayjs(record.plannedStartDate) : null,
         plannedEndDate: record.plannedEndDate ? dayjs(record.plannedEndDate) : null,
         processingUnitId: record.processingUnitId,
@@ -55,18 +64,21 @@ const FinishingPoForm = () => {
     setItems(newItems);
     const total = newItems.reduce((s, i) => s + (i.plannedQty || 0), 0);
     if (po && (po.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-      getStockByBom(po.orderId, 'packing', { plannedQty: total }).then(setStock);
+      getStockByBom(po, 'packing', { plannedQty: total, branchId: po.branchId }).then(setStock);
     }
   };
 
   const save = async (submit) => {
     const v = await form.validateFields();
+    if (submit && !(v.vendorRate > 0)) {
+      return message.warning(`Enter the Rate / Pc${po.isOutsourced ? ' on the Vendor tab' : ''} before submitting`);
+    }
     if (submit && hasShortage && !(await new Promise((res) => modal.confirm({
       title: 'Submit despite packing-material shortage?',
       content: 'One or more packing materials are short for this PO. Submit for approval anyway?',
       okText: 'Submit anyway', cancelText: 'Review', onOk: () => res(true), onCancel: () => res(false),
     })))) return;
-    setSaving(true);
+    setBusy(submit ? 'submit' : 'draft');
     try {
       const payload = {
         ...po,
@@ -77,12 +89,13 @@ const FinishingPoForm = () => {
         items, totalPlannedQty: items.reduce((s, i) => s + (i.plannedQty || 0), 0),
       };
       const saved = await updateFinishingPo(id, payload);
-      if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.finishingPoNo} ${submit ? 'submitted' : 'saved'}`);
       navigate('/purchase-orders/finishing-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
-    } finally { setSaving(false); }
+    } finally { setBusy(null); }
   };
 
   if (booting || !po) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -92,6 +105,7 @@ const FinishingPoForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
+        <ReferBackNotice record={po} />
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Order">{po.orderNo}</Descriptions.Item>
           <Descriptions.Item label="Style">{po.styleNo}</Descriptions.Item>
@@ -105,6 +119,10 @@ const FinishingPoForm = () => {
           <FormSection title="Processing Unit" columns={2}>
             <Form.Item name="processingUnitId" label="In-house Unit">
               <FormSelect placeholder="Select finishing unit" options={units.map((u) => ({ value: u.id, label: u.name }))} />
+            </Form.Item>
+            {/* In-house work is paid per piece as well; a vendor's rate sits on the Vendor tab */}
+            <Form.Item name="vendorRate" label="Rate / Pc" required>
+              <FormInputNumber variant="currency" currency="INR" />
             </Form.Item>
           </FormSection>
         )}
@@ -125,9 +143,11 @@ const FinishingPoForm = () => {
     ...(hasPacking ? [{ key: 'packing', label: 'Packing Stock', children: (
       <MaterialStockPanel rows={stock} materialType="packing" onShortageChange={setHasShortage} />
     ) }] : []),
-    ...(po.isOutsourced ? [{ key: 'vendor', label: 'Vendor', children: (
+    // forceRender: an unopened tab is not mounted, and an unmounted field is left out of
+    // validateFields — saving would then send no rate and wipe the one the wizard captured
+    ...(po.isOutsourced ? [{ key: 'vendor', label: 'Vendor', forceRender: true, children: (
       <FormSection title={`Vendor — ${po.vendorName}`} columns={2}>
-        <Form.Item name="vendorRate" label="Rate / Pc"><FormInputNumber variant="currency" currency="INR" /></Form.Item>
+        <Form.Item name="vendorRate" label="Rate / Pc" required><FormInputNumber variant="currency" currency="INR" /></Form.Item>
         <Form.Item name="vendorDeliveryDate" label="Vendor Delivery Date"><FormDatePicker /></Form.Item>
       </FormSection>
     ) }] : []),
@@ -136,11 +156,11 @@ const FinishingPoForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={`Edit ${po.finishingPoNo}`} backPath="/purchase-orders/finishing-po/list">
-        <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} />
-        <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!ppApproved}
+        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft')} onClick={() => save(false)} />
+        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !ppApproved)}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
       </PageHeader>
-      <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>
+      <Card><Form form={form} layout="vertical" initialValues={initialValues}><Tabs items={tabs} /></Form></Card>
     </div>
   );
 };

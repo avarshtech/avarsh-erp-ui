@@ -55,7 +55,7 @@ const SaveReportDrawer = memo(function SaveReportDrawer({
       open={open}
       onClose={onClose}
       afterOpenChange={(isOpen) => { if (!isOpen) handleAfterClose(); }}
-      width={400}
+      size={400}
       footer={
         <div style={{ textAlign: 'right' }}>
           <Space>

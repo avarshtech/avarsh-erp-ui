@@ -23,9 +23,9 @@ const FabricQCDefectAnalysis = memo(function FabricQCDefectAnalysis({
         </Space>
       }
       extra={
-        <Tooltip title={`A roll fails if the total defect count for that roll exceeds the threshold (${FABRIC_QC_DEFECT_FAIL_THRESHOLD}).`}>
+        <Tooltip title={`Guidance only — rolls with more than ${FABRIC_QC_DEFECT_FAIL_THRESHOLD} defects usually warrant a Fail. The result for each roll is set by the inspector in Pre-Roll Inspection.`}>
           <Tag color="blue" icon={<DashboardOutlined />}>
-            Threshold: {FABRIC_QC_DEFECT_FAIL_THRESHOLD} defects / roll
+            Guide: {FABRIC_QC_DEFECT_FAIL_THRESHOLD} defects / roll
           </Tag>
         </Tooltip>
       }

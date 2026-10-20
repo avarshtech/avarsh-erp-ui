@@ -1,5 +1,5 @@
 /**
- * Test Data Factories for E2E Tests
+ * Test Data Units for E2E Tests
  *
  * Generates test payloads with timestamp-based unique names
  * to avoid conflicts between test runs.
@@ -105,6 +105,7 @@ export function partPayload(overrides = {}) {
   return {
     partName: `E2E Part ${ts()}`,
     description: 'Created by E2E test',
+    panelsPerGarment: 1,
     isActive: true,
     ...overrides,
   };

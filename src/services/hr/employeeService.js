@@ -10,7 +10,7 @@ export const searchEmployees = async (params = {}) => {
   const queryParams = new URLSearchParams();
   if (params.search) queryParams.append('search', params.search);
   if (params.departmentId) queryParams.append('departmentId', params.departmentId);
-  if (params.factoryId) queryParams.append('factoryId', params.factoryId);
+  if (params.unitId) queryParams.append('unitId', params.unitId);
   if (params.status) queryParams.append('status', params.status);
   if (params.category) queryParams.append('category', params.category);
   if (params.employeeType) queryParams.append('employeeType', params.employeeType);
@@ -66,9 +66,10 @@ export const updateEmployee = async (id, data) => {
  * Change employee status (ACTIVE, INACTIVE, TERMINATED, etc.).
  * PUT /api/v1/hr/employees/{id}/status?status=X
  */
-export const changeEmployeeStatus = async (id, status) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/status`, null, {
-    params: { status },
-  });
+export const changeEmployeeStatus = async (id, status, dateOfLeaving) => {
+  const params = { status };
+  // Only sent when leaving; the server clears it on a return to ACTIVE.
+  if (dateOfLeaving) params.dateOfLeaving = dateOfLeaving;
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/status`, null, { params });
   return response.data;
 };

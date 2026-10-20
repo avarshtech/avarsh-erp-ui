@@ -1,52 +1,225 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  App, Form, Input, Select, DatePicker, Switch, Button, Tabs, Card,
-  Row, Col, InputNumber, Table, Space, Spin,
+  App, Form, Input, Select, Switch, Button, Tabs, Card,
+  Row, Col, InputNumber, Table, Space, Spin, Upload, Tooltip,
 } from 'antd';
-import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import DateInput from '../../../components/DateInput';
+import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/hr/employeeService';
-import { getActiveDepartments, getActiveDesignations, getActiveShifts } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import {
+  getActiveDepartmentsByUnit, getActiveDesignationsByDepartment, getActiveShifts,
+} from '../../../services/master/hrMasterService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
   BLOOD_GROUPS, PAYMENT_MODES, DOCUMENT_TYPES, RELATIONSHIP_TYPES,
-  EMPLOYEE_CATEGORY, EMPLOYEE_GRADE,
+  EMPLOYEE_CATEGORY, EMPLOYEE_GRADE, gradeLabel,
 } from '../../../utils/hrConstants';
+import { uploadFile } from '../../../services/core/fileService';
+import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
+import EmployeePhoto from '../../../components/EmployeePhoto';
+import { unitOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 
 const { TextArea } = Input;
 
+/**
+ * Maps each validated field to the tab that renders it.
+ *
+ * Antd mounts a tab pane only once it has been visited, so a Form.Item on an
+ * unvisited tab never registers and validateFields() silently skips it. Every
+ * pane is now force-rendered (see tabItems), which means validation can fail on
+ * a field the user cannot see - this map lets us jump them to the right tab.
+ */
+const FIELD_TAB = {
+  fullName: 'personal',
+  gender: 'personal',
+  dateOfBirth: 'personal',
+  maritalStatus: 'personal',
+  mobileNumber: 'personal',
+  presentAddress: 'personal',
+  aadharNumber: 'personal',
+  panNumber: 'personal',
+  employeeNo: 'employment',
+  departmentId: 'employment',
+  designationId: 'employment',
+  unitId: 'employment',
+  shiftId: 'employment',
+  category: 'employment',
+  employeeType: 'employment',
+  dateOfJoining: 'employment',
+  dateOfLeaving: 'employment',
+  ifscCode: 'bank',
+};
+
+const TAB_LABEL = {
+  personal: 'Personal',
+  employment: 'Employment',
+  statutory: 'Statutory',
+  bank: 'Bank & Nominees',
+  documents: 'Documents',
+};
+
+// Indian mobile, optionally prefixed with +91.
+const MOBILE_PATTERN = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const AADHAAR_PATTERN = /^\d{12}$/;
+const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+const MIN_WORKING_AGE = 14;
+
+/**
+ * Bank details are all-or-nothing: the three columns behind them are NOT NULL,
+ * so a half-filled set cannot be stored. Empty stays valid - that just means
+ * the employee has no bank details on file yet.
+ */
+const BANK_FIELDS = ['accountNumber', 'ifscCode', 'bankName'];
+
+const bankFieldRule = (field, label) => ({ getFieldValue }) => ({
+  validator: (_, value) => {
+    const anyFilled = BANK_FIELDS.some((f) => {
+      const v = f === field ? value : getFieldValue(f);
+      return v != null && String(v).trim() !== '';
+    });
+    const thisFilled = value != null && String(value).trim() !== '';
+    if (anyFilled && !thisFilled) {
+      return Promise.reject(new Error(`${label} is required once any bank detail is entered`));
+    }
+    return Promise.resolve();
+  },
+});
+
+
+/** Identity scans and certificates; anything larger is not a document. */
+const MAX_DOCUMENT_MB = 10;
+
+
+/**
+ * The File cell of the documents table.
+ *
+ * Three states, because rows created before uploads existed still hold whatever
+ * someone typed: an uploaded file shows its name and downloads; a legacy
+ * reference is shown as-is and can be cleared and replaced; an empty row offers
+ * the upload button.
+ */
+const DocumentCell = ({ row, uploading, onUpload, onClear }) => {
+  const { message } = App.useApp();
+  const [downloading, setDownloading] = useState(false);
+  const value = row.fileUrl;
+  const stored = isStoredFile(value);
+
+  const download = async () => {
+    setDownloading(true);
+    try {
+      await downloadStoredFile(value, row.fileName);
+    } catch {
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (stored) {
+    return (
+      <Space size={4} wrap>
+        <PaperClipOutlined />
+        <span style={{ maxWidth: 220, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+          {row.fileName || 'Attached file'}
+        </span>
+        <Button type="link" size="small" icon={<DownloadOutlined />} loading={downloading} onClick={download} />
+        <Button type="link" size="small" danger onClick={onClear}>Replace</Button>
+      </Space>
+    );
+  }
+
+  if (value) {
+    return (
+      <Space size={4} wrap>
+        <Tooltip title="Typed in before documents could be uploaded. Clear it and upload the file itself.">
+          <span style={{ color: 'var(--warning-color, #d46b08)' }}>{value}</span>
+        </Tooltip>
+        <Button type="link" size="small" danger onClick={onClear}>Clear</Button>
+      </Space>
+    );
+  }
+
+  return (
+    <Upload
+      showUploadList={false}
+      accept=".pdf,.png,.jpg,.jpeg"
+      beforeUpload={(file) => {
+        if (file.size > MAX_DOCUMENT_MB * 1024 * 1024) {
+          message.error(`${file.name} is larger than ${MAX_DOCUMENT_MB} MB`);
+          return Upload.LIST_IGNORE;
+        }
+        onUpload(file);
+        return false;
+      }}
+    >
+      <Button icon={<UploadOutlined />} size="small" loading={uploading}>Upload</Button>
+    </Upload>
+  );
+};
+
+
 const EmployeeForm = () => {
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  // The form shows only once the employee has loaded; their values go in after it mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !loading);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [activeTab, setActiveTab] = useState('personal');
   const { clearDirty } = useUnsavedChanges(isDirty);
   const isEdit = Boolean(id);
 
   // Dropdown options
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [managers, setManagers] = useState([]);
   const [nominees, setNominees] = useState([]);
   const [documents, setDocuments] = useState([]);
 
-  // Load dropdown options
+  // Departments belong to a unit and designations to a department. Loading
+  // all of them let a user pick a department from another unit, which saves
+  // fine but leaves the employee unfindable by department on the attendance
+  // calendar. Each level is now scoped to its parent.
+  const watchedUnitId = Form.useWatch('unitId', form);
+  const watchedDepartmentId = Form.useWatch('departmentId', form);
+
   useEffect(() => {
-    getActiveDepartments().then(setDepartments).catch(() => {});
-    getActiveDesignations().then(setDesignations).catch(() => {});
-    getActiveFactories().then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
     getActiveShifts().then(setShifts).catch(() => {});
-  }, []);
+  }, [activeBranchId]);
+
+  useEffect(() => {
+    if (!watchedUnitId) {
+      setDepartments([]);
+      return;
+    }
+    getActiveDepartmentsByUnit(watchedUnitId).then(setDepartments).catch(() => setDepartments([]));
+  }, [watchedUnitId]);
+
+  useEffect(() => {
+    if (!watchedDepartmentId) {
+      setDesignations([]);
+      return;
+    }
+    getActiveDesignationsByDepartment(watchedDepartmentId).then(setDesignations).catch(() => setDesignations([]));
+  }, [watchedDepartmentId]);
 
   // Load employee for edit
   useEffect(() => {
@@ -54,10 +227,11 @@ const EmployeeForm = () => {
     setLoading(true);
     getEmployeeById(id)
       .then((emp) => {
-        form.setFieldsValue({
+        setLoadedValues({
           ...emp,
           dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
           dateOfJoining: emp.dateOfJoining ? dayjs(emp.dateOfJoining) : null,
+          dateOfLeaving: emp.dateOfLeaving ? dayjs(emp.dateOfLeaving) : null,
           ...(emp.statutory || {}),
           ...(emp.bankDetails || {}),
         });
@@ -66,7 +240,7 @@ const EmployeeForm = () => {
       })
       .catch(() => message.error('Failed to load employee'))
       .finally(() => setLoading(false));
-  }, [id, form, message]);
+  }, [id, setLoadedValues, message]);
 
   // Manager search
   const handleManagerSearch = useCallback(async (val) => {
@@ -77,15 +251,80 @@ const EmployeeForm = () => {
     } catch { /* ignore */ }
   }, [id]);
 
+  /** Nominees live in local state, not the Form, so they need checking by hand. */
+  const validateNominees = () => {
+    if (!nominees.length) return null;
+
+    const incomplete = nominees.findIndex((n) => !n.nomineeName?.trim() || !n.relationship);
+    if (incomplete !== -1) {
+      return `Nominee ${incomplete + 1}: name and relationship are required`;
+    }
+
+    const minorWithoutGuardian = nominees.findIndex((n) => n.isMinor && !n.guardianName?.trim());
+    if (minorWithoutGuardian !== -1) {
+      return `Nominee ${minorWithoutGuardian + 1}: a guardian is required for a minor`;
+    }
+
+    const totalShare = nominees.reduce((sum, n) => sum + (Number(n.sharePercentage) || 0), 0);
+    if (Math.round(totalShare * 100) / 100 !== 100) {
+      return `Nominee shares must total 100% (currently ${totalShare}%)`;
+    }
+
+    return null;
+  };
+
+  // The photo picked before the employee exists. A ref, not state: it is only
+  // ever read at save time and re-rendering the form for it would be noise.
+  const pendingPhoto = useRef(null);
+
+  /**
+   * Sends the held photo now that there is an employee to attach it to.
+   *
+   * A failure here does not fail the save: the employee is already created and
+   * telling someone their employee did not save would be a lie. They are told
+   * the photo did not go, and can add it from the employee's own page.
+   */
+  const uploadPendingPhoto = async (newId) => {
+    const file = pendingPhoto.current;
+    if (!file || !newId) return;
+    try {
+      await uploadFile(file, {
+        module: 'HR', entity: 'EMPLOYEE', entityId: newId,
+        fileCategory: 'PHOTO', description: 'Employee photo',
+      });
+      pendingPhoto.current = null;
+    } catch {
+      message.warning('The employee was saved, but the photo did not upload. Add it from their page.');
+    }
+  };
+
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+
+      const nomineeError = validateNominees();
+      if (nomineeError) {
+        setActiveTab('bank');
+        message.error(nomineeError);
+        return;
+      }
+
+      const documentError = documents.some((d) => !d.documentType)
+        ? 'Every document row needs a type. Remove blank rows or pick a type.'
+        : null;
+      if (documentError) {
+        setActiveTab('documents');
+        message.error(documentError);
+        return;
+      }
+
       setSaving(true);
 
       const payload = {
         ...values,
         dateOfBirth: values.dateOfBirth?.format('YYYY-MM-DD'),
         dateOfJoining: values.dateOfJoining?.format('YYYY-MM-DD'),
+        dateOfLeaving: values.dateOfLeaving ? values.dateOfLeaving.format('YYYY-MM-DD') : null,
         statutory: {
           pfApplicable: values.pfApplicable || false,
           pfNumber: values.pfNumber,
@@ -117,13 +356,25 @@ const EmployeeForm = () => {
         await updateEmployee(id, payload);
         message.success('Employee updated successfully');
       } else {
-        await createEmployee(payload);
+        const created = await createEmployee(payload);
         message.success('Employee created successfully');
+        await uploadPendingPhoto(created?.id);
       }
       clearDirty();
       navigate('/hr/employees');
     } catch (err) {
-      if (err?.errorFields) return; // form validation
+      // Form validation failure: jump to the tab holding the first bad field
+      // and say what is wrong. Previously this returned silently, so clicking
+      // Save with an error on a hidden tab appeared to do nothing at all.
+      if (err?.errorFields?.length) {
+        const first = err.errorFields[0];
+        const fieldName = Array.isArray(first.name) ? first.name[0] : first.name;
+        const tab = FIELD_TAB[fieldName];
+        if (tab) setActiveTab(tab);
+        const reason = first.errors?.[0] || 'This field is required';
+        message.error(tab ? `${reason} (${TAB_LABEL[tab]} tab)` : reason);
+        return;
+      }
       message.error(err?.response?.data?.message || 'Failed to save employee');
     } finally {
       setSaving(false);
@@ -133,7 +384,49 @@ const EmployeeForm = () => {
   const addNominee = () => setNominees((prev) => [...prev, { key: Date.now(), nomineeName: '', relationship: '', sharePercentage: 0, isMinor: false, guardianName: '' }]);
   const removeNominee = (key) => setNominees((prev) => prev.filter((n) => (n.key || n.id) !== key));
 
-  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', fileUrl: '', remarks: '' }]);
+  const [uploadingRow, setUploadingRow] = useState(null);
+
+  /**
+   * Uploads through the shared file service and keeps only the returned id.
+   *
+   * This cell used to be a free-text box holding whatever was typed - a Drive
+   * link, a folder path, a certificate number. None of it could be opened from
+   * here, none of it survived the link being moved, and anything readable by
+   * link put identity documents outside the application's access control.
+   */
+  const handleDocumentUpload = async (file, idx, row) => {
+    const rowKey = row.key || row.id;
+    setUploadingRow(rowKey);
+    try {
+      const stored = await uploadFile(file, {
+        module: 'HR',
+        entity: 'EMPLOYEE',
+        // Absent while the employee is still being created; the document row
+        // carries the file id, so the link survives either way.
+        entityId: isEdit ? Number(id) : undefined,
+        fileCategory: 'DOCUMENT',
+        description: row.documentType || undefined,
+      });
+      setDocuments((prev) => {
+        const arr = [...prev];
+        arr[idx] = {
+          ...arr[idx],
+          fileUrl: stored.fileId,
+          fileName: stored.originalFilename || file.name,
+          fileType: stored.fileType || file.type,
+        };
+        return arr;
+      });
+      setIsDirty(true);
+      message.success(`${file.name} uploaded`);
+    } catch {
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setUploadingRow(null);
+    }
+  };
+
+  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', fileUrl: '', fileName: '', fileType: '', remarks: '' }]);
   const removeDocument = (key) => setDocuments((prev) => prev.filter((d) => (d.key || d.id) !== key));
 
   const nomineeColumns = [
@@ -147,7 +440,24 @@ const EmployeeForm = () => {
 
   const documentColumns = [
     { title: 'Type', dataIndex: 'documentType', key: 'documentType', width: 200, render: (_, rec, idx) => <Select showSearch optionFilterProp="label" value={rec.documentType} onChange={(v) => { const arr = [...documents]; arr[idx] = { ...arr[idx], documentType: v }; setDocuments(arr); setIsDirty(true); }} options={DOCUMENT_TYPES} style={{ width: '100%' }} /> },
-    { title: 'File URL / Reference', dataIndex: 'fileUrl', key: 'fileUrl', render: (_, rec, idx) => <Input value={rec.fileUrl} onChange={(e) => { const arr = [...documents]; arr[idx] = { ...arr[idx], fileUrl: e.target.value }; setDocuments(arr); setIsDirty(true); }} /> },
+    {
+      title: 'File',
+      dataIndex: 'fileUrl',
+      key: 'fileUrl',
+      render: (_, rec, idx) => (
+        <DocumentCell
+          row={rec}
+          uploading={uploadingRow === (rec.key || rec.id)}
+          onUpload={(file) => handleDocumentUpload(file, idx, rec)}
+          onClear={() => {
+            const arr = [...documents];
+            arr[idx] = { ...arr[idx], fileUrl: '', fileName: '', fileType: '' };
+            setDocuments(arr);
+            setIsDirty(true);
+          }}
+        />
+      ),
+    },
     { title: 'Remarks', dataIndex: 'remarks', key: 'remarks', render: (_, rec, idx) => <Input value={rec.remarks} onChange={(e) => { const arr = [...documents]; arr[idx] = { ...arr[idx], remarks: e.target.value }; setDocuments(arr); setIsDirty(true); }} /> },
     { title: '', key: 'action', width: 50, render: (_, rec) => <Button type="text" danger icon={<DeleteOutlined />} onClick={() => removeDocument(rec.key || rec.id)} /> },
   ];
@@ -162,14 +472,74 @@ const EmployeeForm = () => {
         <Row gutter={[16, 0]}>
           <Col xs={24} sm={12} md={8}><Form.Item label="Full Name" name="fullName" rules={[{ required: true, message: 'Full name is required' }]}><Input /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Father/Husband Name" name="fatherHusbandName"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Gender" name="gender" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={GENDER_OPTIONS} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Date of Birth" name="dateOfBirth"><DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus"><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} allowClear /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Gender" name="gender" rules={[{ required: true, message: 'Gender is required' }]}><Select showSearch optionFilterProp="label" options={GENDER_OPTIONS} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Date of Birth"
+              name="dateOfBirth"
+              rules={[
+                { required: true, message: 'Date of birth is required' },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    if (value.isAfter(dayjs(), 'day')) {
+                      return Promise.reject(new Error('Date of birth cannot be in the future'));
+                    }
+                    if (dayjs().diff(value, 'year') < MIN_WORKING_AGE) {
+                      return Promise.reject(new Error(`Employee must be at least ${MIN_WORKING_AGE} years old`));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <DateInput style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus" rules={[{ required: true, message: 'Marital status is required' }]}><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Blood Group" name="bloodGroup"><Select showSearch optionFilterProp="label" options={BLOOD_GROUPS.map((b) => ({ value: b, label: b }))} allowClear /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Mobile Number" name="mobileNumber" rules={[{ required: true, message: 'Mobile is required' }]}><Input /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Mobile Number"
+              name="mobileNumber"
+              rules={[
+                { required: true, message: 'Mobile number is required' },
+                { pattern: MOBILE_PATTERN, message: 'Enter a valid 10-digit mobile number' },
+              ]}
+            >
+              <Input maxLength={15} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Aadhaar Number"
+              name="aadharNumber"
+              rules={[{ pattern: AADHAAR_PATTERN, message: 'Aadhaar must be exactly 12 digits' }]}
+            >
+              <Input maxLength={12} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="PAN"
+              name="panNumber"
+              getValueFromEvent={(e) => e.target.value.toUpperCase()}
+              rules={[{ pattern: PAN_PATTERN, message: 'PAN must look like ABCDE1234F' }]}
+            >
+              <Input maxLength={10} />
+            </Form.Item>
+          </Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Emergency Contact Name" name="emergencyContactName"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Emergency Contact Phone" name="emergencyContactPhone"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12}><Form.Item label="Present Address" name="presentAddress"><TextArea rows={2} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Emergency Contact Phone"
+              name="emergencyContactPhone"
+              rules={[{ pattern: MOBILE_PATTERN, message: 'Enter a valid 10-digit mobile number' }]}
+            >
+              <Input maxLength={15} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12}><Form.Item label="Present Address" name="presentAddress" rules={[{ required: true, message: 'Present address is required' }]}><TextArea rows={2} /></Form.Item></Col>
           <Col xs={24} sm={12}><Form.Item label="Permanent Address" name="permanentAddress"><TextArea rows={2} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Migrant Worker" name="isMigrantWorker" valuePropName="checked"><Switch /></Form.Item></Col>
         </Row>
@@ -180,14 +550,55 @@ const EmployeeForm = () => {
       label: 'Employment',
       children: (
         <Row gutter={[16, 0]}>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo"><Input disabled={isEdit} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Department" name="departmentId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={departments.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Designation" name="designationId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={designations.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={factories.map((f) => ({ value: f.id, label: f.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId"><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} allowClear /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: g.replace('_', '+') }))} allowClear /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo" rules={[{ required: true, message: 'Employee number is required' }, { max: 50, message: 'Employee number cannot exceed 50 characters' }]}><Input disabled={isEdit} maxLength={50} /></Form.Item></Col>
+          {/* Unit -> Department -> Designation. Changing a parent clears its
+              children, otherwise a stale child from the previous parent would
+              stay selected and fail server-side validation. */}
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item label="Unit" name="unitId" rules={[{ required: true, message: 'Unit is required' }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={unitOptions(units)}
+                onChange={() => form.setFieldsValue({ departmentId: undefined, designationId: undefined })}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Department"
+              name="departmentId"
+              rules={[{ required: true, message: 'Department is required' }]}
+              extra={!watchedUnitId ? 'Select a unit first' : undefined}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                disabled={!watchedUnitId}
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                onChange={() => form.setFieldsValue({ designationId: undefined })}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Designation"
+              name="designationId"
+              rules={[{ required: true, message: 'Designation is required' }]}
+              extra={!watchedDepartmentId ? 'Select a department first' : undefined}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                disabled={!watchedDepartmentId}
+                options={designations.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: gradeLabel(g) }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Reporting Manager" name="reportingManagerId">
               <Select
@@ -201,7 +612,62 @@ const EmployeeForm = () => {
               />
             </Form.Item>
           </Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Date of Joining" name="dateOfJoining" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Date of Joining"
+              name="dateOfJoining"
+              dependencies={['dateOfBirth']}
+              rules={[
+                { required: true, message: 'Date of joining is required' },
+                ({ getFieldValue }) => ({
+                  validator: (_, value) => {
+                    const dob = getFieldValue('dateOfBirth');
+                    if (!value || !dob) return Promise.resolve();
+                    if (value.isBefore(dob, 'day')) {
+                      return Promise.reject(new Error('Date of joining cannot precede date of birth'));
+                    }
+                    if (value.diff(dob, 'year') < MIN_WORKING_AGE) {
+                      return Promise.reject(new Error(`Employee would be under ${MIN_WORKING_AGE} on the joining date`));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <DateInput style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          {/*
+            dateOfLeaving is on the DTO and persisted by update(), and only F&F
+            settlement ever set it - which happens after the leaver's final
+            payroll. So payroll could not know someone had left, LEFT_MID_MONTH
+            never fired, and their unmarked days were reported as loss of pay
+            rather than days they were not employed.
+          */}
+          {isEdit && (
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label="Date of Leaving"
+                name="dateOfLeaving"
+                dependencies={['dateOfJoining']}
+                extra="Set this when the last working day is known, before the final payroll."
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator: (_, value) => {
+                      if (!value) return Promise.resolve();
+                      const joining = getFieldValue('dateOfJoining');
+                      if (joining && value.isBefore(joining, 'day')) {
+                        return Promise.reject(new Error('Date of leaving cannot precede date of joining'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DateInput style={{ width: '100%' }} allowClear />
+              </Form.Item>
+            </Col>
+          )}
           {isEdit && (
             <Col xs={24} sm={12} md={8}><Form.Item label="Status" name="status"><Select showSearch optionFilterProp="label" options={EMPLOYEE_STATUS} /></Form.Item></Col>
           )}
@@ -231,9 +697,47 @@ const EmployeeForm = () => {
         <>
           <Card title="Bank Details" size="small" style={{ marginBottom: 16 }}>
             <Row gutter={[16, 0]}>
-              <Col xs={24} sm={12} md={8}><Form.Item label="Account Number" name="accountNumber"><Input /></Form.Item></Col>
-              <Col xs={24} sm={12} md={8}><Form.Item label="IFSC Code" name="ifscCode"><Input /></Form.Item></Col>
-              <Col xs={24} sm={12} md={8}><Form.Item label="Bank Name" name="bankName"><Input /></Form.Item></Col>
+              {/*
+                Account number, IFSC and bank name are all NOT NULL on
+                EmployeeBankDetails, and the server writes the record as soon as
+                the account number has content - so filling one and leaving
+                another blank failed on save with a raw constraint error.
+                Leaving all three empty is fine and means no bank details.
+              */}
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="Account Number"
+                  name="accountNumber"
+                  dependencies={['ifscCode', 'bankName']}
+                  rules={[bankFieldRule('accountNumber', 'Account number')]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="IFSC Code"
+                  name="ifscCode"
+                  dependencies={['accountNumber', 'bankName']}
+                  getValueFromEvent={(e) => e.target.value.toUpperCase()}
+                  rules={[
+                    { pattern: IFSC_PATTERN, message: 'IFSC must look like HDFC0001234' },
+                    bankFieldRule('ifscCode', 'IFSC code'),
+                  ]}
+                >
+                  <Input maxLength={11} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="Bank Name"
+                  name="bankName"
+                  dependencies={['accountNumber', 'ifscCode']}
+                  rules={[bankFieldRule('bankName', 'Bank name')]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Branch Name" name="branchName"><Input /></Form.Item></Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Payment Mode" name="paymentMode"><Select showSearch optionFilterProp="label" options={PAYMENT_MODES} allowClear /></Form.Item></Col>
             </Row>
@@ -260,6 +764,17 @@ const EmployeeForm = () => {
       <PageHeader
         title={isEdit ? 'Edit Employee' : 'New Employee'}
         backPath="/hr/employees"
+        /* A photo is a file against an employee id. On a new employee there is
+           no id yet, so the picture is held here and uploaded by handleSave
+           once the employee exists - see pendingPhoto. */
+        avatar={(
+          <EmployeePhoto
+            employeeId={isEdit ? Number(id) : null}
+            employeeName={form.getFieldValue('fullName')}
+            canEdit
+            onPendingChange={(file) => { pendingPhoto.current = file; }}
+          />
+        )}
       >
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/hr/employees')}>Back</Button>
@@ -273,7 +788,17 @@ const EmployeeForm = () => {
         onValuesChange={() => setIsDirty(true)}
         initialValues={{ status: 'ACTIVE', employeeType: 'PERMANENT', isMigrantWorker: false, pfApplicable: false, esiApplicable: false, ptApplicable: false, lwfApplicable: false, tdsApplicable: false }}
       >
-        <Tabs items={tabItems} />
+        {/*
+          forceRender mounts every pane up front. Without it Antd only mounts a
+          pane once visited, so Form.Items on unvisited tabs never register and
+          validateFields() skips them - letting an incomplete record reach the
+          server and fail there instead of failing here.
+        */}
+        <Tabs
+          items={tabItems.map((tab) => ({ ...tab, forceRender: true }))}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+        />
       </Form>
     </>
   );

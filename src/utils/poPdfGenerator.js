@@ -4,6 +4,8 @@ import { getTermsConditionsById } from '../services/master/termsConditionsServic
 import { getSupplierById } from '../services/master/supplierService';
 import { getStateName } from './indianStates';
 import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/core/pantoneService';
+import { escInline, escAttr } from './printDoc';
+import { sanitizeRichText } from './sanitizeRichText';
 import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 /**
@@ -99,7 +101,9 @@ const getStatusLabel = (status) => {
 
 const computeGSTDetails = (po) => {
   const items = po.lineItems || [];
-  const isIgst = po.isIgstApplicable || po.igstApplicable || false;
+  // The PO from the API has no IGST flag: an inter-state PO is one whose lines carry IGST (as POView decides).
+  const isIgst = Boolean(po.isIgstApplicable || po.igstApplicable
+    || items.some((li) => parseFloat(li.igst || li.igstPercent || 0) > 0));
 
   let subtotal = 0;
   let totalSgst = 0;
@@ -184,27 +188,27 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const gst = computeGSTDetails(po);
   const items = po.lineItems || [];
   const amountInWords = numberToIndianWords(gst.grandTotal);
-  const poNumber = po.poNumber || po.poNo || '';
-  const supplierName = po.supplierName || supplier?.name || '';
-  const companyName = org?.organisationName || 'Company Name';
+  // Everything interpolated below is either built here or escaped (escInline for text, escAttr
+  // inside quotes): names, addresses and remarks are user-entered, and this HTML is written into a
+  // same-origin window.
+  const poNumber = escInline(po.poNumber || po.poNo || '');
+  const supplierName = escInline(po.supplierName || supplier?.name || '');
+  const companyName = escInline(org?.organisationName || 'Company Name');
   const watermarkText = companyName;
 
-  const poType = po.poType || 'General';
+  const poType = escInline(po.poType || 'General');
 
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';
   const supplierGstin = supplier?.gstin || po.supplierGstin || '';
-  const orgStateCode = orgGstin.substring(0, 2);
   const supplierStateCode = supplierGstin.substring(0, 2);
 
   // Calculate total quantity per UOM
   const uomTotals = {};
-  let totalQty = 0;
   items.forEach((item) => {
     const uom = item.uomSymbol || item.uomName || item.uom || 'Units';
     const qty = parseFloat(item.quantity || item.qty || 0);
     uomTotals[uom] = (uomTotals[uom] || 0) + qty;
-    totalQty += qty;
   });
 
   // Build line items table rows with GST in columns
@@ -231,9 +235,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
 
     // Description with item details
     let descParts = [];
-    if (item.itemName) descParts.push(`<strong>${item.itemName}</strong>`);
-    if (item.description) descParts.push(item.description);
-    if (item.itemCode) descParts.push(`<span class="item-code">Code: ${item.itemCode}</span>`);
+    const lineName = item.variantName;
+    const lineCode = item.variantCode;
+    if (lineName) descParts.push(`<strong>${escInline(lineName)}</strong>`);
+    if (item.description) descParts.push(escInline(item.description));
+    if (lineCode) descParts.push(`<span class="item-code">Code: ${escInline(lineCode)}</span>`);
 
     // Variant attributes (excluding color which shows as swatch)
     const colorSwatches = extractColorSwatches(item);
@@ -241,7 +247,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       Object.entries(item.variantAttributes).forEach(([k, v]) => {
         const keyLower = k.toLowerCase();
         if (!keyLower.includes('color') && !keyLower.includes('colour')) {
-          descParts.push(`<span class="attr">${k}: ${v}</span>`);
+          descParts.push(`<span class="attr">${escInline(k)}: ${escInline(v)}</span>`);
         }
       });
     }
@@ -252,7 +258,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       swatchHtml = colorSwatches.map(swatch => `
         <div class="color-swatch-container">
           <div class="color-swatch-wrapper">
-            <img src="${swatch.url}" class="color-swatch" alt="${swatch.code}" onerror="this.style.display='none'" />
+            <img src="${escAttr(swatch.url)}" class="color-swatch" alt="${escAttr(swatch.code)}" onerror="this.style.display='none'" />
           </div>
         </div>
       `).join('');
@@ -261,7 +267,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
     // Variant image (base64 data URL from item master)
     const variantImgSrc = item.variantId ? variantImages[item.variantId] : null;
     const variantImageHtml = variantImgSrc
-      ? `<img src="${variantImgSrc}" class="variant-img" alt="variant" onerror="this.style.display='none'" />`
+      ? `<img src="${escAttr(variantImgSrc)}" class="variant-img" alt="variant" onerror="this.style.display='none'" />`
       : '';
 
     // GST columns based on type - only show relevant columns
@@ -288,9 +294,9 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
               </div>
             </div>
           </td>
-          <td class="center">${item.hsnCode || '-'}</td>
+          <td class="center">${escInline(item.hsnCode || '-')}</td>
           <td class="num">${formatCurrency(price)}</td>
-          <td class="center nowrap">${qty}&nbsp;${uom}</td>
+          <td class="center nowrap">${qty}&nbsp;${escInline(uom)}</td>
           <td class="num">${formatCurrency(base)}</td>
           ${gstColumnsHtml}
           <td class="num total-col">${formatCurrency(totalWithTax)}</td>
@@ -299,7 +305,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
 
   // Build total qty summary
   const totalQtyDisplay = Object.entries(uomTotals)
-    .map(([uom, qty]) => `${formatCurrency(qty)} ${uom}`)
+    .map(([uom, qty]) => `${formatCurrency(qty)} ${escInline(uom)}`)
     .join(' | ');
 
   // Order references section (for Regular/Combined POs)
@@ -319,9 +325,9 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <tbody>
           ${po.orderReferences.map(ref => `
             <tr>
-              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.orderNo || '-'}</td>
-              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.styleName || '-'}</td>
-              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.season || '-'}</td>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${escInline(ref.orderNo || '-')}</td>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${escInline(ref.styleName || '-')}</td>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${escInline(ref.season || '-')}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -635,17 +641,17 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="company-info">
           <div class="company-name">${companyName}</div>
           <div class="company-details">
-            ${[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ')}<br>
-            ${[org?.city, org?.state].filter(Boolean).join(', ')}${org?.pincode ? ' - ' + org.pincode : ''}<br>
-            ${org?.phone ? 'Tel: ' + org.phone + ' | ' : ''}${org?.email ? 'Email: ' + org.email : ''}<br>
-            GSTIN: ${orgGstin || '-'} | PAN: ${org?.pan || '-'}${org?.cin ? ' | CIN: ' + org.cin : ''}
+            ${escInline([org?.addressLine1, org?.addressLine2].filter(Boolean).join(', '))}<br>
+            ${escInline([org?.city, org?.state].filter(Boolean).join(', '))}${org?.pincode ? ' - ' + escInline(org.pincode) : ''}<br>
+            ${org?.phone ? 'Tel: ' + escInline(org.phone) + ' | ' : ''}${org?.email ? 'Email: ' + escInline(org.email) : ''}<br>
+            GSTIN: ${escInline(orgGstin || '-')} | PAN: ${escInline(org?.pan || '-')}${org?.cin ? ' | CIN: ' + escInline(org.cin) : ''}
           </div>
         </div>
       </div>
       <div class="po-badge">
         <div class="po-label">Purchase Order</div>
         <div class="po-number">${poNumber}</div>
-        <div class="po-status">${getStatusLabel(po.status)}</div>
+        <div class="po-status">${escInline(getStatusLabel(po.status))}</div>
       </div>
     </div>
     <div class="info-row">
@@ -653,25 +659,25 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="info-card-header">Supplier Details</div>
         <div class="info-card-body">
           <div class="name">${supplierName}</div>
-          ${supplier?.address ? `<div class="detail">${supplier.address}</div>` : '<div class="detail">-</div>'}
-          <div class="detail">${[supplier?.city, supplier?.state].filter(Boolean).join(', ')}${supplier?.pincode ? ' - ' + supplier.pincode : ''}</div>
-          ${supplier?.phone ? `<div class="detail">Phone: ${supplier.phone}</div>` : ''}
-          ${supplier?.email ? `<div class="detail">Email: ${supplier.email}</div>` : ''}
+          ${supplier?.address ? `<div class="detail">${escInline(supplier.address)}</div>` : '<div class="detail">-</div>'}
+          <div class="detail">${escInline([supplier?.city, supplier?.state].filter(Boolean).join(', '))}${supplier?.pincode ? ' - ' + escInline(supplier.pincode) : ''}</div>
+          ${supplier?.phone ? `<div class="detail">Phone: ${escInline(supplier.phone)}</div>` : ''}
+          ${supplier?.email ? `<div class="detail">Email: ${escInline(supplier.email)}</div>` : ''}
           <div style="margin-top: 4px;">
-            ${supplierGstin ? `<span class="gstin">GSTIN: ${supplierGstin}</span>` : ''}
-            ${supplier?.pan ? `<span class="pan-badge">PAN: ${supplier.pan}</span>` : ''}
-            ${supplierStateCode ? `<span class="state-badge">State: ${supplierStateCode}${getStateName(supplierStateCode) ? ' - ' + getStateName(supplierStateCode) : (supplier?.state ? ' - ' + supplier.state : '')}</span>` : ''}
+            ${supplierGstin ? `<span class="gstin">GSTIN: ${escInline(supplierGstin)}</span>` : ''}
+            ${supplier?.pan ? `<span class="pan-badge">PAN: ${escInline(supplier.pan)}</span>` : ''}
+            ${supplierStateCode ? `<span class="state-badge">State: ${escInline(supplierStateCode)}${getStateName(supplierStateCode) ? ' - ' + escInline(getStateName(supplierStateCode)) : (supplier?.state ? ' - ' + escInline(supplier.state) : '')}</span>` : ''}
           </div>
         </div>
       </div>
       <div class="info-card">
         <div class="info-card-header">Ship To</div>
         <div class="info-card-body">
-          <div class="name">${companyName}</div>
-          <div class="detail">${[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || '-'}</div>
-          <div class="detail">${[org?.city, org?.state].filter(Boolean).join(', ')}${org?.pincode ? ' - ' + org.pincode : ''}</div>
-          ${org?.phone ? `<div class="detail">Phone: ${org.phone}</div>` : ''}
-          ${org?.email ? `<div class="detail">Email: ${org.email}</div>` : ''}
+          <div class="name">${po.deliveryBranchName ? companyName + " — " + escInline(po.deliveryBranchName) : companyName}</div>
+          <div class="detail">${escInline(po.deliveryBranchAddress || [org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || '-')}</div>
+          <div class="detail">${escInline(po.deliveryBranchAddress ? (po.deliveryBranchGstin ? 'GSTIN: ' + po.deliveryBranchGstin : '') : [org?.city, org?.state].filter(Boolean).join(', ') + (org?.pincode ? ' - ' + org.pincode : ''))}</div>
+          ${org?.phone ? `<div class="detail">Phone: ${escInline(org.phone)}</div>` : ''}
+          ${org?.email ? `<div class="detail">Email: ${escInline(org.email)}</div>` : ''}
         </div>
       </div>
     </div>
@@ -688,6 +694,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="label">Delivery Date</div>
         <div class="value">${formatDate(po.deliveryDate || po.expectedDeliveryDate)}</div>
       </div>
+      ${po.revisedDeliveryDate ? `
+      <div class="po-detail-item">
+        <div class="label">Revised Delivery Date</div>
+        <div class="value">${formatDate(po.revisedDeliveryDate)}</div>
+      </div>` : ''}
       <div class="po-detail-item">
         <div class="label">Tax Type</div>
         <div class="value">${gst.isIgst ? 'IGST' : 'CGST + SGST'}</div>
@@ -788,12 +799,12 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e2e8f0;">
         <div style="background: white; padding: 6px 8px;">
           <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">E-way Bill No</div>
-          <div style="font-size: 10px; font-weight: 700; color: #1e293b; font-family: monospace; margin-top: 2px;">${po.ewayBillNo}</div>
+          <div style="font-size: 10px; font-weight: 700; color: #1e293b; font-family: monospace; margin-top: 2px;">${escInline(po.ewayBillNo)}</div>
         </div>
         <div style="background: white; padding: 6px 8px;">
           <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Status</div>
           <div style="font-size: 9px; font-weight: 600; margin-top: 2px;">
-            <span style="display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 7px; background: ${po.ewayBillStatus === 'ACTIVE' ? '#dcfce7; color: #166534' : po.ewayBillStatus === 'CANCELLED' ? '#fef2f2; color: #991b1b' : '#f0f0f0; color: #595959'};">${po.ewayBillStatus || 'ACTIVE'}</span>
+            <span style="display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 7px; background: ${po.ewayBillStatus === 'ACTIVE' ? '#dcfce7; color: #166534' : po.ewayBillStatus === 'CANCELLED' ? '#fef2f2; color: #991b1b' : '#f0f0f0; color: #595959'};">${escInline(po.ewayBillStatus || 'ACTIVE')}</span>
           </div>
         </div>
         <div style="background: white; padding: 6px 8px;">
@@ -814,17 +825,17 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
     ` : ''}
     ${po.remarks ? `
     <div class="remarks-section">
-      <strong>Remarks:</strong> ${po.remarks}
+      <strong>Remarks:</strong> ${escInline(po.remarks)}
     </div>
     ` : ''}
     <div class="signature-section">
       <div class="signature-box">
-        <div class="name">${po.createdByName || ''}</div>
+        <div class="name">${escInline(po.createdByName || '')}</div>
         <div class="line"></div>
         <div class="role">Prepared By</div>
       </div>
       <div class="signature-box">
-        <div class="name">${po.approvedByName || ''}</div>
+        <div class="name">${escInline(po.approvedByName || '')}</div>
         <div class="line"></div>
         <div class="role">Approved By</div>
       </div>
@@ -833,7 +844,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       THIS IS A COMPUTER GENERATED DOCUMENT - NO SIGNATURE REQUIRED
     </div>
     <div class="note-line">
-      For any queries, please contact: ${org?.email || 'support@company.com'}
+      For any queries, please contact: ${escInline(org?.email || 'support@company.com')}
     </div>
   </div>
 </body>
@@ -891,6 +902,9 @@ export const generatePOPdf = async (poData, options = {}) => {
         console.warn('Failed to fetch terms & conditions:', err);
       }
     }
+
+    // T&C is stored rich text: reduce it to editor formatting before it reaches the print window.
+    termsContent = await sanitizeRichText(termsContent);
 
     // Build the HTML document
     const variantImages = options.variantImages || {};

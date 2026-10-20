@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Input, DatePicker, Select, Row, Col } from 'antd';
 import { SearchOutlined, InboxOutlined, DollarOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import PageHeader from '../../../components/PageHeader';
@@ -14,6 +13,7 @@ import { GRN_STATUS } from '../../../utils/inventoryConstants';
 import { getGRNList, deleteDraftGRN, getFabricGRN } from '../../../services/inventory/inventoryService';
 import getGRNListColumns from './GRNListColumns';
 import GRNViewModal from './GRNViewModal';
+import CancelGRNModal from './CancelGRNModal';
 
 const { RangePicker } = DatePicker;
 
@@ -100,9 +100,21 @@ const GRNList = () => {
     [message, loadData],
   );
 
+  const [cancelModal, setCancelModal] = useState({ open: false, record: null });
+  const handleCancel = useCallback((record) => setCancelModal({ open: true, record }), []);
+
   const columns = useMemo(
-    () => getGRNListColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
-    [handleView, handleEdit, handleDelete],
+    () => getGRNListColumns({
+      onView: handleView,
+      onEdit: handleEdit,
+      onDelete: handleDelete,
+      onCancel: handleCancel,
+      // Cancelling a posted GRN and deleting a draft are different acts. Cancel
+      // used to run on the delete right while Delete itself was ungated.
+      canCancel: hasPermission('inventory', 'cancel'),
+      canDelete: hasPermission('inventory', 'delete'),
+    }),
+    [handleView, handleEdit, handleDelete, handleCancel],
   );
 
   // Stats come from the paginated API response (computed server-side across
@@ -161,6 +173,13 @@ const GRNList = () => {
         open={viewDrawer.open}
         onClose={() => setViewDrawer((prev) => ({ ...prev, open: false }))}
         grn={viewDrawer.grn}
+      />
+
+      <CancelGRNModal
+        open={cancelModal.open}
+        record={cancelModal.record}
+        onClose={() => setCancelModal({ open: false, record: null })}
+        onCancelled={loadData}
       />
     </div>
   );

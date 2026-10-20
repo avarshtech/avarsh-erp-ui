@@ -170,7 +170,8 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Item Types"
       subtitle="Item"
       addLabel="Add Item Type"
@@ -244,9 +245,26 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                 <Form.Item
                   name="name"
                   label="Item Type Name"
-                  rules={[{ required: true, message: 'Please enter item type name' }]}
+                  rules={[
+                    { required: true, message: 'Please enter item type name' },
+                    { pattern: /^[A-Za-z0-9 ]+$/, message: 'Special characters are not allowed' },
+                  ]}
                 >
-                  <Input placeholder="e.g. Raw Material" size="large"/>
+                  <Input
+                    placeholder="e.g. Raw Material"
+                    size="large"
+                    onKeyPress={(e) => {
+                      if (!/[A-Za-z0-9 ]/.test(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      const pasted = e.clipboardData.getData('text');
+                      if (/[^A-Za-z0-9 ]/.test(pasted)) {
+                        e.preventDefault();
+                      }
+                    }}
+                  />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={3} />

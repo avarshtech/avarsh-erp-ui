@@ -9,7 +9,7 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
   const columns = useMemo(
     () => [
       { title: '#', width: 45, key: 'index', align: 'center', render: (_, __, i) => i + 1 },
-      { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140, align: 'center' },
+      { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140, align: 'center', render: (v, r) => r.variantCode || v || '—' },
       { title: 'Description', dataIndex: 'description', key: 'description', width: 220, ellipsis: true, align: 'center' },
       { title: 'Color', dataIndex: 'color', key: 'color', width: 100, align: 'center' },
       { title: 'Size', dataIndex: 'size', key: 'size', width: 80, align: 'center' },
@@ -28,7 +28,7 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
           <InputNumber
             value={val || null}
             onChange={(v) => onItemChange(i, 'issueQty', v)}
-            addonAfter={record.uom || ''}
+            suffix={record.uom || ''}
             placeholder="0"
             controls={false}
             style={{ width: '100%' }}
@@ -65,7 +65,8 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
 
   return (
     <Table
-      rowKey="id"
+      // Two variants of one item are two BOM lines with the same item id (U222)
+      rowKey={(r) => r.bomLineId ?? r.id}
       columns={columns}
       dataSource={items}
       pagination={false}

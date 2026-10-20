@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Table, Card, Space, Tag, Segmented } from 'antd';
 import { UnorderedListOutlined, TableOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -9,13 +9,17 @@ import StatusTag from '../../../components/StatusTag';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import ProductionPoView from '../components/ProductionPoView';
+import PoNoLink from '../components/PoNoLink';
 import FinishingCoverageMatrix from './FinishingCoverageMatrix';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { PROD_PO_STATUS, getStatusLabel, getProcessLabel, EDITABLE_STATUSES, PO_TYPE, FINISHING_PROCESSES } from '../../../utils/productionConstants';
-import { listFinishingPos, getVendors } from '../../../services/po/productionService';
+import { listFinishingPos, getFinishingPo } from '../../../services/po/production/finishingPoService';
+import { getVendors } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
 const PROCESS_OPTIONS = FINISHING_PROCESSES.map((p) => ({ value: p.key, label: p.label }));
@@ -24,6 +28,9 @@ const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) 
 const FinishingPoList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters this list server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [status, setStatus] = useState();
   const [process, setProcess] = useState();
@@ -51,15 +58,28 @@ const FinishingPoList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message]);
+  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep link from My Approvals (?viewId=X) — GRNList pattern.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getFinishingPo(viewId)
+      .then((po) => po && setView({ open: true, record: po }))
+      .catch(() => message.error('Finishing PO not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
   const vendorOptions = useMemo(() => vendors.map((v) => ({ value: v.id, label: v.name })), [vendors]);
 
   const columns = useMemo(() => [
-    { title: 'Finishing PO', dataIndex: 'finishingPoNo', width: 150, fixed: 'left' },
+    { title: 'Finishing PO', dataIndex: 'finishingPoNo', width: 150, fixed: 'left',
+      render: (v, r) => <PoNoLink text={v} onOpen={() => setView({ open: true, record: r })} /> },
     { title: 'Order', dataIndex: 'orderNo', width: 130 },
     { title: 'Style', dataIndex: 'styleNo', width: 120 },
     { title: 'Buyer', dataIndex: 'buyer', width: 150, ellipsis: true },
@@ -69,30 +89,32 @@ const FinishingPoList = () => {
           {(r.processes || []).map((p) => <Tag key={p.processName} color="blue">{getProcessLabel(p.processName)}</Tag>)}
         </Space>
       ) },
+    ...branchColumn,
     { title: 'Vendor', key: 'vendor', width: 160, render: (_, r) => (r.isOutsourced ? r.vendorName : <Tag>In-house</Tag>) },
-    { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
-    { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString() },
+    { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString('en-IN') },
+    { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString('en-IN') },
     { title: 'PO Value', key: 'poValue', width: 120, align: 'right', render: (_, r) => `₹ ${poValue(r).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
     { title: 'Status', dataIndex: 'status', width: 150, align: 'center',
       render: (s) => <StatusTag status={s} config={PRODUCTION_PO_STATUS_CONFIG} getLabel={getStatusLabel} /> },
     { title: 'Actions', key: 'actions', width: 140, fixed: 'right',
-      render: (_, r) => (
+      // a cancelled PO has nothing left to do: open it from its number instead
+      render: (_, r) => (r.status === PROD_PO_STATUS.CANCELLED ? null : (
         <Space size={0}>
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.FINISHING)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="finishing-po" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/finishing-po/edit/${r.id}`)} />
             </PermissionGuard>
           )}
         </Space>
-      ) },
-  ], [navigate]);
+      )) },
+  ], [navigate, branchColumn]);
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Finishing POs">
-        <PermissionGuard module="production" operation="add">
+      <PageHeader title="Finishing PO">
+        <PermissionGuard module="finishing-po" operation="add">
           <ActionButton action="create" text="Generate Finishing POs" onClick={() => navigate('/purchase-orders/finishing-po/new')} />
         </PermissionGuard>
       </PageHeader>

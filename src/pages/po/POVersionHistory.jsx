@@ -71,8 +71,8 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
       width: 200,
       render: (_, r) => (
         <div>
-          <Text strong style={{ fontSize: 13 }}>{r.itemName || '-'}</Text>
-          {r.itemCode && <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>{r.itemCode}</Text>}
+          <Text strong style={{ fontSize: 13 }}>{r.variantName || r.itemName || '-'}</Text>
+          {(r.variantCode || r.itemCode) && <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>{r.variantCode || r.itemCode}</Text>}
         </div>
       ),
     },
@@ -280,7 +280,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
                     pagination={false}
                     size="small"
                     scroll={{ x: 600 }}
-                    rowKey={(r, i) => r.id || i}
+                    rowKey={(r) => r.id ?? lineItems.indexOf(r)}
                     style={{ borderRadius: 8, overflow: 'hidden' }}
                   />
                 </div>

@@ -182,7 +182,8 @@ const VariantMaster = ({ onDirtyChange }) => {
   const dataType = Form.useWatch('dataType', form);
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Variants / Attributes"
       subtitle="Item"
       addLabel="Add Attribute"

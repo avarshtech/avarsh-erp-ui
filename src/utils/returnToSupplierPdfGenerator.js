@@ -100,7 +100,7 @@ const buildHtml = (rtn, org, supplier) => {
     const total = Number(it.totalAmount || taxable + tax);
     const descParts = [];
     if (it.description) descParts.push(`<strong>${escapeHtml(it.description)}</strong>`);
-    if (it.itemCode) descParts.push(`<span class="attr">Code: ${escapeHtml(it.itemCode)}</span>`);
+    if (it.variantCode) descParts.push(`<span class="attr">Code: ${escapeHtml(it.variantCode)}</span>`);
     if (it.rollNumber) descParts.push(`<span class="attr">Roll: ${escapeHtml(it.rollNumber)}</span>`);
     if (it.size) descParts.push(`<span class="attr">Size: ${escapeHtml(it.size)}</span>`);
     if (it.color) descParts.push(`<span class="attr">Color: ${escapeHtml(it.color)}</span>`);

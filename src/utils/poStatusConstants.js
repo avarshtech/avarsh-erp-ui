@@ -110,6 +110,22 @@ export const BOM_UNLOCK_STATUSES = [
   PO_STATUS.REFERRED_BACK,
 ];
 
+/** PO statuses in which the delivery date may be re-agreed with the supplier */
+export const REVISABLE_DELIVERY_STATUSES = [
+  PO_STATUS.SENT_TO_SUPPLIER,
+  PO_STATUS.PARTIALLY_RECEIVED,
+];
+
+/**
+ * The delivery date the PO is actually tracking to: the revised date once one has been
+ * agreed, otherwise the original. Every date bound and overdue calculation should use
+ * this rather than `po.deliveryDate` directly.
+ */
+export const getEffectiveDeliveryDate = (po) => po?.revisedDeliveryDate || po?.deliveryDate || null;
+
+/** True when the delivery date has been revised at least once */
+export const isDeliveryDateRevised = (po) => Boolean(po?.revisedDeliveryDate);
+
 export default {
   PO_STATUS,
   LINE_ITEM_STATUS,
@@ -123,4 +139,7 @@ export default {
   EWAY_BILL_STATUS,
   EWAY_BILL_THRESHOLD,
   EWAY_BILL_CANCEL_REASONS,
+  REVISABLE_DELIVERY_STATUSES,
+  getEffectiveDeliveryDate,
+  isDeliveryDateRevised,
 };

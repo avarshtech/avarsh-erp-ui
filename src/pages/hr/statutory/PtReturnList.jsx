@@ -1,26 +1,32 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, DatePicker } from 'antd';
-import { PlusOutlined, CheckOutlined, EyeOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form } from 'antd';
+import DateInput from '../../../components/DateInput';
+import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAllPtReturns, generatePtReturn, filePtReturn, getPtReturnRecords } from '../../../services/hr/statutoryService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getAllPtReturns, generatePtReturn, filePtReturn } from '../../../services/hr/statutoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const PtReturnList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission('hr-statutory', 'add');
@@ -31,16 +37,16 @@ const PtReturnList = () => {
       const result = await getAllPtReturns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load PT returns');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, [fetchData]);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+  }, [fetchData, activeBranchId]);
 
   const filteredData = useMemo(() => {
     if (!statusFilter) return data;
@@ -52,7 +58,7 @@ const PtReturnList = () => {
       const values = await form.validateFields();
       setGenerating(true);
       await generatePtReturn({
-        factoryId: values.factoryId,
+        unitId: values.unitId,
         periodFrom: values.periodFrom.format('YYYY-MM-DD'),
         periodTo: values.periodTo.format('YYYY-MM-DD'),
       });
@@ -62,7 +68,7 @@ const PtReturnList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return; // form validation
-      message.error(err?.response?.data?.message || 'Failed to generate PT return');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setGenerating(false);
     }
@@ -78,8 +84,8 @@ const PtReturnList = () => {
             await filePtReturn(id);
             message.success('PT return marked as filed');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to file PT return');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });
@@ -97,30 +103,30 @@ const PtReturnList = () => {
           r.periodFrom && r.periodTo
             ? `${dayjs(r.periodFrom).format('DD MMM YYYY')} - ${dayjs(r.periodTo).format('DD MMM YYYY')}`
             : '-',
-        sorter: (a, b) => (a.periodFrom || '').localeCompare(b.periodFrom || ''),
+        sorter: thenById((a, b) => (a.periodFrom || '').localeCompare(b.periodFrom || '')),
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',
       },
       {
         title: 'Total PT Amount',
-        dataIndex: 'totalAmount',
+        dataIndex: 'totalPtAmount',
         key: 'totalAmount',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',
@@ -140,7 +146,7 @@ const PtReturnList = () => {
         render: (_, r) => (
           <Space>
             {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleMarkFiled(r.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleMarkFiled(r.id); }}>
                 Mark Filed
               </Button>
             )}
@@ -180,6 +186,7 @@ const PtReturnList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} returns` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/pt/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -189,13 +196,13 @@ const PtReturnList = () => {
         onCancel={() => setGenerateOpen(false)}
         confirmLoading={generating}
         afterClose={() => form.resetFields()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
+          <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
             <Select
-              placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              placeholder="Select unit"
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />
@@ -203,12 +210,12 @@ const PtReturnList = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="periodFrom" label="Period From" rules={[{ required: true, message: 'Required' }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="periodTo" label="Period To" rules={[{ required: true, message: 'Required' }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>

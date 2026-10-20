@@ -7,6 +7,7 @@
 4. [Search & Filter Patterns](#search--filter-patterns)
 5. [Aggregation Strategy](#aggregation-strategy)
 6. [Rounding & Precision Rules](#rounding--precision-rules)
+7. [Stock & Payroll Posting Rules](#stock--payroll-posting-rules)
 
 ---
 
@@ -108,6 +109,8 @@ sizeReq[size] = Σ_over_colors(consumptionMatrix[color][size] × orderQtyGrid[co
 allowance[size] = Σ_over_processes(rejectionPercent[size] + shipmentAllowancePercent[size])
 purchaseQty[size] = sizeReq[size] × (1 + allowance[size] / 100)
 ```
+
+> `calcVariantBreakdown` is defined at `src/utils/bomConstants.js:185` and has **no callers** as of 2026-09-24 (`grep -rn calcVariantBreakdown src` finds only the definition). Treat it as the reference formula; do not extend it expecting a screen to pick the change up.
 
 ```javascript
 export const calcVariantBreakdown = (consumptionMatrix, orderQtyGrid, variantMapping, processAllowances) => {
@@ -263,10 +266,16 @@ gramsPerPart = (length × width × NOP × GSM) / 10000
 - `NOP` — Number Of Plies (layers in cutting)
 - `GSM` — Grams per Square Meter (fabric weight)
 
-### Total Consumption (kg)
+### Total Consumption (grams)
 ```
-totalConsumption(kg) = SUM(parts[].gramsPerPart) / 1000
+totalGrams = SUM(parts[].gramsPerPart)
 ```
+
+**Do NOT divide by 1000 here.** The calculator's output unit must match the consumption UOM
+of the fabric row it feeds, which is the item's **secondary** UOM — grams for one item,
+kilograms for another. Converting to kg unconditionally is what put a `0.059` figure into a
+field labelled `GMS` (wrong by 1000×). The caller restates the grams total via
+`convertGramsTo(grams, targetUom)` from `src/utils/uomConversions.js`.
 
 ```javascript
 export const calcKnitsGramsPerPart = (length, width, nop, gsm) => {
@@ -278,11 +287,24 @@ export const calcKnitsGramsPerPart = (length, width, nop, gsm) => {
   return (l * w * n * g) / 10000;
 };
 
-export const calcKnitsTotalConsumption = (parts) => {
-  const total = parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
-  return total / 1000;
-};
+export const calcKnitsTotalGrams = (parts) =>
+  parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
 ```
+
+### Consumption UOM vs Rate UOM (costing rows)
+
+Quantities are captured in the item's **secondary** (consumption) UOM; rates are the purchase
+price per **primary** UOM. Never multiply the two directly:
+
+```
+netCost   = (consumption ÷ uomConversionFactor) × fabricPrice × (1 + allowance%) × (1 + wastage%)
+trimPrice = (consumption ÷ uomConversionFactor) × cost
+```
+
+`uomConversionFactor` is stored only when `conversionApplies(primaryUomId, secondaryUomId,
+factor)` is true, so a null factor safely means "pass the quantity through". Both the factor
+and the primary UOM are **snapshotted** onto the saved row — they are part of what the stored
+rate means, so a later item-master edit must not re-price a saved cost sheet.
 
 ---
 
@@ -453,3 +475,111 @@ totalPrice (INR)     = computed in INR
 finalPrice (quote)   = totalPrice / quoteCurrencyRate
 finalPriceUsd (USD)  = totalPrice / usdToInrRate
 ```
+
+---
+
+## Stock & Payroll Posting Rules
+
+Verified against erp-purchase on 2026-10-02 (review findings F001–F004 and those named below). Each
+rule replaced a version that posted the wrong quantity or amount.
+
+### QC is per GRN line
+- A QC inspects one GRN line (`inventory/qc/domain/QC.poLineItemId`). `StockPopulationService.populateFromQc`
+  materialises stock for that line only. An older QC with no line still covers the whole GRN.
+- A GRN closes only when every line that received goods (`receivingQty > 0`, with a
+  `poLineItemId`) has a settled QC: Approved, Conditional_Pass or Rejected_With_Backup. The
+  check is `inventory/grn/service/GrnInspection.complete(lines, qcs)`, called through
+  `GRNService.closeIfFullyInspected(grnId)`. Never close a GRN because one QC was approved.
+
+### Returns to supplier (accessories)
+- One pending row and one return line per QC, at the QC's received quantity, counted once
+  (`ReturnToSupplierService.onePerQc`). Returning it settles every PENDING_RETURN criterion of
+  that QC. Never add up a quantity per failed criterion: the supplier was debited once per criterion.
+
+### Opening stock (accessories)
+- Opening lots merge on branch, item, variant, size and colour. The lookup is
+  `AccessoriesStockRepository.findOpeningVariantForUpdate(branchId, itemId, variantId, size, color)`,
+  null-safe on branch and variant. The partial unique index is `uq_acc_stock_opening_variant`
+  `WHERE source_type = 'OPENING_BALANCE'`. A key without the branch put a second branch's
+  opening line into the first branch's lot.
+
+### Payroll approval posts by run
+- Processing writes one `LoanRecovery` per instalment it actually took (with `payrollRunId`;
+  re-processing deletes that run's rows first). It also writes the advance amount taken on the
+  salary record, capped so the net salary never goes negative.
+- Approval posts exactly that (`hr/service/PayrollRecoveries`):
+  - Each loan is reduced by its own recovery row of the run (`loanRecoveryRepository.findByPayrollRunId`). A zero balance makes it FULLY_RECOVERED.
+  - The advance amount taken is shared over the advances due that month, oldest first. A fully recovered advance is RECOVERED. Any other advance stays PENDING with the rest owed and moves to the next month (December moves to January of the next year).
+- Never post "the latest recovery of the loan", and never mark an advance recovered without the
+  amount the payslip took.
+
+### Receipt, inspection and the PO's received status
+Review findings F065 and F066:
+- A QC decision that creates stock needs a live receipt. Approve, conditional pass and reject-with-back-up are allowed only while the GRN is QC_Pending, or Closed when a referred-back QC is decided again (`QCService.requireGrnOpenForDecision`). They are refused while the GRN is Pending_Reversal, Reversed or Cancelled.
+- A GRN is reversed before its inspection, not after: `requestReversal` refuses once any non-Draft QC exists (`QCRepository.existsByGrnIdAndStatusNot(grnId, Draft)`).
+- `GRNService.recomputePoStatus`:
+  - runs under the PO's row lock (`findByIdForUpdate`);
+  - acts only on a Sent_To_Supplier, Partially_Received or Completed PO, so a cancelled or referred-back PO keeps its status;
+  - counts submitted receipts only (`sumSubmittedReceivingQtyByPoLineItem`: no Draft, Reversed or Cancelled GRN).
+- Over-receipt checks keep `sumReceivingQtyByPoLineItemForPo`, which counts drafts too.
+
+### Earned-leave encashment and committed payroll runs
+Review findings F070 and F071:
+- Approving an EL encashment run moves `ElEncashmentRecord.elBalanceDays` into `LeaveBalance.encashed`. Those are the days the run paid for: `elAmount = elBalanceDays × (basic + DA) / 26`. Never move `totalDays`, which is opening + accrued.
+- Approval refuses when an employee's closing balance has fallen below those days since the run was calculated. Cancel the run and calculate it again.
+- Bonus reads only committed payroll runs, `PayrollRun.isCommitted()` (APPROVED or PAID). The PT return reads committed runs plus PROCESSED ones.
+- Payroll takes the salary structure in effect in the processed month, `SalaryStructure.appliesWithin(monthStart, monthEnd)`: the latest one effective by the month's end. Never use `isCurrent` for a run. A structure's gross is the sum of its six components (`SalaryStructureService.grossOf`).
+
+### PO money is the server's
+Review finding F077:
+- `purchaseorder/service/PoAmounts` recomputes each line's CGST, SGST, IGST, tax and total, and the header's subtotal, CGST, SGST, tax and grand total, using POForm's arithmetic. Components are rounded per line; header sums add unrounded figures and round once.
+- A client figure within 0.01 of the server's is kept, because the screen's PDF prints its own. Anything further off is replaced and logged.
+- A null tax component that does not apply stays null; the PO view picks the IGST or CGST/SGST split by which is set.
+- The header totals are set before the PO's first write. Set after the IDENTITY insert, they dirtied the PO again: the commit-time update moved the version past the one the create response echoed, and the next action on the new PO was a false 409. The same holds for any entity whose response carries `version`: finish changing it before it is written, or `saveAndFlush` after the last change and map from that.
+
+### GRN lines, inspection holds and returns
+Review findings F104, F069, F056 and F068:
+- A GRN line's PO quantity, rate, item and variant come from its own PO line, never from the request. A line not on the GRN's PO is refused, and a saved GRN keeps its PO and type.
+- When an approved QC is referred back, its untouched stock goes `On_Hold`, which no issue picks, and the next decision puts it back `In_Stock` (`StockPopulationService.holdForQc`). Stock that has already moved refuses the refer-back.
+- A cutting-room fabric return puts back no more into a stock row than the Cutting PO was issued from it. A receipt roll's `fabricStockId` comes from its issue line.
+- An accessories transfer line keeps every lot it drew from (`StockTransferLine.lots`). A cancel restores each lot; receive costs the new lot at the quantity-weighted cost.
+
+### Bill passing debits
+Review findings F044 and F234:
+- A linked debit note is deducted once per PO line a bill covers, and only on one live bill of the PO (`BpBillRepository.findDebitNoteIdsLinkedOnOtherBills`). Cancelled notes are skipped.
+- A debit refresh merges in place: kept rows keep their ids and drop reasons. Only `MATERIAL_REJECTION` debits count against rejected quantity.
+
+### Stock moves through the ledger
+Review findings F015 and F021 (`inventory/stock/domain/StockLedger`, table `inv_stock_movements`):
+- A lot's quantity or status changes only through the ledger: `receive`, `topUp`, `take`, `takeFifo`, `putBack`, `recount`, `hold`, `release`, `markReturned`. Each one checks the move, saves the lot and appends one movement naming the document (`DocRef`: type, id, number, date, line). Never set `availableQty` or `stockStatus` on a lot directly in new code.
+- So far opening stock, returns to supplier and cutting-room returns post through it. QC holds, counts, transfers and issues still write lots themselves until steps S5-S8 move them over; follow the step plan rather than adding another direct writer.
+- Lock the parent document first, then the lots through `lockFabric`, `lockAccessories` or `lockFifo`, which lock in ascending id order. The ledger joins the caller's transaction (MANDATORY) and refuses a read-only one, so the caller's method needs its own read-write `@Transactional`.
+- Statuses follow `StockStatus.FLOW`; a lot that went back to the supplier never comes back.
+- A seed that inserts lots must insert their BALANCE_FORWARD movements too (see `db/e2eseed/V20261003100100__seed_stock_movements.sql`); PostgreSQL refuses UPDATE and DELETE on the movements table.
+
+### Bills are judged line by line
+Review finding F020 (`inventory/billpassing/service/calc/BillLineVariances`):
+- Quantity and rate are compared per GRN line. Bill-wide totals let one line's over-billing hide behind another's under-billing, and an average rate over different items raised a rate exception with every line at its PO rate.
+- A quantity block clears only when confirmed debits cover each over-billed line at its own rate. Debits count on their own `grnLineItemId`; unlinked ones are pooled. Rate-difference debits never count.
+- Rate exceptions name the lines above their PO rate. A line billed with nothing accepted is red. On a multi-line bill the tolerance matrix reads the worst line; a single-line bill reads exactly as before.
+
+### QC keeps its subject; a judged fabric QC takes its verdict from the rolls
+Review finding F104 (3):
+- A saved QC keeps its type, GRN and PO line (`QCService.requireSameSubject`, set once in `syncHeader`). A save naming another is a 409 ("Cancel it and raise another."); a field the client leaves out is not a change.
+- Once every roll of a fabric QC is judged, the verdict and the passed and failed counts come from the rolls (`QCService.verdictFromRolls`): any failed roll fails it. While a roll is undecided the client's figures stand.
+
+### Sewing hours and incentives
+Review findings F059 and F060:
+- The OT hour is an hour worked (`SewHourlyCalculator.workedHours`): its output counted while its hour did not.
+- An incentive is one payout per operator per day (`SewIncentiveService`), on the standard minutes of everything they made over the distinct hours they were counted in, across operations and lines; the worse line's DHU decides the deduction. Slabs are read once per run (`IncentiveSlabService.activeSlabs`, then the static `IncentiveSlabService.slabFor(slabs, efficiency)`).
+
+### Full and final settlement, bonus, gratuity, PT and leave
+Review findings F073, F027, F316, F028 and F013:
+- Changing an F&F amount, or recalculating it, withdraws the open request and sends the new figures. Approval is refused ("Recalculate the settlement, then approve it.") when payroll paid the leaving month after the calculation, or when the loans or advances owed now are less than the settlement deducts.
+- Settling posts what it squared: loans oldest first (a `LoanRecovery` "Recovered in F&F #id"), advances through `PayrollRecoveries.allocateAdvanceRecovery`, and the encashed days off the EL balance, only when `elEncashmentAmount > 0`.
+- The leaving month is paid once. The settlement adds no pending salary when a committed run already paid it. Payroll processing leaves out employees whose F&F is APPROVED or SETTLED by the month's end (`FnfSettlementRepository.findEmployeeIdsPaidOutBy`), and a run processed before that is refused on approval until it is processed again. A leaver on the month's last day is paid that month by the settlement.
+- Bonus follows the Payment of Bonus Act in one place, `hr/service/BonusRules`: 8.33% on the wage capped at 7,000, nothing above the 21,000 ceiling or under 30 days. Gratuity: 15/26 of basic + DA per completed year after five, a remainder of more than six months counting as one more, capped at 20 lakh.
+- Professional tax counts only the slabs in effect in the payroll month, on the half-yearly income in whole rupees (`StatutoryContributionCalculator.professionalTax`).
+- Statutory figures are data (`hr_statutory_rates`, review F027): PF, ESI, EPS, bonus, gratuity and the wage-days basis come from `StatutoryRateService.forPeriod(month, state)` as a `StatutoryRates` record, read for the period being paid (payroll: the run month; bonus: April of the bonus year; F&F gratuity and EL: the leaving month; the EL run: December of its leave year). Never put a rate back into a constant; a change is a new effective-dated row. A missing rate is a 409 naming the code and month.
+- Attendance has seven statuses (`hr/domain/AttendanceStatus`, review F112), each with its payable and loss-of-pay weight and overtime rule. Marking, import, the monthly summary and payroll all count through `AttendanceTally`; never classify a day anywhere else. An unknown status from a client is a 400.
+- Leave overlapping a PENDING or APPROVED application is refused, except the first and second half of one day. Pending days are not available again, and approval re-checks the balance before anything changes (`LeaveService`).

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
+import { Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -7,15 +7,13 @@ import { getAllFnfSettlements } from '../../../services/hr/fnfService';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(FNF_STATUS.map((s) => [s.value, s]));
 const reasonMap = Object.fromEntries(SEPARATION_REASONS.map((r) => [r.value, r.label]));
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const FnfList = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -29,11 +27,11 @@ const FnfList = () => {
       const result = await getAllFnfSettlements();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load F&F settlements');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -55,8 +53,8 @@ const FnfList = () => {
       },
       {
         title: 'Code',
-        dataIndex: 'employeeCode',
-        key: 'employeeCode',
+        dataIndex: 'employeeNo',
+        key: 'employeeNo',
         width: 100,
       },
       {
@@ -65,7 +63,7 @@ const FnfList = () => {
         key: 'lastWorkingDate',
         width: 140,
         render: (val) => (val ? dayjs(val).format('DD MMM YYYY') : '-'),
-        sorter: (a, b) => (a.lastWorkingDate || '').localeCompare(b.lastWorkingDate || ''),
+        sorter: thenById((a, b) => (a.lastWorkingDate || '').localeCompare(b.lastWorkingDate || '')),
         defaultSortOrder: 'descend',
       },
       {
@@ -81,7 +79,7 @@ const FnfList = () => {
         key: 'totalEarnings',
         width: 140,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Total Deductions',
@@ -89,7 +87,7 @@ const FnfList = () => {
         key: 'totalDeductions',
         width: 140,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Net Settlement',
@@ -97,7 +95,7 @@ const FnfList = () => {
         key: 'netSettlement',
         width: 140,
         align: 'right',
-        render: (val) => <strong>{formatCurrency(val)}</strong>,
+        render: (val) => <strong>{formatRupees(val)}</strong>,
       },
       {
         title: 'Status',

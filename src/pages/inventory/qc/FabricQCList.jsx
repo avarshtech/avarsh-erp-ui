@@ -43,7 +43,7 @@ const STATUS_OPTIONS = [
   { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
 ];
 
-const FabricQCList = ({ embedded = false }) => {
+const FabricQCList = ({ embedded = false, refreshToken = 0 }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
 
@@ -97,17 +97,22 @@ const FabricQCList = ({ embedded = false }) => {
     });
   }, [modal, message, loadData]);
 
+  // `refreshToken` lets the page above force a refetch (e.g. after the
+  // deep-linked view modal approves a QC) without remounting the list.
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshToken]);
 
   const filteredData = useMemo(() => {
     let result = data;
     if (statusFilter) result = result.filter((r) => r.status === statusFilter);
     if (searchText) {
       const s = searchText.toLowerCase();
+      // A QC need not carry a description (the API takes it as sent), so every field may be null
       result = result.filter(
-        (r) => r.qcNumber.toLowerCase().includes(s) || r.grnNumber.toLowerCase().includes(s) || r.fabricDescription.toLowerCase().includes(s),
+        (r) => r.qcNumber?.toLowerCase().includes(s)
+          || r.grnNumber?.toLowerCase().includes(s)
+          || r.fabricDescription?.toLowerCase().includes(s),
       );
     }
     if (dateRange?.[0] && dateRange?.[1]) {
@@ -205,11 +210,14 @@ const FabricQCList = ({ embedded = false }) => {
           locale={{ emptyText: <EmptyState title="No fabric QC inspections found" description="Create a new inspection to get started" /> }}
         />
       </Card>
+      {/* onUpdated: an approval inside the modal changes the QC server-side —
+          reload so the row behind it shows the new status without a page refresh. */}
       <QCViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer({ open: false, record: null })}
         record={viewDrawer.record}
         type="fabric"
+        onUpdated={() => loadData()}
       />
     </>
   );
@@ -219,7 +227,7 @@ const FabricQCList = ({ embedded = false }) => {
   return (
     <div className="animate-fade-in-up inv-page">
       <PageHeader title="Fabric Quality Control">
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-qc" operation="add">
           <ActionButton action="create" text="New Inspection" onClick={() => navigate('/inventory/qc/fabric/new')} />
         </PermissionGuard>
       </PageHeader>

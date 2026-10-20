@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, TimePicker } from 'antd';
+import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography } from 'antd';
+import TimeInput from '../../../components/TimeInput';
+import { afterRule } from '../../../utils/timeRules';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getAllShifts, createShift, updateShift, deleteShift } from '../../../services/master/hrMasterService';
@@ -24,6 +26,9 @@ const ShiftMaster = ({ onDirtyChange }) => {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  // Whether crossing midnight is expected, which is what excuses an end time
+  // earlier than the start. Watched so the End Time rule re-runs when it flips.
+  const isNightShift = Form.useWatch('isNightShift', form);
   const skipDirty = useRef(false);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -39,7 +44,7 @@ const ShiftMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load shifts');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -189,7 +194,7 @@ const ShiftMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Shifts"
       subtitle="Work Schedule"
       addLabel="Add Shift"
@@ -266,13 +271,31 @@ const ShiftMaster = ({ onDirtyChange }) => {
               <Form.Item name="name" label="Shift Name" rules={[{ required: true, message: 'Please enter a shift name' }]}>
                 <Input placeholder="e.g. General Shift" maxLength={200} />
               </Form.Item>
-              <Form.Item name="startTime" label="Start Time" rules={[{ required: true, message: 'Please select a start time' }]}>
-                <TimePicker format={TIME_FORMAT} style={{ width: '100%' }} />
+              <Form.Item name="startTime" label="Start Time" rules={[{ required: true, message: 'Please enter a start time' }]}>
+                <TimeInput />
               </Form.Item>
-              <Form.Item name="endTime" label="End Time" rules={[{ required: true, message: 'Please select an end time' }]}>
-                <TimePicker format={TIME_FORMAT} style={{ width: '100%' }} />
+              {/* The end must come after the start unless the shift is flagged as
+                  crossing midnight. Re-validated when either the start or the
+                  night-shift flag changes, or the message would go stale. */}
+              <Form.Item
+                name="endTime"
+                label="End Time"
+                dependencies={['startTime', 'isNightShift']}
+                rules={[
+                  { required: true, message: 'Please enter an end time' },
+                  afterRule(() => form.getFieldValue('startTime'), isNightShift,
+                    { earlier: 'start time', later: 'end time' }),
+                ]}
+              >
+                <TimeInput />
               </Form.Item>
-              <Form.Item name="breakMinutes" label="Break Duration (minutes)">
+              {/* NOT NULL in the schema, so an empty box has to mean zero rather
+                  than nothing. */}
+              <Form.Item
+                name="breakMinutes"
+                label="Break Duration (minutes)"
+                rules={[{ required: true, message: 'Enter the break duration, or 0 for none' }]}
+              >
                 <InputNumber min={0} max={120} placeholder="e.g. 30" style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item name="isNightShift" label="Night Shift" valuePropName="checked">

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/admin/organisationService';
 import sristiLogo from '../assets/images/sristi_logo.jpeg';
+import { escInline } from './printDoc';
 
 /**
  * Order PDF Generator — Garment Export Order Confirmation
@@ -18,7 +19,7 @@ const fmtDate = (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '—');
 
 const sym = (currency) => {
   const map = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AED: 'AED ', AUD: 'A$', CAD: 'C$', JPY: '¥' };
-  return map[currency] || (currency ? currency + ' ' : '');
+  return map[currency] || (currency ? escInline(currency) + ' ' : '');
 };
 
 const fmtMoney = (val, currency) => `${sym(currency)}${fmt(val)}`;
@@ -75,12 +76,12 @@ const buildSizeMatrix = (line, currency) => {
   const grandVal = Object.values(colVal).reduce((a, b) => a + b, 0);
 
   const headerCols = sizes.map((s) =>
-    `<th class="m-sz">${s}</th>`
+    `<th class="m-sz">${escInline(s)}</th>`
   ).join('');
 
   const priceRow = `
     <tr class="m-price-row">
-      <td class="m-color-col"><span class="price-label">Unit Price</span><span class="price-ccy">${currency || ''}</span></td>
+      <td class="m-color-col"><span class="price-label">Unit Price</span><span class="price-ccy">${escInline(currency || '')}</span></td>
       ${sizes.map((s) => `<td class="m-sz-val m-price-val">${fmt(sizePrices[s] || 0)}</td>`).join('')}
       <td class="m-total-col"></td>
       <td class="m-value-col"></td>
@@ -90,13 +91,13 @@ const buildSizeMatrix = (line, currency) => {
     <tr class="${i % 2 === 0 ? 'm-row-a' : 'm-row-b'}">
       <td class="m-color-col">
         <span class="color-dot" style="background:${getColorHint(row.colorName)};"></span>
-        ${row.colorName || '—'}
+        ${escInline(row.colorName || '—')}
       </td>
       ${sizes.map((s) => {
         const q = row.quantities?.[s] || 0;
         return `<td class="m-sz-val">${q > 0 ? q : '<span class="m-zero">·</span>'}</td>`;
       }).join('')}
-      <td class="m-total-col">${(row.total || 0).toLocaleString()}</td>
+      <td class="m-total-col">${(row.total || 0).toLocaleString('en-IN')}</td>
       <td class="m-value-col">${fmtMoney(row.rowValue || 0, currency)}</td>
     </tr>`).join('');
 
@@ -104,7 +105,7 @@ const buildSizeMatrix = (line, currency) => {
     <tr class="m-totals-row">
       <td class="m-color-col"><strong>Total Qty</strong></td>
       ${sizes.map((s) => `<td class="m-sz-val m-total-sz">${colQty[s] > 0 ? `<strong>${colQty[s]}</strong>` : '<span class="m-zero">·</span>'}</td>`).join('')}
-      <td class="m-total-col m-grand-qty"><strong>${grandQty.toLocaleString()}</strong></td>
+      <td class="m-total-col m-grand-qty"><strong>${grandQty.toLocaleString('en-IN')}</strong></td>
       <td class="m-value-col m-grand-val"><strong>${fmtMoney(grandVal, currency)}</strong></td>
     </tr>`;
 
@@ -157,13 +158,13 @@ const buildOrderLinesHtml = (orderLines, currency) => {
       <div class="line-card-header">
         <div class="line-index">Line ${idx + 1}</div>
         <div class="line-tags">
-          ${line.buyerPoNo    ? `<span class="ltag ltag-po">PO: ${line.buyerPoNo}</span>` : ''}
-          ${line.destination  ? `<span class="ltag ltag-dest">${line.destination}</span>` : ''}
+          ${line.buyerPoNo    ? `<span class="ltag ltag-po">PO: ${escInline(line.buyerPoNo)}</span>` : ''}
+          ${line.destination  ? `<span class="ltag ltag-dest">${escInline(line.destination)}</span>` : ''}
           ${line.dispatchDate ? `<span class="ltag ltag-date">Dispatch: ${fmtDate(line.dispatchDate)}</span>` : ''}
-          ${line.leadTime != null ? `<span class="ltag ltag-lead">Lead: ${line.leadTime} days</span>` : ''}
+          ${line.leadTime != null ? `<span class="ltag ltag-lead">Lead: ${escInline(line.leadTime)} days</span>` : ''}
         </div>
         <div class="line-totals-chip">
-          <span class="lchip-qty">${(line.lineQty || 0).toLocaleString()} pcs</span>
+          <span class="lchip-qty">${(line.lineQty || 0).toLocaleString('en-IN')} pcs</span>
           <span class="lchip-sep">|</span>
           <span class="lchip-val">${fmtMoney(line.lineTotal || 0, currency)}</span>
         </div>
@@ -176,11 +177,12 @@ const buildOrderLinesHtml = (orderLines, currency) => {
 
 // ─── Full HTML ────────────────────────────────────────────────────────────────
 
+// Everything interpolated below is either built here or escaped with escInline(): buyer names, POs,
+// destinations and remarks are user-entered, and this HTML is written into a same-origin window.
 const buildOrderHtml = (order, org) => {
-  const companyName  = org?.organisationName || 'Company Name';
+  const companyName  = escInline(org?.organisationName || 'Company Name');
   const currency     = order.currency || '';
   const sc           = statusColors(order.status);
-  const currSym      = sym(currency);
 
   // Assortment — grouped by color (case-insensitive, Pantone-aware)
   const getPantoneKey = (s) => {
@@ -224,11 +226,11 @@ const buildOrderHtml = (order, org) => {
     group.poLines.forEach((po, idx) => {
       assortRows += `<tr class="${cls}">`;
       if (idx === 0) {
-        assortRows += `<td class="a-c" style="font-weight:700;vertical-align:middle;background:#f0f5ff;color:#1d39c4;" rowspan="${group.poLines.length}">${group.displayName}</td>`;
+        assortRows += `<td class="a-c" style="font-weight:700;vertical-align:middle;background:#f0f5ff;color:#1d39c4;" rowspan="${group.poLines.length}">${escInline(group.displayName)}</td>`;
       }
-      assortRows += `<td class="a-c"><span style="font-weight:600;font-family:monospace;font-size:7.5px;">${po.buyerPoNo}</span> <span style="color:#94a3b8;">/</span> <span style="color:#475569;">${po.destination}</span></td>`;
+      assortRows += `<td class="a-c"><span style="font-weight:600;font-family:monospace;font-size:7.5px;">${escInline(po.buyerPoNo)}</span> <span style="color:#94a3b8;">/</span> <span style="color:#475569;">${escInline(po.destination)}</span></td>`;
       if (idx === 0) {
-        assortRows += `<td class="a-c" style="vertical-align:middle;font-weight:600;" rowspan="${group.poLines.length}">${group.totalQty.toLocaleString()}</td>`;
+        assortRows += `<td class="a-c" style="vertical-align:middle;font-weight:600;" rowspan="${group.poLines.length}">${group.totalQty.toLocaleString('en-IN')}</td>`;
         assortRows += `<td class="a-c" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(avgPrice, currency)}</td>`;
         assortRows += `<td class="a-c a-val" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(group.totalValue, currency)}</td>`;
       }
@@ -241,7 +243,7 @@ const buildOrderHtml = (order, org) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Order ${order.orderNo || ''}</title>
+  <title>Order ${escInline(order.orderNo || '')}</title>
   <style>
     /* ── Reset & Base ── */
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -541,16 +543,16 @@ const buildOrderHtml = (order, org) => {
         <div>
           <div class="co-name">${companyName}</div>
           <div class="co-detail">
-            ${[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || ''}<br>
-            ${[org?.city, org?.state].filter(Boolean).join(', ')}${org?.pincode ? ' – ' + org.pincode : ''}<br>
-            ${org?.phone ? 'Tel: ' + org.phone : ''}${org?.email ? (org.phone ? ' &nbsp;|&nbsp; ' : '') + org.email : ''}
+            ${escInline([org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || '')}<br>
+            ${escInline([org?.city, org?.state].filter(Boolean).join(', '))}${org?.pincode ? ' – ' + escInline(org.pincode) : ''}<br>
+            ${org?.phone ? 'Tel: ' + escInline(org.phone) : ''}${org?.email ? (org.phone ? ' &nbsp;|&nbsp; ' : '') + escInline(org.email) : ''}
           </div>
         </div>
       </div>
       <div class="dh-right">
         <div class="doc-type-lbl">Order Confirmation</div>
-        <div class="doc-no">${order.orderNo || ''}</div>
-        <div><span class="doc-status">${statusLabel(order.status)}</span></div>
+        <div class="doc-no">${escInline(order.orderNo || '')}</div>
+        <div><span class="doc-status">${escInline(statusLabel(order.status))}</span></div>
         <div class="doc-date">${fmtDate(order.orderDate)}</div>
       </div>
     </div>
@@ -561,18 +563,18 @@ const buildOrderHtml = (order, org) => {
       <div class="info-panel">
         <div class="info-panel-head">Buyer</div>
         <table class="field-table">
-          ${fieldRow('Name', `<strong>${order.buyerName || '—'}</strong>`)}
-          ${fieldRow('Payment Terms', order.paymentTermsName)}
-          ${fieldRow('Payment Days', order.paymentDays ? order.paymentDays + ' days' : null)}
+          ${fieldRow('Name', `<strong>${escInline(order.buyerName || '—')}</strong>`)}
+          ${fieldRow('Payment Terms', order.paymentTermsName ? escInline(order.paymentTermsName) : null)}
+          ${fieldRow('Payment Days', order.paymentDays ? escInline(order.paymentDays) + ' days' : null)}
         </table>
       </div>
       <div class="info-panel">
         <div class="info-panel-head">Reference</div>
         <table class="field-table">
-          ${fieldRow('Costing Ref', order.costingId ? `<span style="font-family:monospace;color:#4338ca;">${order.costingId}</span>` : null)}
+          ${fieldRow('Costing Ref', order.costingId ? `<span style="font-family:monospace;color:#4338ca;">${escInline(order.costingId)}</span>` : null)}
           ${fieldRow('Order Date', fmtDate(order.orderDate))}
           ${fieldRow('Total Lines', (order.orderLines || []).length)}
-          ${fieldRow('Total Quantity', `<strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong>`)}
+          ${fieldRow('Total Quantity', `<strong>${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</strong>`)}
         </table>
       </div>
     </div>
@@ -580,11 +582,11 @@ const buildOrderHtml = (order, org) => {
     <!-- ── Order Specs ── -->
     <div class="sec-rule" style="margin-top:8px;"><span class="sec-label">Order Specifications</span><span class="sec-line"></span></div>
     <div class="specs-strip">
-      <div class="spec-cell"><div class="spec-lbl">Style No</div><div class="spec-val">${order.styleNo || '—'}</div></div>
-      <div class="spec-cell"><div class="spec-lbl">Garment Type</div><div class="spec-val">${order.garmentType || '—'}</div></div>
-      <div class="spec-cell"><div class="spec-lbl">Season</div><div class="spec-val">${order.season || '—'}</div></div>
-      <div class="spec-cell"><div class="spec-lbl">Component</div><div class="spec-val">${order.component || '—'}</div></div>
-      <div class="spec-cell"><div class="spec-lbl">Currency</div><div class="spec-val">${order.currency || '—'}</div></div>
+      <div class="spec-cell"><div class="spec-lbl">Style No</div><div class="spec-val">${escInline(order.styleNo || '—')}</div></div>
+      <div class="spec-cell"><div class="spec-lbl">Garment Type</div><div class="spec-val">${escInline(order.garmentType || '—')}</div></div>
+      <div class="spec-cell"><div class="spec-lbl">Season</div><div class="spec-val">${escInline(order.season || '—')}</div></div>
+      <div class="spec-cell"><div class="spec-lbl">Component</div><div class="spec-val">${escInline(order.component || '—')}</div></div>
+      <div class="spec-cell"><div class="spec-lbl">Currency</div><div class="spec-val">${escInline(order.currency || '—')}</div></div>
     </div>
 
     ${order.component === 'Multiple' && order.components?.length ? `
@@ -595,9 +597,9 @@ const buildOrderHtml = (order, org) => {
       <tbody>
         ${order.components.map((c) => `
         <tr>
-          <td><strong>${c.name || '—'}</strong></td>
-          <td>${c.description || '—'}</td>
-          <td style="text-align:center;">${c.qtyPerSet ?? c.qty ?? '—'}</td>
+          <td><strong>${escInline(c.name || '—')}</strong></td>
+          <td>${escInline(c.description || '—')}</td>
+          <td style="text-align:center;">${escInline(c.qtyPerSet ?? c.qty ?? '—')}</td>
         </tr>`).join('')}
       </tbody>
     </table>` : ''}
@@ -619,7 +621,7 @@ const buildOrderHtml = (order, org) => {
         <tfoot>
           <tr>
             <td colspan="2"><strong>Grand Total</strong></td>
-            <td class="a-c"><strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong></td>
+            <td class="a-c"><strong>${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</strong></td>
             <td class="a-c"></td>
             <td class="a-c"><strong>${fmtMoney(order.totalOrderValue || 0, currency)}</strong></td>
           </tr>
@@ -637,7 +639,7 @@ const buildOrderHtml = (order, org) => {
       ${order.remarks ? `
       <div class="remarks-panel">
         <div class="r-head">Remarks</div>
-        ${order.remarks}
+        ${escInline(order.remarks)}
       </div>` : '<div style="flex:1;"></div>'}
       <div class="totals-panel">
         <div class="tot-row">
@@ -646,7 +648,7 @@ const buildOrderHtml = (order, org) => {
         </div>
         <div class="tot-row">
           <span class="tl">Total Quantity</span>
-          <span class="tv">${(order.totalOrderQty || 0).toLocaleString()} pcs</span>
+          <span class="tv">${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</span>
         </div>
         <div class="tot-row tot-grand">
           <span class="tl">Order Value</span>
@@ -657,7 +659,7 @@ const buildOrderHtml = (order, org) => {
 
     ${order.referBackReason ? `
     <div class="refer-back-panel">
-      <strong>Refer Back Reason: </strong>${order.referBackReason}
+      <strong>Refer Back Reason: </strong>${escInline(order.referBackReason)}
     </div>` : ''}
 
     <!-- ── Signatures ── -->
@@ -668,8 +670,8 @@ const buildOrderHtml = (order, org) => {
     </div>
 
     <!-- ── Footer ── -->
-    <div class="doc-foot">COMPUTER GENERATED DOCUMENT — ${order.orderNo || ''} — ${fmtDate(order.orderDate)}</div>
-    ${org?.email ? `<div class="doc-foot-note">For queries: ${org.email}</div>` : ''}
+    <div class="doc-foot">COMPUTER GENERATED DOCUMENT — ${escInline(order.orderNo || '')} — ${fmtDate(order.orderDate)}</div>
+    ${org?.email ? `<div class="doc-foot-note">For queries: ${escInline(org.email)}</div>` : ''}
 
   </div>
 </body>

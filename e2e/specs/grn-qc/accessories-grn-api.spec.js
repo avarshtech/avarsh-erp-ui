@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findPOByNumber, refreshPO, trimsGrnPayload,
-  getPOReceipts, today,
+  getPOReceipts,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── PO Line Combinations ────────────────────────────────────────────────────
@@ -273,7 +273,6 @@ test.describe.serial('Accessories GRN — PO Line Combinations (API)', () => {
     payload.lineItems.forEach((li) => {
       const item = selected.find((s) => s.id === li.poLineItemId);
       if (item) {
-        const itemQty = item.id === fullItem.id ? fullQty : halfQty;
         li.cartons = cartonConfig[item.id].map((c) => ({
           poLineItemId: item.id,
           itemCode: item.itemCode,
@@ -321,27 +320,6 @@ test.describe('Accessories GRN — Validation (API)', () => {
     }
     await api.dispose();
   });
-
-  /** Build a valid single-item trims payload with explicit carton columns. */
-  function validPayload(qty = 20) {
-    const item = poSingle.items[0];
-    const cartonConfig = {
-      [item.id]: [{ cartonNumber: `CTN-VAL-${Date.now()}`, quantity: qty }],
-    };
-    const payload = trimsGrnPayload(poSingle, [item], cartonConfig);
-    payload.items[0].receivingQty = qty;
-    payload.lineItems[0].cartons = cartonConfig[item.id].map((c) => ({
-      poLineItemId: item.id,
-      itemCode: item.itemCode,
-      itemDescription: item.description,
-      color: item.color,
-      size: item.size,
-      cartonNumber: c.cartonNumber,
-      quantity: c.quantity,
-      uom: item.uom,
-    }));
-    return payload;
-  }
 
   test('submit: cartonNumber missing rejects with error', async () => {
     await refreshPO(api, poSingle);
@@ -413,7 +391,7 @@ test.describe('Accessories GRN — Validation (API)', () => {
     expect(res.status).toBeLessThan(500);
   });
 
-  test('submit: receivingQty > balance rejects with error', async () => {
+  test('submit: receivingQty > balance is ACCEPTED (over-receipt allowed, warn-only)', async () => {
     await refreshPO(api, poSingle);
     const item = poSingle.items[0];
     expect(item.pendingQty).toBeGreaterThan(0);
@@ -435,9 +413,16 @@ test.describe('Accessories GRN — Validation (API)', () => {
       uom: item.uom,
     }];
 
+    // Business decision 2026-08-17: over-receipt is accepted (warn-only). Cancel the
+    // GRN afterwards so the inflated receipt does not exhaust the PO balance for the
+    // remaining tests in this serial file.
     const res = await api.post('/grns/submit', payload);
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(res.status).toBeLessThan(500);
+    expect(res.status, JSON.stringify(res.data).slice(0, 200)).toBeLessThan(300);
+    const cancel = await api.post(`/grns/${res.data.id}/cancel`, {
+      reason: 'E2E cleanup: restoring PO balance after the over-receipt check.',
+      version: res.data.version,
+    });
+    expect(cancel.status).toBeLessThan(300);
   });
 
   test('submit: item receivingQty <= 0 rejects with error', async () => {

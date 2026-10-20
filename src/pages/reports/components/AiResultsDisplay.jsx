@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useCallback } from 'react';
-import { Typography, Collapse, Table, Space, Button } from 'antd';
+import { Typography, Collapse, Table, Space, Button, Alert } from 'antd';
 import {
   CodeOutlined, TableOutlined, BulbOutlined,
   ArrowRightOutlined, DownOutlined, UpOutlined,
@@ -14,7 +14,7 @@ const extractMetrics = (answer, data) => {
   if (!answer) return [];
   const metrics = [];
 
-  const numberPatterns = /(?:total|count|sum|average|avg|max|min|amount)\s*[:\-—]\s*[\$₹]?[\d,]+(?:\.\d+)?/gi;
+  const numberPatterns = /(?:total|count|sum|average|avg|max|min|amount)\s*[:\-—]\s*[$₹]?[\d,]+(?:\.\d+)?/gi;
   const matches = answer.match(numberPatterns);
   if (matches) {
     matches.slice(0, 4).forEach((match) => {
@@ -26,7 +26,7 @@ const extractMetrics = (answer, data) => {
   }
 
   if (data?.length > 0 && metrics.length === 0) {
-    metrics.push({ label: 'Records Found', value: data.length.toLocaleString() });
+    metrics.push({ label: 'Records Found', value: data.length.toLocaleString('en-IN') });
     metrics.push({ label: 'Fields', value: Object.keys(data[0]).length.toString() });
   }
 
@@ -114,13 +114,15 @@ const ExpandableTable = memo(function ExpandableTable({ columns, data }) {
 
   const needsExpand = data.length > PREVIEW_ROWS;
   const displayData = expanded ? data : data.slice(0, PREVIEW_ROWS);
+  // Rows carry no id; key each by its place in the result (antd's rowKey index parameter is deprecated)
+  const rowKeys = useMemo(() => new Map(data.map((row, i) => [row, i])), [data]);
 
   return (
     <div>
       <Table
         columns={columns}
         dataSource={displayData}
-        rowKey={(_, index) => index}
+        rowKey={(row) => rowKeys.get(row)}
         size="small"
         pagination={false}
         scroll={{ x: 'max-content' }}
@@ -180,6 +182,11 @@ const AiResultsDisplay = memo(function AiResultsDisplay({ response, onSuggestion
 
   return (
     <div>
+      {/* The API answers 200 with an error when the model's SQL is refused or fails */}
+      {response.error && (
+        <Alert type="error" showIcon title={response.error} style={{ marginBottom: 12 }} />
+      )}
+
       {/* Answer text — professional typography */}
       {response.answer && (
         <div style={{ marginBottom: hasData || hasSql ? 18 : 0 }}>

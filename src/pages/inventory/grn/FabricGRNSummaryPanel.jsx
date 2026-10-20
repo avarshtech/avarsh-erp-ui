@@ -63,7 +63,7 @@ const FabricGRNSummaryPanel = ({ selectedPO, rolls = [], createdBy }) => {
       <Title level={5} style={{ marginBottom: 16, marginTop: 0 }}>PO Information</Title>
       {selectedPO ? (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <Descriptions size="small" column={1} colon={false} labelStyle={{ color: 'var(--text-secondary)', fontSize: 12 }} contentStyle={{ fontSize: 13, fontWeight: 500 }}>
+          <Descriptions size="small" column={1} colon={false} styles={{ label: { color: 'var(--text-secondary)', fontSize: 12 }, content: { fontSize: 13, fontWeight: 500 } }}>
             <Descriptions.Item label="PO Number">{selectedPO.poNumber}</Descriptions.Item>
             <Descriptions.Item label="Supplier">{selectedPO.supplier}</Descriptions.Item>
             <Descriptions.Item label="Buyer">{selectedPO.buyerName || '—'}</Descriptions.Item>
@@ -90,7 +90,7 @@ const FabricGRNSummaryPanel = ({ selectedPO, rolls = [], createdBy }) => {
               title={<Text type="secondary" style={{ fontSize: 12 }}>Total Receiving Qty</Text>}
               value={formatNumber(summary.totalReceiving, 2)}
               prefix={<ColumnHeightOutlined />}
-              valueStyle={{ color: 'var(--primary-color)', fontSize: 26, fontWeight: 700 }}
+              styles={{ content: { color: 'var(--primary-color)', fontSize: 26, fontWeight: 700 } }}
             />
           </Card>
 

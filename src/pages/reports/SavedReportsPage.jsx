@@ -120,8 +120,25 @@ const SavedReportsPage = () => {
         dataIndex: 'reportName',
         key: 'reportName',
         ellipsis: true,
-        render: (val) => val ? <Tag color={getModuleColor(val)}>{val}</Tag> : '—',
+        render: (val, record) => (
+          <Space size={4} wrap>
+            {val ? <Tag color={getModuleColor(val)}>{val}</Tag> : '—'}
+            {/* The configuration survives the report being deleted - it used to be
+                destroyed by the cascade - but it can no longer be run. */}
+            {record.reportAvailable === false && (
+              <Tag color="warning">Report deleted</Tag>
+            )}
+          </Space>
+        ),
         sorter: (a, b) => (a.reportName || '').localeCompare(b.reportName || ''),
+      },
+      {
+        title: 'Saved by',
+        key: 'canEdit',
+        width: 110,
+        render: (_, record) => (record.canEdit
+          ? <Tag color="blue">You</Tag>
+          : <Tag>Your role</Tag>),
       },
       {
         title: 'Created',
@@ -142,18 +159,26 @@ const SavedReportsPage = () => {
               type="link"
               size="small"
               icon={<EyeOutlined />}
+              disabled={record.reportAvailable === false}
+              title={record.reportAvailable === false
+                ? 'The report this was built on has been deleted'
+                : undefined}
               onClick={() => handleOpen(record)}
             >
               Open
             </Button>
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              loading={deletingId === record.id}
-            />
+            {/* Visible to the whole role, editable only by whoever saved it. Rendering the
+                button for everyone and letting the server 403 would read as a broken screen. */}
+            {record.canEdit !== false && (
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record)}
+                loading={deletingId === record.id}
+              />
+            )}
           </Space>
         ),
       },
@@ -185,7 +210,10 @@ const SavedReportsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Reports">
+      <PageHeader
+        title="Reports"
+        subtitle="Configurations saved by anyone in your role"
+      >
         <Segmented
           options={navOptions}
           value={location.pathname}

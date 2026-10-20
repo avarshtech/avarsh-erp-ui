@@ -234,7 +234,8 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Terms & Conditions"
       subtitle="Purchase Order"
       addLabel="Add Terms"

@@ -15,8 +15,8 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  findPOByNumber, refreshPO, trimsGrnPayload, trimsQcPayload,
-  submitGrn, submitQc, draftQc, getTrimsQCCriteria, today,
+  findPOByNumber, trimsGrnPayload, trimsQcPayload,
+  submitGrn, submitQc, getTrimsQCCriteria, today,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── Shared State ───────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ test.describe('Accessories QC — Validation (API)', () => {
     const payload = trimsQcPayload(baseGrn, basePoLineItemId, criteriaRows);
 
     const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate() + 2);
     payload.inspectionDate = tomorrow.toISOString().split('T')[0];
 
     const { status } = await api.post('/qc/submit', payload);

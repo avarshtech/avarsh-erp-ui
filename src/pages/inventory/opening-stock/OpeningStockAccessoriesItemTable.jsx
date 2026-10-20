@@ -101,7 +101,7 @@ const OpeningStockAccessoriesItemTable = ({ rows = [], onChange, onAdd, onRemove
     <div>
       <Table
         size="small"
-        rowKey={(_, i) => `row-${i}`}
+        rowKey={(r) => `row-${rows.indexOf(r)}`}
         dataSource={rows}
         columns={columns}
         pagination={false}

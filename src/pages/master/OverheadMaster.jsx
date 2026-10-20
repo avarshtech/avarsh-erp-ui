@@ -160,7 +160,8 @@ const OverheadMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Overheads"
       subtitle="Cost Categories"
       addLabel="Add Overhead"

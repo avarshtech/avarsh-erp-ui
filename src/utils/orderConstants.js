@@ -57,3 +57,19 @@ const CURRENCY_SYMBOLS = {
 };
 
 export const getCurrencySymbol = (currency) => CURRENCY_SYMBOLS[currency] || currency || '';
+
+// ==================== DISPATCH DELAY HELPERS ====================
+
+/**
+ * An upstream slip — a supplier PO's delivery date re-agreed, or a sample request delayed —
+ * is held once on the order as `dispatchDelayDays` + `dispatchDelaySource`, and the API
+ * derives every line's `revisedDispatchDate` from it. The committed `dispatchDate` on a line
+ * never changes, so the original always stays visible beside the date now being tracked to.
+ */
+export const hasDispatchDelay = (order) => (order?.dispatchDelayDays || 0) > 0;
+
+/** The line dispatching first — the one a list column stands for. Dates are ISO strings, so they sort as text. */
+export const getEarliestDispatchLine = (order) =>
+  (order?.orderLines || [])
+    .filter((l) => l?.dispatchDate)
+    .sort((a, b) => (a.dispatchDate < b.dispatchDate ? -1 : a.dispatchDate > b.dispatchDate ? 1 : 0))[0] || null;

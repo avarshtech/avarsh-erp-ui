@@ -88,6 +88,11 @@ const lightComponentsToken = {
   Input: {
     controlHeight: 40,
   },
+  // InputNumber has its own token — without it, number fields fall back to the
+  // 32px global control height and sit short beside Input/Select/DatePicker.
+  InputNumber: {
+    controlHeight: 40,
+  },
   Select: {
     controlHeight: 40,
   },
@@ -139,6 +144,13 @@ const darkComponentsToken = {
     defaultBorderColor: '#475569',
   },
   Input: {
+    controlHeight: 40,
+    colorBgContainer: '#1e293b',
+    colorBorder: '#475569',
+    hoverBorderColor: '#818cf8',
+    activeBorderColor: '#818cf8',
+  },
+  InputNumber: {
     controlHeight: 40,
     colorBgContainer: '#1e293b',
     colorBorder: '#475569',

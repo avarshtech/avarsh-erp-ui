@@ -47,7 +47,7 @@ async function fillRichText(page, text) {
 }
 
 /** Quill encodes typed spaces as &nbsp; — normalize for substring assertions. */
-const normalizeHtml = (s) => (s || '').replace(/&nbsp;| /g, ' ');
+const normalizeHtml = (s) => (s || '').replace(/&nbsp;|\u00a0/g, ' ');
 
 test.describe.serial('Terms & Conditions — CRUD', () => {
   test.beforeEach(async ({ page }) => {

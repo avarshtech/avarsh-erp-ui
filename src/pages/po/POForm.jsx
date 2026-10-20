@@ -23,6 +23,7 @@ import {
   AutoComplete,
   Segmented,
   Popover,
+  Tooltip,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -34,23 +35,32 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import { ActionButton } from '../../components/buttons';
 import { useNavigate, useParams } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import dayjs from 'dayjs';
 import {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
+  submitPurchaseOrder,
   createActivity,
 } from '../../services/po/purchaseOrderService';
 import { getAllTermsConditions } from '../../services/master/termsConditionsService';
 import { getSuppliers } from '../../services/master/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/master/itemService';
 import { useStore } from '../../context/StoreContext';
+import { useBranch } from '../../context/BranchContext';
+import BranchField from '../../components/branch/BranchField';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
-import { generateEwayBill } from '../../services/po/purchaseOrderService';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
+import { CONSUMPTION_MODE } from '../../utils/bomConstants';
+import { formatNumber } from '../../utils/formatters';
+import { poLineAmount, poLineTax, poTotals } from '../../utils/poAmounts';
+import { getVariantStockAvailability } from '../../services/inventory/inventoryService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -238,23 +248,26 @@ const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
               }}
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                {Object.entries(attrs).length > 0 ? (
-                  Object.entries(attrs).map(([key, val]) => {
-                    const kLower = key.toLowerCase();
-                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                    const showSwatch = isColorAttr && isPantoneCode(val);
-                    return (
-                      <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        {showSwatch && <PantoneColorSwatch value={val} size={16} />}
-                        <Text style={{ fontSize: 12 }}>
-                          {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
-                        </Text>
-                      </Tag>
-                    );
-                  })
-                ) : (
-                  <Text type="secondary">Default variant</Text>
-                )}
+                {/* The variant NAME is the identity since the item/variant refactor —
+                    labelling by attributes alone rendered every attribute-less variant
+                    as an indistinguishable "Default variant". */}
+                <Text strong style={{ fontSize: 13 }}>
+                  {variant.variantName || 'Default variant'}
+                </Text>
+                {variant.variantCode && <Tag color="blue">{variant.variantCode}</Tag>}
+                {Object.entries(attrs).map(([key, val]) => {
+                  const kLower = key.toLowerCase();
+                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                  const showSwatch = isColorAttr && isPantoneCode(val);
+                  return (
+                    <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {showSwatch && <PantoneColorSwatch value={val} size={16} />}
+                      <Text style={{ fontSize: 12 }}>
+                        {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
+                      </Text>
+                    </Tag>
+                  );
+                })}
                 {isCurrent && (
                   <Tag color="green" style={{ marginLeft: 'auto', fontWeight: 600 }}>
                     Current
@@ -279,12 +292,13 @@ const TAX_OPTIONS = [
 ];
 
 const POForm = () => {
+  const { isSampleOrder } = useSampleOrderNos();
   const navigate = useNavigate();
   const { id } = useParams();
   const prevIdRef = useRef(id);
   const [form] = Form.useForm();
+  const { isMultiBranch } = useBranch();
   const { message, modal } = App.useApp();
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [pageLoading, setPageLoading] = useState(!!id);
@@ -296,12 +310,15 @@ const POForm = () => {
 
   // Line items
   const [lineItems, setLineItems] = useState([createEmptyLineItem()]);
+  // What is already on the rack for the variants on this PO, keyed by variant id. A
+  // variant with nothing In_Stock is simply absent, so its line renders no stock cell at
+  // all rather than a zero. Purely informational — nothing here is reserved or held.
+  const [stockByVariant, setStockByVariant] = useState({});
 
   // IGST applicability (determined by supplier)
   const [isIgstApplicable, setIsIgstApplicable] = useState(false);
 
   // Change detection for resubmit warning
-  const [changeCheckLoading, setChangeCheckLoading] = useState(false);
 
   // Dirty state for unsaved changes warning
   const [isDirty, setIsDirtyState] = useState(false);
@@ -344,7 +361,7 @@ const POForm = () => {
   const [entityVersion, setEntityVersion] = useState(null);
 
   // Store context
-  const { suppliers, uoms, setData, isCacheValid, setLoading: setStoreLoading } = useStore();
+  const { uoms } = useStore();
 
   const isEditMode = !!id;
 
@@ -489,6 +506,7 @@ const POForm = () => {
         deliveryDate: data.deliveryDate ? dayjs(data.deliveryDate) : null,
         termsConditionId: data.termsConditionsId || data.termsConditionId,
         remarks: data.remarks || '',
+        branchId: data.deliveryBranchId,
       });
 
       // If suppliers list is already loaded, set selected supplier immediately
@@ -584,6 +602,8 @@ const POForm = () => {
           0,
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
+        variantName: item.variantName || '',
+        variantCode: item.variantCode || '',
         variantAttributes: item.variantAttributes || null,
         hsnCode: item.hsnCode || '',
         categoryName: item.categoryName || '',
@@ -596,7 +616,7 @@ const POForm = () => {
       setLineItems(mappedItems.length > 0 ? mappedItems : [createEmptyLineItem()]);
     } catch {
       message.error('Failed to load purchase order');
-      navigate('/purchase-orders/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } finally {
       // Defer so React paints the form with populated values before hiding the skeleton
       requestAnimationFrame(() => setPageLoading(false));
@@ -640,7 +660,7 @@ const POForm = () => {
           const qty = parseFloat(updated.qty) || 0;
           const unitPrice = parseFloat(updated.unitPrice) || 0;
           const gstPercent = parseFloat(updated.gstPercent) || 0;
-          updated.amount = parseFloat((qty * unitPrice * (1 + gstPercent / 100)).toFixed(2));
+          updated.amount = poLineAmount(qty, unitPrice, gstPercent);
           return updated;
         }
         return item;
@@ -674,9 +694,19 @@ const POForm = () => {
         return;
       }
 
+      // An item with no active variant cannot be bought: a PO line is raised against the
+      // variant. This used to fall through and save a line with no variant at all, so
+      // refuse the selection and name the item rather than accept an unusable line.
+      if (variants.length === 0) {
+        message.error(
+          `${selectedItem.itemCode || selectedItem.itemName || 'This item'} has no active variant, `
+          + 'so it cannot be purchased. Activate a variant in Item Master first.'
+        );
+        return;
+      }
+
       // If item has exactly one variant, auto-select it
-      const selectedVariant = variants.length === 1 ? variants[0] : null;
-      populateLineItemWithVariant(lineKey, selectedItem, selectedVariant);
+      populateLineItemWithVariant(lineKey, selectedItem, variants[0]);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -710,9 +740,7 @@ const POForm = () => {
             const unitPrice = (rawPrice !== null && rawPrice !== undefined && rawPrice > 0) ? rawPrice : '';
             const qty = parseFloat(li.qty) || 0;
             const numericPrice = parseFloat(unitPrice) || 0;
-            const amount = parseFloat(
-              (qty * numericPrice * (1 + gst / 100)).toFixed(2)
-            );
+            const amount = poLineAmount(qty, numericPrice, gst);
 
             return {
               ...li,
@@ -729,6 +757,8 @@ const POForm = () => {
               unitPrice,
               gstPercent: gst,
               variantId: variant?.id || null,
+              variantName: variant?.variantName || '',
+              variantCode: variant?.variantCode || '',
               variantAttributes: variant?.attributes || null,
               hsnCode: item.hsnCode || '',
               categoryName: item.categoryName || '',
@@ -768,26 +798,6 @@ const POForm = () => {
     });
   };
 
-  // Handle variant modal cancel
-  const handleVariantModalCancel = () => {
-    // If it's a new item selection (not change), clear the line item
-    if (!variantModalState.isChange && variantModalState.pendingLineKey) {
-      setLineItems((prev) =>
-        prev.map((li) =>
-          li.key === variantModalState.pendingLineKey
-            ? { ...createEmptyLineItem(), key: variantModalState.pendingLineKey }
-            : li
-        )
-      );
-    }
-    setVariantModalState({
-      show: false,
-      pendingItem: null,
-      pendingLineKey: null,
-      isChange: false,
-      currentVariantId: null,
-    });
-  };
 
   // Handle "Change Variant" click from variant column
   const handleChangeVariant = (lineKey, itemId) => {
@@ -912,6 +922,9 @@ const POForm = () => {
   }, [poType, bomOrders]);
 
   // Remove BOM order (for Combined PO)
+  // UNWIRED: a Combined PO can add BOM orders but has no control to remove
+  // one, so this never runs.
+  // eslint-disable-next-line no-unused-vars
   const removeOrder = useCallback((orderNo) => {
     setBomOrders(prev => prev.filter(o => o.orderNo !== orderNo));
     // Remove line items that came from this order's BOM
@@ -930,15 +943,37 @@ const POForm = () => {
 
   // BOM Line Selection confirm handler
   const handleBomLineSelectionConfirm = useCallback((selectedLines) => {
+    // The PO is raised in the item's purchase (primary) UOM. BOM lines saved before UOM
+    // conversion existed have no converted figure, so they fall back to the consumption UOM.
+    const bomPurchaseQty = (bomLine) => bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0;
+    const bomPurchaseUom = (bomLine) => bomLine.purchaseUom || bomLine.uom || '';
+    // The BOM line carries the purchase UOM as a symbol only. Resolve it to the master
+    // record so the saved line has a real uomId — without it the server persists no UOM
+    // and every downstream read (PO view, GRN) shows a blank unit.
+    const bomPurchaseUomId = (bomLine) => {
+      const symbol = bomPurchaseUom(bomLine).trim().toLowerCase();
+      if (!symbol) return null;
+      const match = (uoms || []).find(
+        (u) => (u.symbol || '').trim().toLowerCase() === symbol || (u.name || '').trim().toLowerCase() === symbol
+      );
+      return match?.id ?? null;
+    };
+
     const createPoLineFromBom = (bomLine, bomId) => ({
       key: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       itemId: bomLine.itemId,
       itemCode: bomLine.itemCode,
       itemName: bomLine.itemName || '',
       description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
-      qty: String(bomLine.purchaseQty || 0),
-      uom: bomLine.uom || '',
-      uomId: null,
+      // The PO is raised in the BOM line's purchase UOM. When the item defines a UOM
+      // conversion the BOM snapshots the converted quantity; otherwise both are the same.
+      qty: String(bomPurchaseQty(bomLine)),
+      // The BOM's own figure, kept so the Qty cell can show it once the buyer edits away
+      // from it — the quantity is editable now, and a silent deviation would be worse
+      // than no BOM link at all.
+      _bomQty: String(bomPurchaseQty(bomLine)),
+      uom: bomPurchaseUom(bomLine),
+      uomId: bomPurchaseUomId(bomLine),
       primaryUom: '',
       primaryUomId: null,
       secondaryUom: '',
@@ -947,6 +982,8 @@ const POForm = () => {
       gstPercent: 0,
       amount: 0,
       variantId: bomLine.variantId || null,
+      variantName: bomLine.variantName || '',
+      variantCode: bomLine.variantCode || '',
       variantAttributes: bomLine.variants || null,
       hsnCode: bomLine.hsnCode || '',
       categoryName: bomLine.categoryName || '',
@@ -956,15 +993,56 @@ const POForm = () => {
       status: LINE_ITEM_STATUS.DRAFT,
     });
 
+    // A VARIANT_PER_SIZE BOM line spans several size-variants at once, but a PO line is
+    // raised against exactly one variant. The server sends the split (variantBreakdown)
+    // already apportioned to the line's purchase quantity — it is computed there because
+    // the order's size grid is not loaded on this screen, and a Combined PO draws lines
+    // from several BOMs across several orders, so there is no single grid to read here.
+    const splitByVariant = (bomLine) => {
+      if (bomLine.consumptionMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE) return [bomLine];
+      return (bomLine.variantBreakdown || []).map((share) => ({
+        ...bomLine,
+        variantId: share.variantId,
+        variantCode: share.variantCode || '',
+        variantName: share.variantName || '',
+        // The share is already in the purchase UOM, so it stands in for both figures.
+        purchaseQtyPrimary: share.purchaseQty,
+        purchaseQty: share.purchaseQty,
+      }));
+    };
+
+    // Each part keeps its parent's id, so several PO lines can legitimately cite one
+    // BOM line as their source.
+    const expanded = [];
+    const unsplittable = [];
+    selectedLines.forEach(({ bomLine, bomId }) => {
+      const parts = splitByVariant(bomLine);
+      if (parts.length === 0) {
+        unsplittable.push(bomLine.itemCode || bomLine.itemName || `BOM line ${bomLine.id}`);
+        return;
+      }
+      parts.forEach((part) => expanded.push({ bomLine: part, bomId }));
+    });
+
+    if (unsplittable.length > 0) {
+      message.error(
+        `Cannot add ${unsplittable.join(', ')}: the BOM line covers several sizes, but its `
+        + 'variants or the order quantities behind them are incomplete. Complete the BOM first.'
+      );
+    }
+
     let newLines;
     if (poType === PO_TYPE.COMBINED) {
       // Merge duplicate item+variant+uom lines
       const mergeMap = new Map();
-      selectedLines.forEach(({ bomLine, bomId }) => {
-        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.uom || ''}`;
+      expanded.forEach(({ bomLine, bomId }) => {
+        // Group by the unit actually being purchased, so quantities only merge when comparable
+        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomPurchaseUom(bomLine)}`;
         if (mergeMap.has(key)) {
           const existing = mergeMap.get(key);
-          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQty || 0));
+          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomPurchaseQty(bomLine)));
+          // The merged total is what the BOMs asked for, so it is the figure to deviate from.
+          existing._bomQty = existing.qty;
           existing.bomLineSources.push({ bomId, lineId: bomLine.id });
         } else {
           mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
@@ -973,50 +1051,50 @@ const POForm = () => {
       newLines = Array.from(mergeMap.values());
 
       // Check if any merging happened
-      if (newLines.length < selectedLines.length) {
+      if (newLines.length < expanded.length) {
         message.info('Lines with same item+variant+UOM merged: quantities combined from multiple orders');
       }
     } else {
-      newLines = selectedLines.map(({ bomLine, bomId }) => createPoLineFromBom(bomLine, bomId));
+      newLines = expanded.map(({ bomLine, bomId }) => createPoLineFromBom(bomLine, bomId));
     }
 
-    setLineItems(newLines);
+    // Every selected line can be unsplittable, which would otherwise leave the table with
+    // no rows at all and no way to type one.
+    setLineItems(newLines.length > 0 ? newLines : [createEmptyLineItem()]);
     setIsDirty(true);
-  }, [poType]);
+  }, [poType, uoms, message]);
+
+  // Asked once for every line on the form rather than once per line: on a twenty-line
+  // combined PO that is the difference between one round trip and twenty. Keyed on the
+  // sorted id list so re-rendering for an unrelated edit (a price, a remark) does not
+  // refetch.
+  const variantIdsKey = useMemo(() => (
+    [...new Set(lineItems.map((l) => l.variantId).filter(Boolean))].sort((a, b) => a - b).join(',')
+  ), [lineItems]);
+
+  useEffect(() => {
+    let alive = true;
+    const ids = variantIdsKey ? variantIdsKey.split(',').map(Number) : [];
+    getVariantStockAvailability(ids)
+      .then((rows) => {
+        if (!alive) return;
+        // A variant can hold stock in more than one unit, so keep every row and let the
+        // cell pick the one that matches the line.
+        const byVariant = {};
+        rows.forEach((row) => {
+          if (!byVariant[row.variantId]) byVariant[row.variantId] = [];
+          byVariant[row.variantId].push(row);
+        });
+        setStockByVariant(byVariant);
+      })
+      // Fails closed: the stock cell disappears and the form behaves exactly as it did
+      // before this feature existed. Availability is never worth blocking a PO over.
+      .catch(() => { if (alive) setStockByVariant({}); });
+    return () => { alive = false; };
+  }, [variantIdsKey]);
 
   // Calculate totals
-  const totals = useMemo(() => {
-    const subtotal = lineItems.reduce((sum, item) => {
-      return sum + (parseFloat(item.qty) || 0) * (parseFloat(item.unitPrice) || 0);
-    }, 0);
-
-    let sgst = 0;
-    let cgst = 0;
-    let igst = 0;
-
-    lineItems.forEach((item) => {
-      const base = (parseFloat(item.qty) || 0) * (parseFloat(item.unitPrice) || 0);
-      const gstPercent = parseFloat(item.gstPercent) || 0;
-      const gstAmount = (base * gstPercent) / 100;
-
-      if (isIgstApplicable) {
-        igst += gstAmount;
-      } else {
-        sgst += gstAmount / 2;
-        cgst += gstAmount / 2;
-      }
-    });
-
-    const grandTotal = isIgstApplicable ? subtotal + igst : subtotal + sgst + cgst;
-
-    return {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      sgst: parseFloat(sgst.toFixed(2)),
-      cgst: parseFloat(cgst.toFixed(2)),
-      igst: parseFloat(igst.toFixed(2)),
-      grandTotal: parseFloat(grandTotal.toFixed(2)),
-    };
-  }, [lineItems, isIgstApplicable]);
+  const totals = useMemo(() => poTotals(lineItems, isIgstApplicable), [lineItems, isIgstApplicable]);
 
   // GST Breakup by percentage
   const gstBreakup = useMemo(() => {
@@ -1086,6 +1164,15 @@ const POForm = () => {
     if (remarks.length > 500) {
       errors.push('Remarks cannot exceed 500 characters');
     }
+
+    // Every line must name the variant it is buying — the variant is the purchasable
+    // identity, and both the API and the column now refuse a line without one. Catching
+    // it here means the buyer sees which line is at fault instead of a bare 400.
+    lineItems.forEach((item, index) => {
+      if (item.itemId && !item.variantId) {
+        errors.push(`Line ${index + 1}: pick a variant for ${item.itemCode || item.itemName || 'this item'}`);
+      }
+    });
 
     // BOM-PO type validations
     if (poType === PO_TYPE.REGULAR && bomOrders.length === 0) {
@@ -1234,6 +1321,7 @@ const POForm = () => {
       termsConditionsId: values.termsConditionId || null,
       termsConditionsTitle: terms?.name || '',
       remarks: values.remarks || '',
+      deliveryBranchId: values.branchId ?? null,
       status,
       subtotal: totals.subtotal,
       tax: isIgst ? totals.igst : totals.sgst + totals.cgst,
@@ -1245,27 +1333,7 @@ const POForm = () => {
         const qty = parseFloat(item.qty) || 0;
         const unitPrice = parseFloat(item.unitPrice) || 0;
         const gstPercent = parseFloat(item.gstPercent) || 0;
-        const taxableBase = qty * unitPrice;
-
-        let cgst = 0,
-          sgst = 0,
-          igst = 0;
-        let cgstValue = 0,
-          sgstValue = 0,
-          igstValue = 0;
-
-        if (isIgst) {
-          igst = gstPercent;
-          igstValue = parseFloat(((taxableBase * gstPercent) / 100).toFixed(2));
-        } else {
-          const halfGst = gstPercent / 2;
-          cgst = halfGst;
-          sgst = halfGst;
-          cgstValue = parseFloat(((taxableBase * halfGst) / 100).toFixed(2));
-          sgstValue = parseFloat(((taxableBase * halfGst) / 100).toFixed(2));
-        }
-
-        const taxValue = parseFloat((cgstValue + sgstValue + igstValue).toFixed(2));
+        const { cgst, sgst, igst, cgstValue, sgstValue, igstValue, taxValue } = poLineTax(qty * unitPrice, gstPercent, isIgst);
 
         return {
           itemId: item.itemId,
@@ -1351,7 +1419,7 @@ const POForm = () => {
       }
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } catch {
       message.error('Failed to save purchase order');
     } finally {
@@ -1420,9 +1488,7 @@ const POForm = () => {
       (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK);
 
     if (isResubmit) {
-      setChangeCheckLoading(true);
       const changed = await hasChangesFromLastVersion();
-      setChangeCheckLoading(false);
 
       if (!changed) {
         modal.confirm({
@@ -1451,12 +1517,15 @@ const POForm = () => {
   const doSubmit = async () => {
     setSubmitting(true);
     try {
-      const payload = buildPayload(PO_STATUS.PENDING_APPROVAL);
       let result;
       if (isEditMode) {
-        result = await updatePurchaseOrder(id, payload);
+        // The save keeps the PO's status; the submit command sends it for approval with the version
+        // the save answered, and moves its draft lines in progress. A new PO is still created submitted.
+        const saved = await updatePurchaseOrder(id, buildPayload(originalPO?.status ?? PO_STATUS.DRAFT));
+        if (saved?.version != null) setEntityVersion(saved.version);
+        result = await submitPurchaseOrder(id, saved.version);
       } else {
-        result = await createPurchaseOrder(payload);
+        result = await createPurchaseOrder(buildPayload(PO_STATUS.PENDING_APPROVAL));
       }
       if (result?.version != null) setEntityVersion(result.version);
 
@@ -1507,7 +1576,7 @@ const POForm = () => {
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } catch {
       message.error('Failed to submit purchase order');
     } finally {
@@ -1524,10 +1593,10 @@ const POForm = () => {
         content: 'You have unsaved changes. Are you sure you want to leave?',
         okText: 'Leave',
         cancelText: 'Stay',
-        onOk: () => navigate('/purchase-orders/list'),
+        onOk: () => navigate(listPath('/purchase-orders/supplier-po/list')),
       });
     } else {
-      navigate('/purchase-orders/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     }
   };
 
@@ -1566,17 +1635,17 @@ const POForm = () => {
         if (record._fromBom) {
           return (
             <div>
-              <Text strong style={{ fontSize: 13 }}>{record.itemCode}</Text>
+              <Text strong style={{ fontSize: 13 }}>{record.variantCode}</Text>
               <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>{record.itemName}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.variantName}</Text>
             </div>
           );
         }
         return (
           <ItemSearchInput
             value={
-              record.itemCode || record.itemName
-                ? `${record.itemCode || ''} - ${record.itemName || ''}`
+              record.variantCode || record.variantName
+                ? `${record.variantCode || ''} - ${record.variantName || ''}`
                 : ''
             }
             onSelect={(item) => handleItemSelect(item, record.key)}
@@ -1644,7 +1713,7 @@ const POForm = () => {
                 }
                 trigger="hover"
                 placement="right"
-                overlayInnerStyle={{ padding: 4 }}
+                styles={{ container: { padding: 4 } }}
               >
                 <img
                   src={imgUrl}
@@ -1656,6 +1725,21 @@ const POForm = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', flex: 1, minWidth: 0 }}>
               {hasMultipleVariants && (
                 <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)', flexShrink: 0 }} />
+              )}
+              {/* Variant identity leads; attributes follow as supporting detail. */}
+              {(record.variantName || record.variantCode) && (
+                <div style={{ width: '100%', minWidth: 0 }}>
+                  {record.variantName && (
+                    <Text strong style={{ fontSize: 11, display: 'block' }} ellipsis={{ tooltip: record.variantName }}>
+                      {record.variantName}
+                    </Text>
+                  )}
+                  {record.variantCode && (
+                    <Text type="secondary" style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      {record.variantCode}
+                    </Text>
+                  )}
+                </div>
               )}
               {Object.entries(attrs).length > 0 ? (
                 Object.entries(attrs).map(([key, val]) => {
@@ -1688,7 +1772,7 @@ const POForm = () => {
       dataIndex: 'description',
       width: 180,
       render: (value, record) => (
-        <Input
+        <Input name="description"
           placeholder="Description"
           value={value}
           onChange={(e) =>
@@ -1740,26 +1824,89 @@ const POForm = () => {
       width: 100,
       align: 'center',
       render: (value, record) => {
-        if (record._fromBom) {
-          const uomLabel = (record.uom || record.primaryUom || '').toUpperCase();
-          return <Text strong style={{ color: 'var(--primary-color)' }}>{value}{uomLabel ? ` ${uomLabel}` : ''}</Text>;
-        }
+        // A BOM-sourced quantity used to be read-only text, on the reasoning that the BOM
+        // owns the number. It is editable now because the buyer has to be able to buy less
+        // when the material is already on the rack — which is the whole point of the stock
+        // cell beside it. The BOM figure is kept and shown once the two diverge, so a
+        // deviation is visible rather than silent.
+        const deviated = record._fromBom && record._bomQty != null
+          && String(record._bomQty) !== String(value ?? '');
         return (
-          <InputNumber
-            min={0}
-            step={1}
-            precision={2}
-            controls={false}
-            style={{ width: '100%', height: 40 }}
-            value={value === '' ? null : Number(value)}
-            onChange={(v) =>
-              handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
-            }
-            disabled={submitting || savingDraft || !record.itemId}
-            placeholder="0"
-            addonAfter={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
-            {...numericInputProps}
-          />
+          <Space orientation="vertical" size={0} style={{ width: '100%' }}>
+            <InputNumber name="qty"
+              min={0}
+              step={1}
+              precision={2}
+              controls={false}
+              style={{ width: '100%', height: 40 }}
+              value={value === '' ? null : Number(value)}
+              onChange={(v) =>
+                handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
+              }
+              disabled={submitting || savingDraft || !record.itemId}
+              placeholder="0"
+              suffix={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+              {...numericInputProps}
+            />
+            {deviated && (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                BOM: {formatNumber(Number(record._bomQty), 3)}
+              </Text>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      // Requirement: before committing to a purchase quantity, the buyer sees what is
+      // already on the rack for this exact variant — no siblings, no item-level rollup.
+      // Nothing renders when there is no stock, so the column is quiet on most lines.
+      title: 'In Stock',
+      key: 'inStock',
+      width: 150,
+      align: 'center',
+      render: (_, record) => {
+        const rows = stockByVariant[record.variantId] || [];
+        if (rows.length === 0) return null;
+
+        const lineUom = (record.uom || record.primaryUom || '').trim().toLowerCase();
+        // Stock carries its own unit. Prefer the row that matches the line so the figure
+        // and the purchase quantity are comparable; otherwise show the first and say why
+        // the action is unavailable.
+        const match = rows.find((r) => (r.uom || '').trim().toLowerCase() === lineUom);
+        const row = match || rows[0];
+        if (!(row.availableQty > 0)) return null;
+
+        const currentQty = parseFloat(record.qty || 0) || 0;
+        const reduced = Math.max(0, currentQty - row.availableQty);
+        const canReduce = Boolean(match) && currentQty > 0
+          && !submitting && !savingDraft && record.itemId;
+
+        return (
+          <Space orientation="vertical" size={2} style={{ width: '100%' }}>
+            <Text strong style={{ color: 'var(--success-color, #389e0d)' }}>
+              {formatNumber(row.availableQty, 3)} {row.uom}
+            </Text>
+            {match ? (
+              <Button
+                size="small"
+                type="link"
+                disabled={!canReduce}
+                style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                onClick={() => handleLineItemChange(record.key, 'qty', String(reduced))}
+              >
+                Reduce by stock
+              </Button>
+            ) : (
+              <Tooltip
+                title={`Stock is held in ${row.uom} but this line is bought in ${record.uom || record.primaryUom || 'another unit'}. Convert it yourself before adjusting the quantity.`}
+              >
+                <Text type="secondary" style={{ fontSize: 11, cursor: 'help' }}>
+                  Different unit
+                </Text>
+              </Tooltip>
+            )}
+          </Space>
         );
       },
     },
@@ -1768,7 +1915,7 @@ const POForm = () => {
       dataIndex: 'unitPrice',
       width: 120,
       render: (value, record) => (
-        <InputNumber
+        <InputNumber name="unitPrice"
           min={0}
           step={0.01}
           precision={2}
@@ -2035,6 +2182,7 @@ const POForm = () => {
                     />
                   </Form.Item>
                 </Col>
+                {isMultiBranch ? <Col xs={24} md={12}><BranchField label="Deliver To (Branch)" /></Col> : <BranchField />}
               </Row>
               <Row gutter={24}>
                 <Col xs={24}>
@@ -2138,7 +2286,10 @@ const POForm = () => {
                 <Row gutter={[24, 12]}>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
-                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>
+                      {order.orderNo}
+                      {isSampleOrder(order.orderNo) && <SampleOrderTag />}
+                    </Text>
                   </Col>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
@@ -2363,8 +2514,8 @@ const POForm = () => {
             stages={lineItem.processingStages}
             poDate={form.getFieldValue('poDate')}
             deliveryDate={form.getFieldValue('deliveryDate')}
-            itemName={lineItem.itemName}
-            itemCode={lineItem.itemCode}
+            itemName={lineItem.variantName}
+            itemCode={lineItem.variantCode}
             variantAttributes={lineItem.variantAttributes}
           />
         ) : null;

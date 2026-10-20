@@ -27,14 +27,14 @@ const SplitPopover = ({ roll, uom, onSplit }) => {
       onOpenChange={setOpen}
       placement="left"
       content={
-        <Space direction="vertical" size={8} style={{ minWidth: 220, maxWidth: '90vw' }}>
+        <Space orientation="vertical" size={8} style={{ minWidth: 220, maxWidth: '90vw' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Split <Text strong>{roll.rollNumber}</Text> ({formatNumber(roll.weight, 1)} {uom})
           </Text>
           <InputNumber
             value={issueQty}
             onChange={setIssueQty}
-            addonAfter={uom}
+            suffix={uom}
             controls={false}
             min={0.1}
             max={Number((roll.weight - 0.1).toFixed(1))}
@@ -63,6 +63,9 @@ const FabricIssueRollPicker = ({
   bomRequired = 0,
   uom = 'kg',
   uomMismatch = false,
+  // Sample issues are raised against a sample request, not a Cutting PO, so the
+  // one sentence that names the source document is the caller's to supply.
+  uomMismatchMessage = 'UOM mismatch between Cutting PO and available stock rolls — cannot proceed with this issue',
 }) => {
   // Garments-industry split model: the ORIGINAL roll number stays in stock
   // carrying the remnant qty. A NEW sub-roll with a derived suffix
@@ -141,15 +144,15 @@ const FabricIssueRollPicker = ({
   return (
     <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12 }}>
-        <Text>BOM Required: <Text strong>{formatNumber(bomRequired, 1)} {uom}</Text></Text>
-        <Text>Selected: <Text strong>{formatNumber(selectedQty, 1)} {uom}</Text></Text>
+        <Text>BOM Required: <Text strong>{formatNumber(bomRequired, 2)} {uom}</Text></Text>
+        <Text>Selected: <Text strong>{formatNumber(selectedQty, 2)} {uom}</Text></Text>
       </div>
       {uomMismatch && (
         <Alert
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message="UOM mismatch between Cutting PO and available stock rolls — cannot proceed with this issue"
+          title={uomMismatchMessage}
         />
       )}
       <Table

@@ -4,6 +4,8 @@ Use this template when dispatching a spec compliance reviewer subagent.
 
 **Purpose:** Verify implementer built what was requested (nothing more, nothing less) AND followed ERP standards.
 
+**Agent type:** `feature-dev:code-reviewer` when it is listed as available; otherwise `general-purpose` with the same prompt.
+
 ```
 Agent({
   description: "Review spec compliance for Task N",
@@ -54,14 +56,15 @@ Agent({
     - Did they solve the wrong problem?
 
     **ERP-Specific Compliance (MANDATORY):**
-    - ZERO deprecated Ant Design props (`visible`, `bordered`, `onVisibleChange`, `dropdownClassName`, `size="default"`)
+    - Every consumer in the task's impact table updated, or the reason recorded?
+    - ZERO deprecated Ant Design props (`visible`, `bordered` on Input/Select, `onVisibleChange`, `dropdownClassName` / `popupClassName`, `size="default"` — verified list in references/antd6-deprecations.md)
     - ZERO deprecated CSS classes (`.ant-modal-visible`, `.ant-drawer-visible`, `.ant-input-bordered`)
     - ZERO deprecated React patterns (`defaultProps`, `findDOMNode`, `UNSAFE_` lifecycle, `ReactDOM.render`)
     - Form.useForm() used (not class-based forms)?
     - App.useApp() for message/notification/modal (not static methods)?
     - StoreContext used for master data (not duplicated in local state)?
     - File size limits respected?
-    - Backend: @RequiredArgsConstructor, @Transactional, DTO mapping via MapStruct?
+    - Backend: @RequiredArgsConstructor, @Transactional, DTO mapping via MapStruct, @RequiresPermission on new handlers, no applied migration edited?
 
     **Verify by reading code, not by trusting report.**
 

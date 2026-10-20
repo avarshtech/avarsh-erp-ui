@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Button } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { listPath } from '../utils/listMemory';
 
 const PageHeader = memo(function PageHeader({
   title,
@@ -12,6 +13,9 @@ const PageHeader = memo(function PageHeader({
   addLabel,
   extra,
   status,
+  /** Rendered between the back arrow and the title: a photo belongs with the
+      name it identifies, not over with the buttons that act on the record. */
+  avatar,
   children,
   className,
   style,
@@ -22,7 +26,8 @@ const PageHeader = memo(function PageHeader({
     if (onBack) {
       onBack();
     } else if (backPath) {
-      navigate(backPath);
+      // Back to a list lands on the page, sort and filters it was left with (utils/listMemory)
+      navigate(listPath(backPath));
     }
   };
 
@@ -42,10 +47,17 @@ const PageHeader = memo(function PageHeader({
             size="small"
           />
         )}
+        {avatar}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h1>{title}</h1>
-            {status && <span>{status}</span>}
+            {/* Own gap: `status` is usually several badges, and relying on each
+                tag's trailing margin leaves them touching */}
+            {status && (
+              <span className="status-badge-group" style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                {status}
+              </span>
+            )}
           </div>
           {subtitle && (
             <small style={{ color: 'var(--text-secondary)', fontSize: 13 }}>

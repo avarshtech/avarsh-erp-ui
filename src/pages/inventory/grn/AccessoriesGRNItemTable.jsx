@@ -91,7 +91,18 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         width: 170,
         render: (v, row) => {
           if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
-          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{v ?? '—'}</Text>;
+          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{row.variantCode || '—'}</Text>;
+        },
+      },
+      {
+        title: 'Variant',
+        dataIndex: 'variantName',
+        align: 'center',
+        width: 180,
+        ellipsis: true,
+        render: (v, row) => {
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
+          return <ReadOnlyText value={v || row.variantCode} />;
         },
       },
       {
@@ -148,7 +159,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
               value={val}
               placeholder="Qty"
               controls={false}
-              addonAfter={row.uom || ''}
+              suffix={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
               status={!val ? 'warning' : ''}

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { getAccessToken } from '../services/auth/sessionStore';
 
 /**
  * Global Store Context
@@ -20,6 +21,9 @@ const initialState = {
   
   // Suppliers
   suppliers: [],
+
+  // Vendors (job workers): the pickers' options from GET /vendors/options, never PAN or bank details
+  vendors: [],
   
   // Buyers
   buyers: [],
@@ -39,7 +43,17 @@ const initialState = {
   // Users & Roles
   users: [],
   roles: [],
-  
+
+  // Order numbers of SAMPLE-type orders (drives sample badges across lifecycle screens)
+  sampleOrderNos: [],
+
+  // Cutting-room masters: fabric types (relaxation hours + stock UOM), cut/lay
+  // tables, and the code lists + thresholds the cutting screens read from
+  cuttingMasters: null,
+  sewingMasters: null,
+  sampleMasters: null,
+  billPassingMasters: null,
+
   // Loading states per data type
   loading: {
     categories: false,
@@ -49,6 +63,7 @@ const initialState = {
     uoms: false,
     variants: false,
     suppliers: false,
+    vendors: false,
     buyers: false,
     styles: false,
     termsConditions: false,
@@ -56,6 +71,11 @@ const initialState = {
     sizePresets: false,
     users: false,
     roles: false,
+    sampleOrderNos: false,
+    cuttingMasters: false,
+    sewingMasters: false,
+    sampleMasters: false,
+    billPassingMasters: false,
   },
 
   // Error states per data type
@@ -67,6 +87,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    vendors: null,
     buyers: null,
     styles: null,
     termsConditions: null,
@@ -74,6 +95,11 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
+    cuttingMasters: null,
+    sewingMasters: null,
+    sampleMasters: null,
+    billPassingMasters: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -85,6 +111,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    vendors: null,
     buyers: null,
     styles: null,
     termsConditions: null,
@@ -92,6 +119,11 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
+    cuttingMasters: null,
+    sewingMasters: null,
+    sampleMasters: null,
+    billPassingMasters: null,
   },
 };
 
@@ -182,6 +214,17 @@ export const StoreProvider = ({ children }) => {
   const clearStore = useCallback(() => {
     setState(initialState);
   }, []);
+
+  // The store sits above /login and outlives a logout, so the masters loaded for one user would
+  // be served to the next. A session that ends (logout, timeout, a failed refresh) empties it;
+  // a login or a token refresh, which leave a token in memory, do not.
+  useEffect(() => {
+    const onAuthChange = () => {
+      if (!getAccessToken()) clearStore();
+    };
+    window.addEventListener('authChange', onAuthChange);
+    return () => window.removeEventListener('authChange', onAuthChange);
+  }, [clearStore]);
 
   /**
    * Add item to a collection

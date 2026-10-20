@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useMemo } from 'react';
-import { Breadcrumb, Skeleton, Button, Tooltip, App } from 'antd';
+import { Breadcrumb, Skeleton, Button, Tooltip, App, Result } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
+import MasterAssistant from './genie/MasterAssistant';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
   GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined,
@@ -9,6 +10,13 @@ import {
   ToolOutlined,
   ScissorOutlined,
   DollarOutlined,
+  MinusCircleOutlined,
+  PlusCircleOutlined,
+  IssuesCloseOutlined,
+  SlidersOutlined,
+  CarOutlined,
+  BankOutlined,
+  ClusterOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -18,6 +26,7 @@ import UomMaster from './UomMaster';
 import ItemMaster from './ItemMaster';
 import BuyerMaster from './BuyerMaster';
 import SupplierMaster from './SupplierMaster';
+import VendorMaster from './VendorMaster';
 import TermsConditionsMaster from './TermsConditionsMaster';
 import StyleMaster from './StyleMaster';
 import PaymentTermsMaster from './PaymentTermsMaster';
@@ -27,8 +36,13 @@ import PartsMaster from './PartsMaster';
 import OverheadMaster from './OverheadMaster';
 import DefectTypeMaster from './DefectTypeMaster';
 import TrimsQCCriteriaMaster from './TrimsQCCriteriaMaster';
+import BpDebitTypeMaster from './BpDebitTypeMaster';
+import BpChargeTypeMaster from './BpChargeTypeMaster';
+import BpIssueTypeMaster from './BpIssueTypeMaster';
+import BpToleranceSettings from './BpToleranceSettings';
+import CourierMaster from './CourierMaster';
+import BranchMaster from './BranchMaster';
 import { useStore } from '../../context/StoreContext';
-import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
 import {
   getAllCategories,
@@ -38,21 +52,39 @@ import {
   getAllUOMs,
 } from '../../services/master/masterDataService';
 import { getStyles } from '../../services/master/styleService';
+import { getBuyers } from '../../services/master/buyerService';
 import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
 import { getAllSizePresets } from '../../services/master/sizePresetService';
 
 // Group accent colors for left border on group headers
 const GROUP_ACCENT = {
+  organisation: 'var(--primary-color)',
   business: 'var(--info-color)',
   catalog: 'var(--btn-duplicate-color)',
   style: 'var(--success-color)',
   commercial: 'var(--warning-color)',
   manufacturing: 'var(--error-color)',
   quality: 'var(--primary-color)',
+  billPassing: 'var(--btn-print-color)',
 };
 
 // Static navigation config — add new master data entries here
 const NAV_GROUPS = [
+  {
+    groupKey: 'organisation',
+    label: 'Organisation',
+    items: [
+      {
+        key: 'branch',
+        label: 'Branches',
+        icon: <BankOutlined />,
+        moduleId: 'branches',
+        Component: BranchMaster,
+        loadingKey: null,
+        description: 'Sites the company operates from — units hang under a branch',
+      },
+    ],
+  },
   {
     groupKey: 'business',
     label: 'Business Partners',
@@ -73,7 +105,16 @@ const NAV_GROUPS = [
         moduleId: 'supplier-info',
         Component: SupplierMaster,
         loadingKey: null,
-        description: 'Fabric, trims and accessories vendors',
+        description: 'Fabric, trims and accessories suppliers',
+      },
+      {
+        key: 'vendor',
+        label: 'Vendors',
+        icon: <ClusterOutlined />,
+        moduleId: 'vendor-info',
+        Component: VendorMaster,
+        loadingKey: null,
+        description: 'Job workers and outside processing units',
       },
     ],
   },
@@ -192,6 +233,15 @@ const NAV_GROUPS = [
         loadingKey: null,
         description: 'Overhead and markup cost categories for costing',
       },
+      {
+        key: 'couriers',
+        label: 'Couriers',
+        icon: <CarOutlined />,
+        moduleId: 'couriers',
+        Component: CourierMaster,
+        loadingKey: null,
+        description: 'Carriers and hand delivery options for sample dispatches',
+      },
     ],
   },
   {
@@ -205,7 +255,7 @@ const NAV_GROUPS = [
         moduleId: 'process-master',
         Component: ProcessMaster,
         loadingKey: null,
-        description: 'Manufacturing processes and allowance defaults for BOM',
+        description: 'Processes for the cost sheet, BOM allowances and cut panel / garment process requirements',
       },
       {
         key: 'parts',
@@ -214,7 +264,7 @@ const NAV_GROUPS = [
         moduleId: 'parts-master',
         Component: PartsMaster,
         loadingKey: null,
-        description: 'Garment part names for BOM line items',
+        description: 'Garment parts / panels (with panels per garment) for BOM lines, cutting and cut panel requirements',
       },
     ],
   },
@@ -239,6 +289,50 @@ const NAV_GROUPS = [
         Component: TrimsQCCriteriaMaster,
         loadingKey: null,
         description: 'Criteria checking master for trims QC inspection',
+      },
+    ],
+  },
+  {
+    // On a key of their own: a bill clerk holding inventory-bill-passing does not set the rules
+    // his bills are checked against
+    groupKey: 'billPassing',
+    label: 'Bill Passing',
+    items: [
+      {
+        key: 'bp-debit-type',
+        label: 'Debit Types',
+        icon: <MinusCircleOutlined />,
+        moduleId: 'inventory-bill-passing-masters',
+        Component: BpDebitTypeMaster,
+        loadingKey: null,
+        description: 'Reasons a supplier invoice can be debited, and whether each needs a QC reference',
+      },
+      {
+        key: 'bp-charge-type',
+        label: 'Charge Types',
+        icon: <PlusCircleOutlined />,
+        moduleId: 'inventory-bill-passing-masters',
+        Component: BpChargeTypeMaster,
+        loadingKey: null,
+        description: 'Freight, insurance and other charges addable to a bill, with their default GST treatment',
+      },
+      {
+        key: 'bp-issue-type',
+        label: 'Issue Types',
+        icon: <IssuesCloseOutlined />,
+        moduleId: 'inventory-bill-passing-masters',
+        Component: BpIssueTypeMaster,
+        loadingKey: null,
+        description: 'Query and hold reasons, and which of them block a bill from reaching approval',
+      },
+      {
+        key: 'bp-tolerance',
+        label: 'Tolerance Settings',
+        icon: <SlidersOutlined />,
+        moduleId: 'inventory-bill-passing-masters',
+        Component: BpToleranceSettings,
+        loadingKey: null,
+        description: 'Quantity, rate and value variance limits used by the four-way match',
       },
     ],
   },
@@ -309,13 +403,12 @@ const collapsedItemSelected = {
 
 const MasterDashboard = () => {
   const { message, modal } = App.useApp();
-  const { isDarkMode } = useTheme();
   const {
-    categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets,
+    categories, subCategories, itemTypes, attributes, uoms, styles, buyers, paymentTerms, sizePresets,
     setData, setLoading, loading, isCacheValid,
   } = useStore();
 
-  const accessibleGroups = useMemo(getAccessibleGroups, []);
+  const accessibleGroups = useMemo(() => getAccessibleGroups(), []);
   const accessibleItems  = useMemo(
     () => accessibleGroups.flatMap(g => g.items.map(item => ({ ...item, groupLabel: g.label }))),
     [accessibleGroups],
@@ -419,6 +512,18 @@ const MasterDashboard = () => {
       );
     }
 
+    // Styles pick their buyer from this list: without it a fresh session's Style form offers no
+    // buyers (and the style list shows buyer ids) until the Buyers tab happens to be opened.
+    if (!isCacheValid('buyers') || buyers.length === 0) {
+      setLoading('buyers', true);
+      fetchPromises.push(
+        getBuyers()
+          .then((data) => setData('buyers', Array.isArray(data) ? data : data?.content || []))
+          .catch(() => message.error('Failed to load buyers'))
+          .finally(() => setLoading('buyers', false))
+      );
+    }
+
     if (!isCacheValid('paymentTerms') || paymentTerms.length === 0) {
       setLoading('paymentTerms', true);
       fetchPromises.push(
@@ -442,7 +547,7 @@ const MasterDashboard = () => {
     if (fetchPromises.length > 0) {
       await Promise.allSettled(fetchPromises);
     }
-  }, [categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets, isCacheValid, setData, setLoading]);
+  }, [categories, subCategories, itemTypes, attributes, uoms, styles, buyers, paymentTerms, sizePresets, isCacheValid, setData, setLoading]);
 
   useEffect(() => {
     fetchAllMetaData();
@@ -456,13 +561,13 @@ const MasterDashboard = () => {
   // Breadcrumb
   const breadcrumbItems = useMemo(() => [
     { title: 'Master Data' },
-    { title: activeItem.groupLabel },
-    { title: activeItem.label },
+    { title: activeItem?.groupLabel },
+    { title: activeItem?.label },
   ], [activeItem]);
 
   // Content area — render active master component or loading spinner
   const renderContent = () => {
-    const { Component, loadingKey, label } = activeItem;
+    const { Component, loadingKey } = activeItem;
     if (loadingKey && loading[loadingKey]) {
       return (
         <div style={{ padding: 24 }}>
@@ -501,7 +606,22 @@ const MasterDashboard = () => {
     return collapsedItemBase;
   };
 
+  // The route guard admits any master key, but the nav groups are filtered
+  // again here — a role whose keys all fell out of NAV_GROUPS would otherwise
+  // dereference an undefined activeItem and blank the page instead of 403ing.
+  if (!activeItem) {
+    return (
+      <Result
+        status="403"
+        title="Access Denied"
+        subTitle="You do not have permission to access any master data."
+        extra={<Button type="primary" onClick={() => window.history.back()}>Go Back</Button>}
+      />
+    );
+  }
+
   return (
+    <MasterAssistant item={activeItem} items={accessibleItems} select={handleMenuSelect}>
     <div className="animate-fade-in-up" style={{
       display: 'flex',
       flexDirection: 'column',
@@ -688,6 +808,7 @@ const MasterDashboard = () => {
       </div>
 
     </div>
+    </MasterAssistant>
   );
 };
 

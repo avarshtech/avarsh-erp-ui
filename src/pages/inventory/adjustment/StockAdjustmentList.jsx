@@ -3,7 +3,6 @@ import { App, Table, Card, Space, Input, Select, DatePicker, Row, Col, Typograph
 import { SearchOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
@@ -16,6 +15,8 @@ import { getAllCategories, getAllSubCategories } from '../../../services/master/
 import { useStore } from '../../../context/StoreContext';
 import { formatNumber } from '../../../utils/formatters';
 import AdjustmentViewDrawer from './AdjustmentViewDrawer';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -36,6 +37,9 @@ const StockAdjustmentList = () => {
   const navigate = useNavigate();
   const store = useStore();
   const { categories: storeCategories, subCategories: storeSubCategories } = store;
+  // A count is of one store; the register follows the header switcher (X-Branch-Id)
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -55,7 +59,7 @@ const StockAdjustmentList = () => {
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -129,6 +133,7 @@ const StockAdjustmentList = () => {
       render: (text, record) => <RecordLink text={text} onClick={() => setViewDrawer({ open: true, record })} />,
     },
     { title: 'Date', dataIndex: 'adjustmentDate', key: 'adjustmentDate', width: 120, align: 'center', render: (d) => dayjs(d).format('DD-MMM-YYYY') },
+    ...branchColumn,
     { title: 'Category', dataIndex: 'categoryName', key: 'categoryName', width: 130, align: 'center' },
     { title: 'Items', dataIndex: 'items', key: 'itemsCount', width: 80, align: 'center', render: (items) => items?.length || 0 },
     {
@@ -148,13 +153,10 @@ const StockAdjustmentList = () => {
       render: (_, record) => (
         <Space size="small">
           <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
-          {hasPermission('inventory-adjustment', 'update') && (
-            <ActionButton action="edit" onClick={() => navigate(`/inventory/adjustment/${record.id}`)} />
-          )}
         </Space>
       ),
     },
-  ], [navigate]);
+  ], [branchColumn]);
 
   return (
     <div className="animate-fade-in-up">

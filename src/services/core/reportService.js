@@ -12,6 +12,27 @@ export const getReportDefinition = async (id) => {
   return response.data;
 };
 
+// Report Designer (admin) — blueprints carry column keys, never SQL
+export const getReportCatalog = async () => {
+  const response = await axiosInstance.get('/reports/catalog');
+  return response.data;
+};
+
+export const createReportFromBlueprint = async (data) => {
+  const response = await axiosInstance.post('/reports/definitions/from-blueprint', data);
+  return response.data;
+};
+
+export const updateReportFromBlueprint = async (id, data) => {
+  const response = await axiosInstance.put(`/reports/definitions/${id}/from-blueprint`, data);
+  return response.data;
+};
+
+export const deleteReportDefinition = async (id) => {
+  const response = await axiosInstance.delete(`/reports/definitions/${id}`);
+  return response.data;
+};
+
 // Report Execution
 export const executeReport = async (params) => {
   const response = await axiosInstance.post('/reports/execute', params);
@@ -54,7 +75,9 @@ export const deleteSavedReport = async (id) => {
 // AI Chat
 export const aiChat = async (data) => {
   const response = await axiosInstance.post('/reports/ai/chat', data);
-  return response.data;
+  const body = response.data || {};
+  // The API (AiChatResponse) sends naturalLanguageAnswer and generatedSql; the chat reads answer and sql
+  return { ...body, answer: body.answer ?? body.naturalLanguageAnswer, sql: body.sql ?? body.generatedSql };
 };
 
 // Execution Log

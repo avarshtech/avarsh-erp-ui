@@ -5,11 +5,11 @@ import {
   Avatar,
   Dropdown,
   Space,
-  Input,
   Tooltip,
   Drawer,
   App,
   Badge,
+  Tag,
 } from "antd";
 import {
   DashboardOutlined,
@@ -21,7 +21,6 @@ import {
   DollarOutlined,
   SettingOutlined,
   UserOutlined,
-  SearchOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -34,18 +33,47 @@ import {
   CloseOutlined,
   BarChartOutlined,
   TeamOutlined,
+  ToolOutlined,
   AuditOutlined,
+  ScissorOutlined,
+  ExperimentOutlined,
+  FieldTimeOutlined,
+  ContainerOutlined,
+  DeploymentUnitOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
-import { hasModuleAccess } from "../utils/permissions";
+import { hasModuleAccess, PREVIEW_SCREEN_IDS, PREVIEW_MESSAGE } from "../utils/permissions";
+import PreviewBanner from "../components/PreviewBanner";
+
+/** A menu label with the "Preview" tag of a browser-only screen (SCREENS `preview`). */
+// A submenu label has 172px; a full-size tag (72px) pushed "Carton Stickers" and "Export Invoices"
+// past it, so the menu cut the label to "…" and hid the tag. The compact tag (~48px) fits, and the
+// tag never shrinks: an over-long label is what gets shortened. On a submenu heading antd renders
+// this span without its title wrapper and gives it a 10px start margin; zero it so the heading lines
+// up with its neighbours.
+const withPreviewTag = (label) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', maxWidth: '100%', verticalAlign: 'middle', marginInlineStart: 0 }}>
+    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+    <Tooltip title={PREVIEW_MESSAGE}>
+      <Tag color="orange" className="menu-preview-tag" style={{ marginInlineStart: 6, marginInlineEnd: 0, flexShrink: 0 }}>
+        Preview
+      </Tag>
+    </Tooltip>
+  </span>
+);
+import ErrorBoundary from "../components/ErrorBoundary";
+import { APP_VERSION, consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
+import BranchSwitcher from "../components/branch/BranchSwitcher";
+import { useBranch } from "../context/BranchContext";
 import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
+import GenieProvider from "../components/genie/GenieProvider";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
 import useIsPwa from "../hooks/useIsPwa";
@@ -111,7 +139,7 @@ const SessionTimer = () => {
 };
 
 // Sidebar content extracted so it can be shared between Sider and Drawer
-const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick, isDarkMode }) => (
+const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick }) => (
   <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
     <Menu
       theme="dark"
@@ -169,25 +197,46 @@ const SidebarVersion = () => (
       borderTop: '1px solid var(--sidebar-border)',
     }}
   >
-    Version 1.05.01
+    Version {APP_VERSION}
   </div>
 );
 
 const MainLayoutInner = () => {
-  const { message } = App.useApp();
+  const { message, notification } = App.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
-  const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
+  const { isMobile, isMobileOrTablet } = useResponsive();
   const { isWco } = useIsPwa();
   const { isOffline } = useNetworkStatus();
+  // Inter-branch transfers only make sense with more than one branch
+  const { isMultiBranch } = useBranch();
 
   // Auto-focus first input on route change + global keyboard shortcuts
   useFocusManagement();
   useKeyboardShortcuts();
+
+  // ── "You're on a new version" ──
+  // This layout only mounts once the user is signed in, so this fires on the
+  // first authenticated load of a build this browser has not run before — the
+  // first login after a deploy, for PWA and browser alike. consumeBuildChange()
+  // records the build, so it announces once per deploy and not again.
+  useEffect(() => {
+    if (!consumeBuildChange()) return;
+
+    const version = getDisplayVersion();
+    notification.success({
+      title: "Avarsh ERP Updated",
+      description: version
+        ? `You are now running version ${version}.`
+        : "You are now running the latest version.",
+      placement: "bottomRight",
+      duration: 6,
+    });
+  }, [notification]);
 
   // ── Pending approvals badge (refreshes on navigation + every 2 minutes) ──
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
@@ -301,6 +350,12 @@ const MainLayoutInner = () => {
       moduleId: "dashboard",
     },
     {
+      key: "/virtual-factory",
+      icon: <DeploymentUnitOutlined />,
+      label: "Virtual Factory",
+      moduleId: "virtual-factory",
+    },
+    {
       key: "/approvals",
       icon: <AuditOutlined />,
       label: (
@@ -335,40 +390,135 @@ const MainLayoutInner = () => {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
-      moduleId: "bom",
+      moduleId: ["bom", "cut-panel", "garment-process"],
+      // Creation happens via the BOM page button — no "Create BOM" menu item.
       children: [
-        { key: "/bom/list", label: "BOM List" },
-        { key: "/bom/new", label: "Create BOM" },
+        { key: "/bom/list", label: "BOM", moduleId: "bom" },
+        { key: "/bom/cut-panel/list", label: "Cut Panel", moduleId: "cut-panel" },
+        { key: "/bom/garment-process/list", label: "Garment Process", moduleId: "garment-process" },
       ],
     },
     {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: ["purchase-orders", "production"],
+      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po", "cut-panel-po", "garment-process-po"],
       children: [
-        { key: "/purchase-orders/list", label: "PO List", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/new", label: "New PO", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/cutting-po/list", label: "Cutting POs", moduleId: "production" },
-        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "production" },
-        { key: "/purchase-orders/finishing-po/list", label: "Finishing POs", moduleId: "production" },
+        { key: "/purchase-orders/supplier-po/list", label: "Supplier PO", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/cutting-po/list", label: "Cutting PO", moduleId: "cutting-po" },
+        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "work-order" },
+        { key: "/purchase-orders/finishing-po/list", label: "Finishing PO", moduleId: "finishing-po" },
+        { key: "/purchase-orders/cut-panel-po/list", label: "Cut Panel PO", moduleId: "cut-panel-po" },
+        { key: "/purchase-orders/garment-process-po/list", label: "Garment Process PO", moduleId: "garment-process-po" },
+      ],
+    },
+    {
+      // Sits directly after Purchase Orders by user preference (menu order set 2026-09-18)
+      key: "/sample-requests",
+      icon: <ExperimentOutlined />,
+      label: "Sample Requests",
+      // Each child is its own RBAC module (R2); the group shows if ANY is accessible.
+      // Creation happens via the list-page buttons — no "New …" menu items.
+      moduleId: ["sample-requests", "sample-dispatches", "sample-comments", "sample-invoices"],
+      children: [
+        { key: "/sample-requests/list", label: "SR List", moduleId: "sample-requests" },
+        { key: "/sample-requests/comments", label: "Customer Comments", moduleId: "sample-comments" },
+        { key: "/sample-requests/invoices/list", label: "Invoices", moduleId: "sample-invoices" },
+        { key: "/sample-requests/dispatches/list", label: "Dispatches", moduleId: "sample-dispatches" },
       ],
     },
     {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier"],
+      // Every child carries its own key. None of them did, and the child filter
+      // passes anything without one, so holding a single inventory right showed
+      // links to all ten screens and nine of them answered with Access Denied.
+      moduleId: [
+        "inventory", "inventory-dashboard", "inventory-stock", "inventory-qc",
+        "inventory-issue", "inventory-adjustment", "inventory-return-supplier",
+        "inventory-bill-passing", "opening-stock",
+      ],
       children: [
-        { key: "/inventory/dashboard", label: "Dashboard" },
-        { key: "/inventory/grn/list", label: "GRN List" },
-        { key: "/inventory/grn/allowance", label: "GRN Allowance" },
-        { key: "/inventory/qc", label: "Quality Control" },
-        { key: "/inventory/stock", label: "Stock" },
-        { key: "/inventory/opening-stock", label: "Opening Stock" },
-        { key: "/inventory/issue", label: "Material Issue" },
-        { key: "/inventory/adjustment", label: "Stock Adjustment" },
-        { key: "/inventory/return-to-supplier", label: "Return to Supplier" },
+        { key: "/inventory/dashboard", label: "Dashboard", moduleId: "inventory-dashboard" },
+        { key: "/inventory/grn/list", label: "GRN List", moduleId: "inventory" },
+        { key: "/inventory/grn/allowance", label: "GRN Allowance", moduleId: "inventory" },
+        { key: "/inventory/qc", label: "Quality Control", moduleId: "inventory-qc" },
+        { key: "/inventory/stock", label: "Stock", moduleId: "inventory-stock" },
+        { key: "/inventory/opening-stock", label: "Opening Stock", moduleId: "opening-stock" },
+        { key: "/inventory/issue", label: "Material Issue", moduleId: "inventory-issue" },
+        { key: "/inventory/adjustment", label: "Stock Adjustment", moduleId: "inventory-adjustment" },
+        { key: "/inventory/return-to-supplier", label: "Return to Supplier", moduleId: "inventory-return-supplier" },
+        ...(isMultiBranch ? [{ key: "/inventory/transfer", label: "Stock Transfer", moduleId: "inventory-transfer" }] : []),
+        { key: "/inventory/bill-passing", label: "Bill Passing", moduleId: "inventory-bill-passing" },
+      ],
+    },
+    {
+      key: "/production",
+      icon: <ScissorOutlined />,
+      label: "Production",
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-packing", "production-job-work", "production-masters"],
+      children: [
+        { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
+        { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
+        { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
+        { key: "/production/packing/list", label: "Packing", moduleId: "production-packing" },
+        { key: "/production/job-work", label: "Job Work", moduleId: "production-job-work" },
+        // Moved here from the Export Documentation children, where it sat while this group
+        // already claimed its permission key above — so the menu and the RBAC matrix disagreed
+        // about which module it belonged to.
+        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
+      ],
+    },
+    {
+      key: "/tna",
+      icon: <FieldTimeOutlined />,
+      label: "Time & Action",
+      moduleId: ["tna", "tna-masters", "tna-replan-approval"],
+      children: [
+        { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
+        { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
+        { key: "/tna/revisions", label: "Revisions & Audit", moduleId: "tna-replan-approval" },
+        { key: "/tna/exceptions", label: "Exceptions", moduleId: "tna" },
+        { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
+        { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
+      ],
+    },
+    {
+      key: "/export-docs",
+      icon: <ContainerOutlined />,
+      label: "Export Documentation",
+      // Each child is its own RBAC module; the group shows if ANY is accessible.
+      // Carton Packing now lives in the Production group — it is shop-floor capture.
+      // These documents still read the PRD §7.3 carton dataset it produces.
+      moduleId: [
+        "export-shipments", "export-packing-list",
+        "export-stickers", "export-invoice", "export-templates",
+      ],
+      children: [
+        { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
+        { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
+        { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
+        { key: "/export-docs/invoices/list", label: "Export Invoices", moduleId: "export-invoice" },
+        { key: "/export-docs/templates/list", label: "Buyer Templates", moduleId: "export-templates" },
+        // Reports and the audit trail read packing lists, so they ride that key —
+        // a viewer of the documents may read what was done to them.
+        { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
+        { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
+        // Packing arrives in the next design session.
+      ],
+    },
+    {
+      key: "/master",
+      icon: <DatabaseOutlined />,
+      label: "Master Data",
+      // Visible if any master tab is accessible. The list omitted six of the
+      // twelve, so a role granted only Couriers, Styles, Size Presets, Payment
+      // Terms, Processes or Parts never saw the menu at all.
+      moduleId: [
+        "master-data", "buyer-info", "supplier-info", "vendor-info", "items",
+        "style-master", "size-presets", "payment-terms", "terms-conditions", "process-master", "branches",
+        "parts-master", "overhead-master", "couriers", "inventory-bill-passing-masters",
       ],
     },
     {
@@ -383,13 +533,6 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/master",
-      icon: <DatabaseOutlined />,
-      label: "Master Data",
-      // Master Data is visible if user has access to any master module
-      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
-    },
-    {
       key: "/hr",
       icon: <TeamOutlined />,
       label: "HR & Payroll",
@@ -398,24 +541,51 @@ const MainLayoutInner = () => {
         { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
         { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
         { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
+        // These screens existed with working routes but no navigation entry, so
+        // they were unreachable unless the URL was typed by hand.
+        { key: "/hr/attendance/entry", label: "Mark Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/import", label: "Import Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
+        { key: "/hr/leaves/balances", label: "Leave Balances", moduleId: "hr-leave" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
-        { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
+        { key: "/hr/loans", label: "Loans", moduleId: "hr-loans" },
+        { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
-        { key: "/hr/statutory/pt", label: "Statutory", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
+      ],
+    },
+    {
+      key: "/assets",
+      icon: <ToolOutlined />,
+      label: "Assets",
+      moduleId: ["assets", "asset-dashboard", "asset-reports", "asset-setup", "asset-transfers", "asset-disposals", "asset-verification"],
+      children: [
+        { key: "/assets/dashboard", label: "Dashboard", moduleId: "asset-dashboard" },
+        { key: "/assets", label: "Asset Register", moduleId: "assets" },
+        { key: "/assets/transfers", label: "Transfers", moduleId: "asset-transfers" },
+        { key: "/assets/disposals", label: "Disposals", moduleId: "asset-disposals" },
+        { key: "/assets/verification", label: "Verification", moduleId: "asset-verification" },
+        { key: "/assets/reports", label: "Reports", moduleId: "asset-reports" },
+        { key: "/assets/setup", label: "Asset Setup", moduleId: "asset-setup" },
       ],
     },
     {
       key: "/admin",
       icon: <SettingOutlined />,
       label: "Admin",
-      moduleId: ["users", "roles", "approval-flows"],
+      moduleId: ["users", "roles", "approval-flows", "company-profile"],
       children: [
         { key: "/admin/dashboard", label: "Dashboard" },
         { key: "/admin/users", label: "Users", moduleId: "users" },
         { key: "/admin/roles", label: "Role & Access", moduleId: "roles" },
         { key: "/admin/approval-flows", label: "Approval Flows", moduleId: "approval-flows" },
+        { key: "/admin/company-profile", label: "Company Profile", moduleId: "company-profile" },
       ],
     },
   ];
@@ -433,13 +603,21 @@ const MainLayoutInner = () => {
       // Strip moduleId before passing to Ant Design Menu to avoid DOM warnings
       const { moduleId, children, ...rest } = item;
       if (children) {
-        const filteredChildren = children
-          .filter((child) => {
-            if (!child.moduleId) return true;
-            return hasModuleAccess(child.moduleId);
-          })
-          .map(({ moduleId: _mid, ...childRest }) => childRest);
-        return { ...rest, children: filteredChildren.length > 0 ? filteredChildren : undefined };
+        const visible = children.filter((child) => {
+          if (!child.moduleId) return true;
+          return hasModuleAccess(child.moduleId);
+        });
+        // Browser-only (preview) screens carry a tag: once on the group when every item in it is
+        // one, otherwise on each such item.
+        const allPreview = visible.length > 0 && visible.every((child) => PREVIEW_SCREEN_IDS.has(child.moduleId));
+        const filteredChildren = visible.map(({ moduleId: mid, ...childRest }) => (
+          !allPreview && PREVIEW_SCREEN_IDS.has(mid) ? { ...childRest, label: withPreviewTag(childRest.label) } : childRest
+        ));
+        return {
+          ...rest,
+          ...(allPreview ? { label: withPreviewTag(rest.label) } : {}),
+          children: filteredChildren.length > 0 ? filteredChildren : undefined,
+        };
       }
       return rest;
     });
@@ -455,6 +633,9 @@ const MainLayoutInner = () => {
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {currentUser?.email || currentUser?.username || ''}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            {getVersionLabel()}
           </div>
         </div>
       ),
@@ -499,18 +680,51 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
     if (path.startsWith('/inventory/return-to-supplier')) return ['/inventory/return-to-supplier'];
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
+    if (path.startsWith('/inventory/bill-passing')) return ['/inventory/bill-passing'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];
+    if (path.startsWith('/export-docs/packing-lists')) return ['/export-docs/packing-lists/list'];
+    if (path.startsWith('/export-docs/shipments')) return ['/export-docs/shipments/list'];
+    if (path.startsWith('/export-docs/stickers')) return ['/export-docs/stickers'];
+    if (path.startsWith('/export-docs/invoices')) return ['/export-docs/invoices/list'];
+    if (path.startsWith('/export-docs/templates')) return ['/export-docs/templates/list'];
+    if (path.startsWith('/export-docs/reports')) return ['/export-docs/reports'];
+    if (path.startsWith('/export-docs/audit')) return ['/export-docs/audit'];
+    if (path.startsWith('/production/cutting')) return ['/production/cutting'];
+    if (path.startsWith('/production/sewing')) return ['/production/sewing'];
+    if (path.startsWith('/production/finishing')) return ['/production/finishing'];
+    if (path.startsWith('/production/packing')) return ['/production/packing/list'];
+    if (path.startsWith('/production/job-work')) return ['/production/job-work'];
+    if (path.startsWith('/production/masters')) return ['/production/masters'];
+    if (path.startsWith('/bom/cut-panel')) return ['/bom/cut-panel/list'];
+    if (path.startsWith('/bom/garment-process')) return ['/bom/garment-process/list'];
+    if (path.startsWith('/bom/new') || path.startsWith('/bom/edit')) return ['/bom/list'];
+    if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
+    if (path.startsWith('/purchase-orders/cut-panel-po')) return ['/purchase-orders/cut-panel-po/list'];
+    if (path.startsWith('/purchase-orders/garment-process-po')) return ['/purchase-orders/garment-process-po/list'];
+    // Each attendance screen has its own menu entry, so highlight the specific
+    // one rather than always falling back to the calendar.
+    if (path.startsWith('/hr/attendance/entry') || path.startsWith('/hr/attendance/bulk')) return ['/hr/attendance/entry'];
+    if (path.startsWith('/hr/attendance/import')) return ['/hr/attendance/import'];
+    if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
+    if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
+    if (path.startsWith('/hr/leaves/balances')) return ['/hr/leaves/balances'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
+    if (path.startsWith('/hr/advances')) return ['/hr/advances'];
     if (path.startsWith('/hr/loans')) return ['/hr/loans'];
     if (path.startsWith('/hr/bonus')) return ['/hr/bonus'];
+    if (path.startsWith('/hr/statutory/pf')) return ['/hr/statutory/pf'];
+    if (path.startsWith('/hr/statutory/esi')) return ['/hr/statutory/esi'];
+    if (path.startsWith('/hr/statutory/el')) return ['/hr/statutory/el'];
     if (path.startsWith('/hr/statutory')) return ['/hr/statutory/pt'];
     if (path.startsWith('/hr/fnf')) return ['/hr/fnf'];
+    if (path.startsWith('/admin/roles')) return ['/admin/roles'];
     return [path];
   };
 
@@ -519,6 +733,9 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
+    if (path.startsWith("/tna")) return ["/tna"];
+    if (path.startsWith("/production")) return ["/production"];
+    if (path.startsWith("/export-docs")) return ["/export-docs"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];
@@ -542,6 +759,7 @@ const MainLayoutInner = () => {
 
   return (
     <SessionExpiryGuard>
+      <GenieProvider>
       <OfflineBanner />
       {/* Skip-to-content link for keyboard users */}
       <a href="#main-content" className="skip-to-content">
@@ -593,7 +811,7 @@ const MainLayoutInner = () => {
             placement="left"
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
-            width={280}
+            size={280}
             closable={false}
             styles={{
               body: { padding: 0, background: sidebarGradient },
@@ -746,22 +964,10 @@ const MainLayoutInner = () => {
                   }}
                 />
               )}
-              {/* Hide search on mobile, show on tablet+ */}
-              {!isMobile && (
-                <Input
-                  placeholder="Search..."
-                  prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
-                  style={{
-                    width: isTablet ? 200 : 280,
-                    borderRadius: 20,
-                    marginLeft: isMobileOrTablet ? 8 : 16,
-                    background: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
-                  }}
-                />
-              )}
             </Space>
             <Space size={isMobile ? 6 : 12} align="center">
+              {/* Working branch; renders nothing for a single-branch company */}
+              <BranchSwitcher compact={isMobile} />
               {!isMobile && <SessionTimer />}
               {!isMobile && <div className="toolbar-divider" />}
 
@@ -843,11 +1049,18 @@ const MainLayoutInner = () => {
               outline: 'none',
             }}
           >
-            <Outlet />
+            {/* A render error used to unmount the whole tree and leave a white
+                page, indistinguishable from a slow load. Wrapping the routed
+                content keeps the shell and shows what went wrong. */}
+            <ErrorBoundary>
+              <PreviewBanner />
+              <Outlet />
+            </ErrorBoundary>
           </Content>
         </Layout>
         <LiveActivityFeedWindow />
       </Layout>
+      </GenieProvider>
     </SessionExpiryGuard>
   );
 };

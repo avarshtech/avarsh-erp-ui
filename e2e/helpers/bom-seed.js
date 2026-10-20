@@ -26,8 +26,15 @@ export async function loadBomRefs(api) {
   const process = (procs.content || procs)[0];
   const parts = (await api.get('/parts/active')).data || [];
   const part = (parts.content || parts)[0];
+  // /items enriches each item with its ACTIVE variants, and an item always has at
+  // least one. The variant — not the item — is what a BOM line is matched on, so
+  // carry the first one rather than leaving the line variant-less.
+  const variant = (item.variants || [])[0];
   return {
-    item: { id: item.id, name: item.name ?? item.itemName, itemTypeId: item.itemTypeId, uom: item.uomName },
+    item: {
+      id: item.id, name: item.name ?? item.itemName, itemTypeId: item.itemTypeId, uom: item.uomName,
+      variantId: variant?.id ?? null, variantCode: variant?.variantCode ?? null,
+    },
     process: {
       id: process.id, name: process.name ?? process.processName,
       loss: process.defaultProcessLossPercent ?? 0,
@@ -56,7 +63,8 @@ export function buildBomPayload(order, refs, overrides = {}) {
       itemId: refs.item.id, itemName: refs.item.name, itemTypeId: refs.item.itemTypeId, uom: refs.item.uom,
       partsName: [refs.partName],
       consumptionPerGarment: consumption, consumptionMode: 'SIMPLE',
-      consumptionMatrix: null, variantMapping: null, qtyCalcBasis: 'TOTAL', variantId: null,
+      consumptionMatrix: null, variantMapping: null, qtyCalcBasis: 'TOTAL',
+      variantId: refs.item.variantId ?? null,
       baseQty: orderQty, totalQty, purchaseQty,
       processes: [{ id: refs.process.id, processName: refs.process.name }],
       processAllowances: [{

@@ -5,6 +5,7 @@
  */
 
 import axiosInstance, { upload } from '../core/axiosInstance';
+import { inertBlob } from '../../utils/inertBlob';
 
 const ENDPOINTS = {
   COST_SHEETS: '/cost-sheets',
@@ -107,6 +108,44 @@ export const updateCostSheet = async (id, data) => {
 };
 
 /**
+ * Autosave an existing Draft while the user types.
+ * POST /api/v1/cost-sheets?autosave=true — no WhatsApp message, no feed row. Silent: the
+ * sheet shows its own "autosave paused" state; a version conflict still raises the dialog.
+ */
+export const autosaveCostSheet = async (id, data) => {
+  const payload = { id: Number(id), ...data };
+  const response = await axiosInstance.post(ENDPOINTS.COST_SHEETS, payload, { params: { autosave: true }, silent: true });
+  return response.data;
+};
+
+/**
+ * Send an existing Draft or Rejected cost sheet for approval, as it was last saved. Approved
+ * at once when no approval flow is configured.
+ * POST /api/v1/cost-sheets/{id}/submit
+ * @param {number|string} id - Cost sheet ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const submitCostSheet = async (id, version) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/${id}/submit`, { version });
+  return response.data;
+};
+
+/**
+ * Take a submitted (Final) cost sheet back to Draft for revision, rows kept; its pending
+ * approval request is cancelled and the reason kept in the history.
+ * POST /api/v1/cost-sheets/{id}/withdraw
+ * @param {number|string} id - Cost sheet ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @param {string} reason - Why, 1 to 500 characters
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const withdrawCostSheet = async (id, version, reason) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/${id}/withdraw`, { version, reason });
+  return response.data;
+};
+
+/**
  * Approve a cost sheet. Routed through the centralized approval engine when a
  * flow is configured; applied directly otherwise.
  * PUT /api/v1/cost-sheets/{id}/approve
@@ -129,6 +168,21 @@ export const approveCostSheet = async (id, comments) => {
  */
 export const rejectCostSheet = async (id, reason) => {
   const response = await axiosInstance.put(`${ENDPOINTS.COST_SHEETS}/${id}/reject`, { comments: reason });
+  return response.data;
+};
+
+/**
+ * Revert the approval on an Approved cost sheet, sending it back to Draft so it
+ * can be edited. Rejected by the API (409) once an order has been raised against
+ * the costing id.
+ * PUT /api/v1/cost-sheets/{id}/revert-approval
+ * @param {number|string} id - Cost sheet ID
+ * @param {string} reason - Why the approval is being reverted (required)
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const revertCostSheetApproval = async (id, reason) => {
+  const response = await axiosInstance.put(
+    `${ENDPOINTS.COST_SHEETS}/${id}/revert-approval`, { comments: reason });
   return response.data;
 };
 
@@ -167,21 +221,6 @@ export const getCostSheetHistory = async (id) => {
 };
 
 // ==================== PAST PRICES ====================
-
-/**
- * Get past PO price suggestions for a given item.
- * GET /api/v1/cost-sheets/past-prices?type=fabric&itemId=42
- * @param {string} type - Item category ('fabric', 'trim', 'manufacturing', 'overhead')
- * @param {number} itemId - Item ID from items table
- * @returns {Promise<Array>} PastPriceSuggestionDTO[]
- */
-export const getPastPOSuggestions = async (type, itemId) => {
-  if (!itemId) return [];
-  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/past-prices`, {
-    params: { type, itemId },
-  });
-  return response.data ?? [];
-};
 
 // ==================== SUMMARIES ====================
 
@@ -231,22 +270,6 @@ export const getTodaysRate = async (fromCurrency, toCurrency) => {
   }
 
   return 1;
-};
-
-// ==================== TECHPACK AI IMPORT ====================
-
-/**
- * Upload a Buyer Techpack PDF and extract costing data using AI.
- * The backend runs Gemini extraction + master data matching.
- * Returns TechpackCostingDTO with match info for the frontend review modal.
- * POST /api/v1/cost-sheets/extract-techpack (multipart/form-data)
- * @param {File} file - PDF techpack file
- * @returns {Promise<Object>} TechpackCostingDTO
- */
-export const extractTechpackForCosting = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  return upload(`${ENDPOINTS.COST_SHEETS}/extract-techpack`, formData);
 };
 
 // ==================== CONSUMPTION CALCULATION ====================
@@ -314,7 +337,8 @@ export const downloadAttachment = async (fileId) => {
     `/files/download/${fileId}`,
     { responseType: 'blob' }
   );
-  return response.data;
+  // The sheet previews this blob in a new window, in this app's origin (review U077).
+  return inertBlob(response.data);
 };
 
 /**
@@ -325,25 +349,6 @@ export const downloadAttachment = async (fileId) => {
  */
 export const deleteAttachment = async (fileId) => {
   await axiosInstance.delete(`/files/${fileId}`);
-};
-
-// ==================== WHATSAPP NOTIFICATIONS ====================
-
-/**
- * Send a WhatsApp notification for a cost sheet.
- * POST /api/v1/whatsapp/test/send
- * @param {string} phoneNumber - Recipient phone number (with country code)
- * @param {string} templateName - WhatsApp template name
- * @param {string} [languageCode='en_US'] - Language code
- * @returns {Promise<Object>} Response with success status
- */
-export const sendWhatsAppNotification = async (phoneNumber, templateName, languageCode = 'en_US') => {
-  const response = await axiosInstance.post('/whatsapp/test/send', {
-    phoneNumber,
-    templateName,
-    languageCode,
-  });
-  return response.data;
 };
 
 // ==================== SCENARIOS ====================

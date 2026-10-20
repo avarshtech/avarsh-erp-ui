@@ -16,7 +16,7 @@ const AdjustmentViewDrawer = ({ open, onClose, record }) => {
       title={record.adjustmentNumber}
       open={open}
       onClose={onClose}
-      width={960}
+      size={960}
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <ActionButton action="close" text="Close" onClick={onClose} />

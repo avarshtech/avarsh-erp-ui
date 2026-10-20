@@ -1,0 +1,403 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { App, Form, Card, Row, Col, Space, Skeleton, Alert, Result } from 'antd';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import dayjs from 'dayjs';
+import PageHeader from '../../components/PageHeader';
+import { ActionButton } from '../../components/buttons';
+import {
+  createSampleRequest, createSampleRequestBatch, updateSampleRequest, changeStatus,
+} from '../../services/sample-request/sampleRequestService';
+import { SR_STATUS, SR_SCOPE, srIsMaterial, srRaisesInBatch } from '../../utils/sampleRequestConstants';
+import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
+import { toastUnlessHandled } from '../../utils/apiError';
+import useSampleMasters from '../../hooks/useSampleMasters';
+import useBusyAction from '../../hooks/useBusyAction';
+import useSampleRequestDraft from './useSampleRequestDraft';
+import SampleBomPicker from './form/SampleBomPicker';
+import SectionHeader from './form/SectionHeader';
+import SectionDetails from './form/SectionDetails';
+import SectionDeadlines from './form/SectionDeadlines';
+import MaterialsTable from './form/MaterialsTable';
+import SummaryBar from './form/SummaryBar';
+
+const toDate = (v) => (v ? dayjs(v) : null);
+
+// Same sticky header card as the Supplier PO form — actions stay reachable
+// however far down the materials table the user has scrolled.
+const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
+
+const SampleRequestForm = () => {
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  // Set by the bare-entry BOM picker; the ?bomId/?orderNo query params carry
+  // the same pair when the SR is raised from the BOM screen.
+  const [picked, setPicked] = useState(null);
+  const bomId = picked?.bomId || searchParams.get('bomId') || undefined;
+  const orderNo = picked?.orderNo || searchParams.get('orderNo') || undefined;
+
+  const draft = useSampleRequestDraft({ id, bomId, orderNo });
+  const [form] = Form.useForm();
+  const [materials, setMaterials] = useState([]);
+  const { sampleTypes, loading: typesLoading } = useSampleMasters();
+  const [savedId, setSavedId] = useState(id ? Number(id) : null);
+  // Optimistic-lock version of the last save — authoritative once we have one,
+  // since draft.record still carries the version the form was loaded with
+  const [savedVersion, setSavedVersion] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
+
+  const substitution = Form.useWatch('colourSubstitutionAllowed', form);
+  const sampleTypeId = Form.useWatch('sampleTypeId', form);
+  const sampleQty = Form.useWatch('sampleQty', form);
+  const watchedSizes = Form.useWatch('sizes', form);
+  const sizes = useMemo(() => watchedSizes || [], [watchedSizes]);
+  const colourName = Form.useWatch('colourName', form);
+  const typeName = sampleTypes.find((t) => t.id === sampleTypeId)?.name || draft.record?.sampleTypeName || '';
+
+  // How colour divides this type: whether one save becomes several requests,
+  // and whether it is a swatch rather than a garment. An edit is never a batch -
+  // a request that exists is one request.
+  const scope = sampleTypes.find((t) => t.id === sampleTypeId)?.sampleScope
+    || draft.record?.sampleScope || SR_SCOPE.ORDER_NO_COLOUR;
+  const isMaterialScope = srIsMaterial(scope);
+  const batchScope = !savedId && srRaisesInBatch(scope);
+
+  const watchedColours = Form.useWatch('colours', form);
+  /**
+   * The colour the live requirement column is worked out for.
+   *
+   * Exact when the request is for one colourway. With several picked the column
+   * can only show one number, so it shows none of them and falls back to the
+   * conservative largest-across-colours — each request is still saved with its
+   * own colour-exact figure.
+   */
+  const liveColour = useMemo(() => {
+    if (isMaterialScope) return null;
+    if (colourName) return colourName;
+    const picked = watchedColours || [];
+    return picked.length === 1 ? String(picked[0]).trim() : null;
+  }, [isMaterialScope, colourName, watchedColours]);
+
+  // Initialise once the draft resolves
+  useEffect(() => {
+    if (draft.loading || draft.error || draft.needsPicker) return;
+    setMaterials(draft.materials);
+    if (draft.mode === 'edit' && draft.record) {
+      const r = draft.record;
+      form.setFieldsValue({
+        sampleTypeId: r.sampleTypeId,
+        colourSubstitutionAllowed: Boolean(r.colourSubstitutionAllowed),
+        sampleQty: r.sampleQty,
+        sizes: r.sizes,
+        colourName: r.colourName,
+        colourReference: r.colourReference,
+        priority: r.priority || 'NORMAL',
+        specialInstructions: r.specialInstructions,
+        inHandDate: toDate(r.inHandDate),
+        dispatchDeadline: toDate(r.dispatchDeadline),
+        buyerApprovalDeadline: toDate(r.buyerApprovalDeadline),
+        remarks: r.remarks,
+      });
+    } else {
+      form.setFieldsValue({ priority: 'NORMAL', sizes: draft.orderSizes });
+    }
+    setIsDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.loading, draft.mode]);
+
+  // Toggling substitution OFF resets any edited colours back to BOM values
+  useEffect(() => {
+    if (substitution === false) {
+      setMaterials((prev) => prev.map((l) => ({ ...l, colourDesign: l.originalColourDesign })));
+    }
+  }, [substitution]);
+
+  const onColourChange = useCallback((lineNo, value) => {
+    setIsDirty(true);
+    setMaterials((prev) => prev.map((l) => (l.lineNo === lineNo ? { ...l, colourDesign: value } : l)));
+  }, []);
+
+  const onMandatoryChange = useCallback((lineNo, checked) => {
+    setIsDirty(true);
+    setMaterials((prev) => prev.map((l) => {
+      if (l.lineNo !== lineNo) return l;
+      // Marking a trim mandatory re-locks its colour to the BOM value
+      return { ...l, mandatory: checked, colourDesign: checked ? l.originalColourDesign : l.colourDesign };
+    }));
+  }, []);
+
+  const srForRules = useMemo(() => ({
+    colourSubstitutionAllowed: Boolean(substitution),
+    status: SR_STATUS.DRAFT,
+  }), [substitution]);
+
+  const totals = useMemo(() => {
+    let shortfall = 0;
+    materials.forEach((l) => {
+      const required = computeSampleQtyRequired(l, sampleQty, sizes, liveColour);
+      if (stockStatusFor(l.stockAvailable, required) !== 'IN_STOCK') shortfall += 1;
+    });
+    return {
+      total: materials.length,
+      fabric: materials.filter((l) => l.section === 'FABRIC').length,
+      trims: materials.filter((l) => l.section !== 'FABRIC').length,
+      available: materials.length - shortfall,
+      shortfall,
+    };
+  }, [materials, sampleQty, sizes, liveColour]);
+
+  // Only what the server accepts. The header the BOM supplies — order, style,
+  // buyer, country, season, order qty — is deliberately absent: the server
+  // resolves all of it from bomId, and the sample type NAME is snapshotted
+  // there too. Material lines carry the two editable fields and nothing else;
+  // every spec column (and sampleQtyRequired) is re-materialised from the BOM
+  // on save, so spreading the line back would only leak computed columns.
+  const buildPayload = () => {
+    const v = form.getFieldsValue();
+    // A per-colour or material request picks its colourway or fabric when it is raised (the
+    // batch's colours / bomLineIds). Once it exists, that choice is part of what it is, and the
+    // edit form mounts no single-value field for it - so getFieldsValue() has no colourName or
+    // bomLineId, and the server would rebuild the identity from nothing. Edits send the record's.
+    const record = savedId ? draft.record : null;
+    const keepsRecordColour = record && (scope === SR_SCOPE.ORDER_PER_COLOUR || isMaterialScope);
+    return {
+      bomId: draft.header?.bomId ?? draft.record?.bomId ?? null,
+      // Optimistic locking — the server rejects a stale version with 409
+      version: savedVersion ?? draft.record?.version,
+      sampleTypeId: v.sampleTypeId ?? null,
+      colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
+      sampleQty: v.sampleQty ?? null,
+      sizes: v.sizes || [],
+      // The colourway this request IS. Raising a per-colour or material type sends
+      // its set through the batch instead (a lab dip's colour comes off the BOM
+      // line, server-side); editing one sends back the record's colour and fabric,
+      // because the update rebuilds the identity from exactly these two fields.
+      colourName: (keepsRecordColour ? record.colourName : v.colourName) || null,
+      bomLineId: (record && isMaterialScope ? record.bomLineId : null) ?? null,
+      colourReference: v.colourReference || '',
+      priority: v.priority || 'NORMAL',
+      specialInstructions: v.specialInstructions || '',
+      inHandDate: v.inHandDate ? v.inHandDate.format('YYYY-MM-DD') : null,
+      dispatchDeadline: v.dispatchDeadline ? v.dispatchDeadline.format('YYYY-MM-DD') : null,
+      buyerApprovalDeadline: v.buyerApprovalDeadline ? v.buyerApprovalDeadline.format('YYYY-MM-DD') : null,
+      remarks: v.remarks || '',
+      materials: materials.map((l) => ({
+        bomLineId: l.bomLineId,
+        colourDesign: l.colourDesign ?? '',
+        mandatory: Boolean(l.mandatory),
+      })),
+    };
+  };
+
+  /**
+   * Saves, and always answers with a LIST - one entry for a single request, N
+   * for a set. One shape means one branch at the call sites rather than two.
+   *
+   * A batch deliberately does not set savedId: it became N independent
+   * documents and there is no single row for this form to go on editing, so the
+   * caller navigates away instead.
+   */
+  const persist = async () => {
+    const payload = buildPayload();
+    if (savedId) return [await updateSampleRequest(savedId, payload)];
+
+    const v = form.getFieldsValue();
+    if (batchScope) {
+      const batch = isMaterialScope
+        ? { request: payload, bomLineIds: v.bomLineIds || [] }
+        : { request: payload, colours: (v.colours || []).map((c) => String(c).trim()).filter(Boolean) };
+      const raised = await createSampleRequestBatch(batch);
+      setIsDirty(false);
+      return raised;
+    }
+
+    const saved = await createSampleRequest(payload);
+    setSavedId(saved.id);
+    setSavedVersion(saved.version ?? null);
+    setIsDirty(false);
+    return [saved];
+  };
+
+  const handleSaveDraft = async () => {
+    setBusy('draft');
+    try {
+      const saved = await persist();
+      message.success(saved.length > 1
+        ? `${saved.length} sample requests saved as draft — ${saved.map((s) => s.srNo).join(', ')}`
+        : `${saved[0].srNo} saved as draft`);
+      navigate('/sample-requests/list');
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setBusy(null); }
+  };
+
+  const handleSubmit = async () => {
+    try { await form.validateFields(); } catch { message.warning('Complete the mandatory fields first'); return; }
+    setBusy('submit');
+    try {
+      const saved = await persist();
+      // Submitting is per request, so a set would need N calls of which any
+      // could fail halfway - exactly the half-done state the all-or-nothing
+      // batch save avoids. A set is saved as drafts and submitted from the list.
+      if (saved.length > 1) {
+        message.success(`${saved.length} sample requests saved as draft — submit each from the list`);
+        navigate('/sample-requests/list');
+        return;
+      }
+      await changeStatus(saved[0].id, SR_STATUS.SUBMITTED, saved[0].version);
+      message.success(`${saved[0].srNo} submitted`);
+      navigate('/sample-requests/list');
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to submit'); } finally { setBusy(null); }
+  };
+
+  const handleCancel = () => {
+    if (!isDirty) { navigate('/sample-requests/list'); return; }
+    modal.confirm({
+      title: 'Discard changes?',
+      content: 'Unsaved changes will be lost.',
+      okText: 'Discard',
+      okButtonProps: { danger: true },
+      onOk: () => navigate('/sample-requests/list'),
+    });
+  };
+
+  if (draft.needsPicker) {
+    return (
+      <div className="animate-fade-in-up">
+        <PageHeader title="New Sample Request" style={STICKY_HEADER} />
+        <SampleBomPicker
+          onPick={setPicked}
+          resolving={draft.loading && Boolean(picked)}
+          pickedBomId={picked?.bomId}
+        />
+      </div>
+    );
+  }
+  if (draft.loading) {
+    return (
+      <div className="animate-fade-in-up">
+        <div className="page-header" style={STICKY_HEADER}>
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 200 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 90 }} />
+            <Skeleton.Button active style={{ width: 130 }} />
+            <Skeleton.Button active style={{ width: 180 }} />
+          </Space>
+        </div>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 16 }} />
+          <Row gutter={[24, 16]}>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <Col xs={12} sm={8} md={6} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 4 }} block={false} />
+                <Skeleton.Input active size="small" block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Row gutter={16}>
+            {[[1, 6], [2, 6], [3, 4], [4, 8]].map(([k, lg]) => (
+              <Col xs={24} sm={12} md={8} lg={lg} key={k} style={{ marginBottom: 16 }}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={10} lg={8} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+            <Col xs={24} md={8} lg={12} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+          </Row>
+        </Card>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Row gutter={16}>
+            {[1, 2, 3].map((i) => (
+              <Col xs={24} sm={8} key={i} style={{ marginBottom: 16 }}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        <Card size="small">
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Skeleton active paragraph={{ rows: 5 }} />
+        </Card>
+      </div>
+    );
+  }
+  if (draft.error === 'NOT_EDITABLE') {
+    return (
+      <Result
+        status="warning"
+        title="This Sample Request is no longer editable"
+        subTitle={`Only Draft SRs can be edited — ${draft.record?.srNo} is ${draft.record?.status}.`}
+        extra={<ActionButton action="view" text="Back to SR List" onClick={() => navigate('/sample-requests/list')} />}
+      />
+    );
+  }
+  if (draft.error) {
+    return <Alert type="error" showIcon title="Failed to load" description={draft.error} style={{ margin: 24 }} />;
+  }
+
+  return (
+    <div className="animate-fade-in-up">
+      <PageHeader
+        title={savedId ? 'Edit Sample Request' : 'New Sample Request'}
+        onBack={handleCancel}
+        style={STICKY_HEADER}
+      >
+        <ActionButton action="close" text="Cancel" onClick={handleCancel} />
+        <ActionButton action="save" variant="draft" text="Save as Draft" {...busyProps('draft')} onClick={handleSaveDraft} />
+        <ActionButton action="send" text="Submit Sample Request" {...busyProps('submit')} onClick={handleSubmit} />
+      </PageHeader>
+      <SectionHeader
+        srNo={draft.record?.srNo}
+        header={draft.header}
+      />
+      <Form form={form} layout="vertical" onValuesChange={() => setIsDirty(true)}>
+        <SectionDetails
+          form={form}
+          sampleTypes={sampleTypes}
+          typesLoading={typesLoading}
+          orderSizes={draft.orderSizes}
+          orderColours={draft.orderColours}
+          materials={materials}
+          existingRequests={draft.existingRequests}
+          record={draft.record}
+        />
+        <SectionDeadlines form={form} />
+        <MaterialsTable
+          materials={materials}
+          sr={srForRules}
+          sampleQty={sampleQty}
+          sizes={sizes}
+          colourName={liveColour}
+          isMaterialScope={isMaterialScope}
+          typeName={typeName}
+          onColourChange={onColourChange}
+          onMandatoryChange={onMandatoryChange}
+        />
+        <SummaryBar totals={totals} />
+      </Form>
+    </div>
+  );
+};
+
+export default SampleRequestForm;

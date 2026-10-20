@@ -6,22 +6,30 @@ import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect, FormDatePicker, FormSection } from '../../../components/form';
 import { numericInputProps } from '../../../utils/inputHelpers';
+import useBusyAction from '../../../hooks/useBusyAction';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
 import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import MarkerUploadCard from '../components/MarkerUploadCard';
 import PpSampleGate from '../components/PpSampleGate';
+import ReferBackNotice from '../components/ReferBackNotice';
 import { PO_TYPE, PO_ACTION, isPpApproved, computeVariancePercent, VARIANCE_THRESHOLD } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom, getPpApprovalStatus,
-  getCuttingPo, createCuttingPo, updateCuttingPo, changeCuttingPoStatus, getOrderCoverage,
-} from '../../../services/po/productionService';
+  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom, getPpApprovalStatus, setPpApprovalStatus,
+} from '../../../services/po/production/productionLookupService';
+import {
+  getCuttingPo, createCuttingPo, updateCuttingPo, changeCuttingPoStatus, getCuttingPoCoverage,
+} from '../../../services/po/production/cuttingPoService';
+import { getOrderAllocations } from '../../../services/orders/orderAllocationService';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
 
-// Allocated defaults to CAD requirement and is editable on the Cutting PO fabric panel.
+// Allocated defaults to CAD requirement (in the stock unit, e.g. Kg) and is editable on
+// the Cutting PO fabric panel.
 const normFabricStock = (rows) => rows.map((r) => ({
   ...r, allocated: r.cadRequired, availableBalance: r.currentStock - r.cadRequired, shortageSurplus: r.currentStock - r.cadRequired,
 }));
@@ -30,11 +38,14 @@ const CuttingPoForm = () => {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { message, modal } = App.useApp();
+  const { message, modal, notification } = App.useApp();
   const [form] = Form.useForm();
 
+  const { isMultiBranch, effectiveBranchId } = useBranch();
   const [orders, setOrders] = useState([]);
   const [order, setOrder] = useState(null);
+  // The order's branch split; a cutting PO is raised against one row of it
+  const [allocations, setAllocations] = useState([]);
   const [items, setItems] = useState([]);
   const [consumption, setConsumption] = useState([]);
   const [stock, setStock] = useState([]);
@@ -44,33 +55,46 @@ const CuttingPoForm = () => {
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
-  const [saving, setSaving] = useState(false);
+  // An edit shows the form only once the PO has loaded; its values go in after the form mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !booting);
+  const [saved, setSaved] = useState(null); // the PO being edited, for its refer-back notice
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => { getConfirmedOrders().then(setOrders); }, []);
 
-  const hydrateFromOrder = useCallback(async (orderId, cadPerPc) => {
-    const [o, cons, pp] = await Promise.all([
-      getOrderForPo(orderId), getConsumptionComparison(orderId, cadPerPc), getPpApprovalStatus(orderId),
+  // plannedQty: the PO's total when editing; a fresh order's own planned rows otherwise.
+  // Both the consumption totals and the stock requirement are per-piece × this total.
+  // branchId: the edited PO's own, or the form's (a new PO); the form is not mounted while an edit loads
+  const hydrateFromOrder = useCallback(async (orderId, cadPerPc, plannedQty, branchId = form.getFieldValue('branchId')) => {
+    const [o, pp, alloc] = await Promise.all([
+      getOrderForPo(orderId), getPpApprovalStatus(orderId),
+      getOrderAllocations(orderId).catch(() => null),
     ]);
+    const total = plannedQty ?? sum(o.items || [], 'plannedQty');
+    const cons = await getConsumptionComparison(o, cadPerPc, total);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
-    setStock(normFabricStock(await getStockByBom(orderId, 'fabric', { cadPerPc: cons[0]?.cadPerPc })));
+    setAllocations(alloc?.rows || []);
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, plannedQty: total, branchId })));
     return o;
-  }, []);
+  }, [form]);
 
   // Edit: load existing PO
   useEffect(() => {
     if (!isEdit) return;
     getCuttingPo(id).then(async (po) => {
       if (!po) { message.error('Cutting PO not found'); return navigate('/purchase-orders/cutting-po/list'); }
-      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc);
+      setSaved(po);
+      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc, po.totalPlannedQty, po.branchId);
       setItems(po.items || []);
-      getOrderCoverage(PO_TYPE.CUTTING, po.orderId, id).then(setCoverage);
+      getCuttingPoCoverage(po.orderId, id).then(setCoverage);
       if (o && po.allowancePercent != null && o.allowancePercent !== po.allowancePercent) {
         setAllowanceWarn({ stored: po.allowancePercent, live: o.allowancePercent });
       }
-      form.setFieldsValue({
+      setLoadedValues({
         orderId: po.orderId, plannedCutDate: po.plannedCutDate ? dayjs(po.plannedCutDate) : null,
         plannedDeliveryDate: po.plannedDeliveryDate ? dayjs(po.plannedDeliveryDate) : null,
+        orderAllocationId: po.orderAllocationId, branchId: po.branchId,
         processingUnitType: po.processingUnitType, processingUnitId: po.processingUnitId, processingUnitName: po.processingUnitName,
         markerFileUrl: po.markerFileUrl, markerEfficiency: po.markerEfficiency, remarks: po.remarks,
       });
@@ -81,7 +105,15 @@ const CuttingPoForm = () => {
     const o = await hydrateFromOrder(orderId);
     setItems((o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
     setAllowanceWarn(null);
-    getOrderCoverage(PO_TYPE.CUTTING, orderId).then(setCoverage);
+    // A fresh pick of the order clears the allocation; a single-branch company
+    // has no picker, so its branch is the only one there is.
+    form.setFieldsValue({ orderAllocationId: undefined, branchId: isMultiBranch ? undefined : effectiveBranchId, processingUnitId: undefined, processingUnitName: '' });
+    getCuttingPoCoverage(orderId).then(setCoverage);
+  };
+
+  const handleAllocationSelect = (allocationId) => {
+    const row = allocations.find((a) => a.id === allocationId);
+    form.setFieldsValue({ branchId: row?.branchId, processingUnitId: undefined, processingUnitName: '' });
   };
 
   const thisPoQty = sum(items, 'plannedQty');
@@ -104,7 +136,7 @@ const CuttingPoForm = () => {
 
   const refreshStock = (rows) => {
     setConsumption(rows);
-    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty'), branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
   };
 
   // Editing Planned Qty re-derives the BOM-based requirement (per-garment from BOM × planned qty)
@@ -113,7 +145,19 @@ const CuttingPoForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
+  };
+
+  // Allowance % is editable on the PO (decision ②) — default comes from the
+  // order's BOM items; changing it recomputes every row's planned qty, and with it
+  // the consumption totals and the fabric requirement.
+  const applyAllowance = (pct) => {
+    const val = pct == null ? 0 : pct;
+    setOrder((o) => ({ ...o, allowancePercent: val }));
+    onItemsChange(items.map((i) => ({
+      ...i, allowancePercent: val,
+      plannedQty: Math.ceil((i.orderQty || 0) * (1 + val / 100)),
+    })));
   };
 
   const applyBulkRate = () => {
@@ -125,6 +169,7 @@ const CuttingPoForm = () => {
     orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
     buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
     processingUnitType: values.processingUnitType, processingUnitId: values.processingUnitId, processingUnitName: values.processingUnitName,
+    orderAllocationId: values.orderAllocationId ?? null, branchId: values.branchId ?? null,
     plannedCutDate: values.plannedCutDate?.format('YYYY-MM-DD'), plannedDeliveryDate: values.plannedDeliveryDate?.format('YYYY-MM-DD'),
     totalOrderQty: sum(items, 'orderQty'), allowancePercent: order.allowancePercent, totalPlannedQty: sum(items, 'plannedQty'),
     bomConsumptionPerPc: consumption[0]?.bomPerPc, cadConsumptionPerPc: consumption[0]?.cadPerPc,
@@ -140,16 +185,21 @@ const CuttingPoForm = () => {
       return message.warning('Enter a rate/price for every size-color row before saving');
     }
     if (submit && !(await confirmWarnings())) return;
-    setSaving(true);
+    setBusy(submit ? 'submit' : 'draft');
     try {
       const payload = buildPayload(values);
       const saved = isEdit ? await updateCuttingPo(id, payload) : await createCuttingPo(payload);
-      if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.cuttingPoNo} ${submit ? 'submitted' : 'saved'}`);
+      if (saved.warnings?.length) {
+        // The buyer has an approved-unit list and this unit is not on it: warn, never block
+        notification.warning({ title: 'Buyer approval', description: saved.warnings.join(' '), duration: 10 });
+      }
       navigate('/purchase-orders/cutting-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
-    } finally { setSaving(false); }
+    } finally { setBusy(null); }
   };
 
   if (booting) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -158,7 +208,17 @@ const CuttingPoForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
-        {ppStatus && <PpSampleGate status={ppStatus} />}
+        <ReferBackNotice record={saved} />
+        {ppStatus && (
+          <PpSampleGate
+            status={ppStatus}
+            onMarkApproved={order ? async () => {
+              const next = await setPpApprovalStatus(order.id, 'COMPLETED');
+              setPpStatus(next);
+              message.success('PP Sample marked approved for this order');
+            } : undefined}
+          />
+        )}
         <FormSection title="Order & Style" columns={2}>
           <Form.Item name="orderId" label="Confirmed Order" rules={[{ required: true, message: 'Select an order' }]}>
             <FormSelect placeholder="Select a confirmed order" disabled={isEdit} onChange={handleOrderSelect}
@@ -173,14 +233,30 @@ const CuttingPoForm = () => {
             <Text type="secondary">Style: <Text strong>{order.styleNo}</Text></Text>
             <Text type="secondary">Buyer: <Text strong>{order.buyer}</Text></Text>
             <Text type="secondary">BOM: <Text strong>{order.bomNo}</Text></Text>
-            <Text type="secondary">Allowance: <Text strong>{order.allowancePercent}%</Text></Text>
+            <Text type="secondary">
+              Allowance:{' '}
+              <InputNumber size="small" min={0} max={50} value={order.allowancePercent}
+                onChange={applyAllowance} style={{ width: 80 }} suffix="%" {...numericInputProps} />
+            </Text>
           </Space>
         )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-            message={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
+            title={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
         )}
         <FormSection title="Processing Unit">
+          {/* Which branch's share of the order this PO cuts; the unit list below follows it */}
+          {isMultiBranch && (
+            <Col xs={24} md={12}>
+              <Form.Item name="orderAllocationId" label="Branch Allocation" rules={[{ required: true, message: 'Select the branch allocation this PO is raised against' }]}>
+                <FormSelect placeholder={order ? 'Select branch allocation' : 'Select an order first'} disabled={!order} onChange={handleAllocationSelect}
+                  options={allocations.map((a) => ({ value: a.id, label: `${a.branchName}${a.unitName ? ` / ${a.unitName}` : ''} · ${(a.qty || 0).toLocaleString('en-IN')} pcs` }))} />
+              </Form.Item>
+            </Col>
+          )}
+          <Form.Item name="branchId" hidden><Input /></Form.Item>
+          {/* Always registered: an edit must send the allocation back, or the link would be lost */}
+          {!isMultiBranch && <Form.Item name="orderAllocationId" hidden><Input /></Form.Item>}
           <Col span={24}><ProcessingUnitSelector poType={PO_TYPE.CUTTING} /></Col>
         </FormSection>
         <FormSection title="Other" columns={1}>
@@ -212,8 +288,8 @@ const CuttingPoForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={isEdit ? 'Edit Cutting PO' : 'New Cutting PO'} backPath="/purchase-orders/cutting-po/list">
-        <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} disabled={!order} />
-        <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!order || !ppApproved}
+        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft', !order)} onClick={() => save(false)} />
+        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !order || !ppApproved)}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
       </PageHeader>
       <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>

@@ -1,14 +1,16 @@
 /**
  * BOM — Status Workflow (API)
  *
- * BOM has just two states: DRAFT → CREATED. The transition is carried in the
- * create/update payload `status` (there is no separate status endpoint used by
- * the UI). BOM is NOT wired to the approval engine — the approval gate is
- * upstream (only CONFIRMED orders can seed a BOM).
+ * BOM has just two states: DRAFT → CREATED. A new BOM is created in either; an
+ * existing one moves by its own commands, POST /boms/{id}/release and /reopen
+ * with its version (a save no longer carries the move). BOM is NOT wired to the
+ * approval engine — the approval gate is upstream (only CONFIRMED orders can seed
+ * a BOM).
  *
  * What this tests:
  *   - Save as Draft → status DRAFT
  *   - Create/Submit → status CREATED
+ *   - Draft → CREATED by the release command
  *   - A CREATED BOM is still editable (re-save) but NOT deletable (Draft-only)
  */
 
@@ -55,12 +57,13 @@ test.describe('BOM — Status Workflow', () => {
     expect(got.status).toBe('CREATED');
   });
 
-  test('Draft → Created via update payload status', async () => {
+  test('Draft → Created by the release command', async () => {
     const bom = await createBom('DRAFT');
     const got = (await api.get(`/boms/${bom.id}`)).data;
-    const upd = await api.put(`/boms/${bom.id}`, { ...got, status: 'CREATED' });
+    const upd = await api.post(`/boms/${bom.id}/release`, { version: got.version });
     expect(upd.status).toBeGreaterThanOrEqual(200);
     expect(upd.status).toBeLessThan(300);
+    expect(upd.data.status).toBe('CREATED');
     const after = (await api.get(`/boms/${bom.id}`)).data;
     expect(after.status).toBe('CREATED');
   });

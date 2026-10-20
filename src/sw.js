@@ -1,6 +1,6 @@
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { NetworkFirst } from 'workbox-strategies';
+import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
@@ -65,10 +65,20 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // ─── Runtime Caching: Master Data APIs ───
+// The live activity feed is an EventSource under /api/v1, and a streaming
+// response has no end: running it through a caching strategy means the handler
+// buffers a response that never completes and holds a fetch open for the life of
+// the connection. Leaving it unmatched lets the browser fetch it directly,
+// outside the service worker entirely.
+const isStreamingRequest = ({ url, request }) =>
+  request?.headers?.get('accept') === 'text/event-stream'
+  || url.pathname.includes('/activity-feed/stream');
+
 registerRoute(
-  ({ url }) =>
-    url.pathname.match(
-      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
+  ({ url, request }) =>
+    !isStreamingRequest({ url, request })
+    && url.pathname.match(
+      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|vendors|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
     ),
   new NetworkFirst({
     cacheName: 'erp-master-data',
@@ -81,9 +91,31 @@ registerRoute(
   'GET'
 );
 
+// ─── Bill Passing: never from cache ───
+// Registered before the catch-all below, because the first matching route
+// wins. A supplier bill's status and net payable decide whether money moves;
+// an approver reading a half-hour-old copy of either, with nothing on screen
+// to say it is stale, is not a risk worth the offline convenience.
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/v1/inventory/bill-passing'),
+  new NetworkOnly(),
+  'GET'
+);
+
+// Same reasoning for order mapping: the screen shows how much of a PO line is still
+// unmapped, and every allocation is checked against that balance server-side. A
+// half-hour-old balance would offer quantities that are already spoken for and then be
+// refused on submit, with nothing on screen explaining why.
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/v1/purchase-orders/order-mapping'),
+  new NetworkOnly(),
+  'GET'
+);
+
 // ─── Runtime Caching: Other API GET requests ───
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/v1/'),
+  ({ url, request }) =>
+    !isStreamingRequest({ url, request }) && url.pathname.startsWith('/api/v1/'),
   new NetworkFirst({
     cacheName: 'erp-api-data',
     plugins: [

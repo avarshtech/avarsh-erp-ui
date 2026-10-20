@@ -361,7 +361,7 @@ const FabricStagesDialog = ({
           </Space>
         </div>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       {/* Header */}
       <div style={{ marginBottom: 20 }}>

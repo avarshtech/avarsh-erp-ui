@@ -33,7 +33,7 @@ const RecentOrdersCard = memo(function RecentOrdersCard({ orders = [], loading =
       dataIndex: 'quantity',
       key: 'quantity',
       align: 'right',
-      render: (qty) => (qty != null ? qty.toLocaleString() : '—'),
+      render: (qty) => (qty != null ? qty.toLocaleString('en-IN') : '—'),
     },
     {
       title: 'Status',

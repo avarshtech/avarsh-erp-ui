@@ -7,7 +7,9 @@ import { hasModuleAccess, hasPermission, isAdminRole, getCurrentUser } from '../
  * Admin/SuperAdmin roles bypass all permission checks.
  *
  * Props:
- *  - module: module ID to check access for (e.g., 'bom', 'orders')
+ *  - module: module ID to check access for (e.g., 'bom', 'orders'), or an
+ *    array of IDs for a shell screen that several keys share — the route opens
+ *    if ANY of them grants access, mirroring the sidebar's group rule.
  *  - operation: optional specific operation (e.g., 'add', 'update')
  *  - children: component to render if authorized
  */
@@ -16,8 +18,10 @@ const PermissionRoute = ({ module, operation, children }) => {
   const user = getCurrentUser();
   if (isAdminRole(user?.role)) return children;
 
+  const modules = Array.isArray(module) ? module : [module];
+
   // Check module-level access
-  if (!hasModuleAccess(module)) {
+  if (!modules.some((id) => hasModuleAccess(id))) {
     return (
       <Result
         status="403"
@@ -29,7 +33,7 @@ const PermissionRoute = ({ module, operation, children }) => {
   }
 
   // Check specific operation if provided
-  if (operation && !hasPermission(module, operation)) {
+  if (operation && !modules.some((id) => hasPermission(id, operation))) {
     return (
       <Result
         status="403"

@@ -115,7 +115,7 @@ const OpeningStockFabricRollTable = ({ rows = [], onChange, onAdd, onRemove, rea
     <div>
       <Table
         size="small"
-        rowKey={(_, i) => `row-${i}`}
+        rowKey={(r) => `row-${rows.indexOf(r)}`}
         dataSource={rows}
         columns={columns}
         pagination={false}

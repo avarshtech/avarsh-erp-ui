@@ -16,13 +16,16 @@ const CATEGORY_COLORS = {
 
 const getAccessoriesStockColumns = () => [
   {
+    // Same width as the fabric register: a variant code carries the item code plus its
+    // attributes, so it needs one unbroken line. ellipsis, never wrap.
     title: 'Item Code',
     dataIndex: 'itemCode',
     key: 'itemCode',
     fixed: 'left',
-    width: 200,
+    width: 260,
     align: 'center',
-    render: (code) => code,
+    ellipsis: true,
+    render: (code, r) => r.variantCode || '—',
   },
   {
     title: 'Category',
@@ -47,6 +50,16 @@ const getAccessoriesStockColumns = () => [
     width: 140,
     align: 'center',
     render: (text) => <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text || '-'}</span>,
+  },
+  {
+    // colour lives on each variant row of the item
+    title: 'Colour',
+    key: 'color',
+    width: 140,
+    align: 'center',
+    ellipsis: true,
+    render: (_, r) => [...new Set((r.variants || []).map((v) => v.color)
+      .filter((c) => c && c !== '-' && c !== '—'))].join(', ') || '-',
   },
   {
     title: 'Supplier',

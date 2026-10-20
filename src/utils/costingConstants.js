@@ -10,6 +10,7 @@
  */
 
 import { getCurrencySymbol } from './orderConstants';
+import { convertToPrimary } from './uomConversions';
 
 // ==================== COSTING STATUS ====================
 
@@ -226,23 +227,33 @@ export const generateCostingId = () => {
 // ==================== FORMULA HELPERS ====================
 
 /**
- * Calculate fabric net cost per row
- * Net Cost = Consumption × Fabric Price × (1 + Allowance%) × (1 + Wastage%)
+ * Calculate fabric net cost per row.
+ *
+ * Consumption is held in the item's SECONDARY UOM (59.33 GMS) while the price is the
+ * purchase rate per PRIMARY UOM (₹600/kg), so the quantity is restated in the primary
+ * UOM first. `uomConversionFactor` is null whenever no conversion applies, in which case
+ * `convertToPrimary` passes the quantity straight through.
+ *
+ * Net Cost = (Consumption ÷ Factor) × Fabric Price × (1 + Allowance%) × (1 + Wastage%)
  */
-export const calcFabricNetCost = (consumption, fabricPrice, allowancePct = 0, wastagePct = 0) => {
-  const c = Number(consumption) || 0;
+export const calcFabricNetCost = (consumption, fabricPrice, allowancePct = 0, wastagePct = 0, uomConversionFactor = null) => {
+  const qty = convertToPrimary(Number(consumption) || 0, uomConversionFactor) || 0;
   const p = Number(fabricPrice) || 0;
   const a = Number(allowancePct) || 0;
   const w = Number(wastagePct) || 0;
-  return c * p * (1 + a / 100) * (1 + w / 100);
+  return qty * p * (1 + a / 100) * (1 + w / 100);
 };
 
 /**
- * Calculate trim price per row
- * Price = Consumption × Cost
+ * Calculate trim price per row.
+ * Same secondary-to-primary restatement as fabric — thread is consumed in MTR but
+ * bought by the cone.
+ *
+ * Price = (Consumption ÷ Factor) × Cost
  */
-export const calcTrimPrice = (consumption, cost) => {
-  return (Number(consumption) || 0) * (Number(cost) || 0);
+export const calcTrimPrice = (consumption, cost, uomConversionFactor = null) => {
+  const qty = convertToPrimary(Number(consumption) || 0, uomConversionFactor) || 0;
+  return qty * (Number(cost) || 0);
 };
 
 /**
@@ -259,13 +270,17 @@ export const calcKnitsGramsPerPart = (length, width, nop, gsm) => {
 };
 
 /**
- * Calculate total knits consumption in kg
- * Total = Sum of Grams per Part / 1000
+ * Calculate total knits consumption in GRAMS — the unit the per-part formula above
+ * actually produces.
+ *
+ * Deliberately NOT converted to kg here: the caller restates it in whichever UOM the
+ * target fabric row is consumed in (see `convertGramsTo`). Converting to kg
+ * unconditionally is what put a 0.059 kg figure into a field labelled GMS.
+ *
+ * Total = Sum of Grams per Part
  */
-export const calcKnitsTotalConsumption = (parts) => {
-  const total = parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
-  return total / 1000;
-};
+export const calcKnitsTotalGrams = (parts) =>
+  parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
 
 /**
  * Calculate total making price

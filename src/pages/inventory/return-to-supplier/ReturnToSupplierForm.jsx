@@ -110,7 +110,7 @@ const ReturnToSupplierForm = ({ returnType, onSaved }) => {
         title: 'Return Saved Successfully',
         icon: <CheckCircleFilled style={{ color: 'var(--color-success, #52c41a)' }} />,
         content: (
-          <Space direction="vertical" size={4} style={{ marginTop: 8 }}>
+          <Space orientation="vertical" size={4} style={{ marginTop: 8 }}>
             <div><Text type="secondary">Return DC: </Text><Text strong>{result.returnNumber}</Text></div>
             <div><Text type="secondary">Debit Note: </Text><Text strong>{result.debitNote?.debitNoteNumber || '—'}</Text></div>
             <div><Text type="secondary">Grand Total: </Text><Text strong>{formatCurrency(result.grandTotal)}</Text></div>

@@ -8,12 +8,14 @@
  *
  * IMPORTANT (e2e): unlike costing/orders, the PURCHASE_ORDER module HAS a
  * configured approval flow in the e2e seed. So:
- *   - submitting (status Pending_Approval) creates a PENDING approval request and
- *     the PO stays Pending_Approval (it does NOT auto-approve).
+ *   - submitting (POST /purchase-orders/{id}/submit with the PO's version) creates a
+ *     PENDING approval request and the PO stays Pending_Approval (it does NOT
+ *     auto-approve).
  *   - approve/reject/refer-back route through the engine's processAction, which
- *     validates the approver ROLE. The e2e superadmin is not the configured
- *     approver for the PO flow level, so those decisions are correctly REFUSED
- *     ("You do not have the required role to approve at this level").
+ *     validates the approver ROLE: a user whose role is not the level's approver is
+ *     REFUSED ("You do not have the required role to approve at this level"). A
+ *     superuser such as the e2e superadmin bypasses that check on purpose, so the
+ *     refusal is asserted with the non-superuser e2e-viewer.
  *   - cancel is a direct module action (not engine-gated) and is reachable.
  *
  * These tests assert the reachable, correct behavior for this user.
@@ -50,7 +52,7 @@ const get = async (id) => (await api.get(`/purchase-orders/${id}`)).data;
 
 async function submit(po) {
   const cur = await get(po.id);
-  const res = await api.post('/purchase-orders', { ...cur, id: po.id, status: 'Pending_Approval' });
+  const res = await api.post(`/purchase-orders/${po.id}/submit`, { version: cur.version });
   expect(res.status).toBeGreaterThanOrEqual(200);
   expect(res.status).toBeLessThan(300);
   return get(po.id);
@@ -95,9 +97,15 @@ test.describe('PO — Status Lifecycle', () => {
   test('Approve by a non-approver is refused by the engine (role guard)', async () => {
     const po = await newDraftPo();
     await submit(po);
-    // superadmin is not the configured approver for the PO flow level → refused.
-    const r = await api.put(`/purchase-orders/${po.id}/approve`, { comment: 'try approve' });
-    expect(r.status).toBeGreaterThanOrEqual(400);
+    // A superuser bypasses the approver check on purpose (SuperuserCheck), so the guard is
+    // proved with e2e-viewer: an ordinary role (V114 seed) that is not the flow's Admin approver.
+    const viewer = await createAuthenticatedClient('e2e-viewer');
+    try {
+      const r = await viewer.put(`/purchase-orders/${po.id}/approve`, { comment: 'try approve' });
+      expect(r.status).toBeGreaterThanOrEqual(400);
+    } finally {
+      await viewer.dispose();
+    }
     // PO remains pending (no unauthorized advance)
     expect((await get(po.id)).status).toBe('Pending_Approval');
   });

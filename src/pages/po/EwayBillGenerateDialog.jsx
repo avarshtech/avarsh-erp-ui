@@ -56,6 +56,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
         dataIndex: 'itemName',
         key: 'itemName',
         width: 160,
+        render: (v, r) => r.variantName || v,
       },
       {
         title: 'Description',

@@ -11,15 +11,21 @@ import {
   Popconfirm,
   Image,
   Skeleton,
+  Tooltip,
+  Button,
 } from 'antd';
 import {
   CalendarOutlined,
   ShoppingOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
+import { useBranch } from '../../context/BranchContext';
+import OrderBranchAllocation from './OrderBranchAllocation';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import { changeOrderStatus } from '../../services/orders/orderService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import {
   hasPermission,
@@ -33,9 +39,13 @@ import {
   ORDER_STATUS,
   getStatusLabel,
   getCurrencySymbol,
+  hasDispatchDelay,
 } from '../../utils/orderConstants';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import OrderSampleRequestSummaryCard from '../sample-request/OrderSampleRequestSummaryCard';
+import OrderPackingSummaryCard from '../expdoc/OrderPackingSummaryCard';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';
@@ -82,6 +92,13 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
   const referBackTextareaRef = useRef(null);
   const cancelTextareaRef = useRef(null);
 
+  // Branch split: the drawer returns the saved view, so the card updates without a
+  // round trip through the parent. Reset when a different order is shown.
+  const { isMultiBranch, branchName } = useBranch();
+  const [allocOpen, setAllocOpen] = useState(false);
+  const [savedAllocations, setSavedAllocations] = useState(null);
+  useEffect(() => { setSavedAllocations(null); }, [orderData?.id]);
+
   useEffect(() => {
     if (showReferBackInput) {
       setTimeout(() => referBackTextareaRef.current?.focus(), 50);
@@ -104,7 +121,6 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
       setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setStyleImageLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Load style image when dialog opens
@@ -154,7 +170,6 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
     costingId,
     buyerName,
     orderDate,
-    styleId,
     styleNo,
     garmentType,
     season,
@@ -350,7 +365,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   </td>
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <Text strong>{(row.total || 0).toLocaleString()}</Text>
+                  <Text strong>{(row.total || 0).toLocaleString('en-IN')}</Text>
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   <Text>{fmtCurrency(row.rowValue)}</Text>
@@ -366,7 +381,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
               ))}
               <td style={{ ...tdStyle, textAlign: 'right' }}>
                 <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
-                  {grandQty.toLocaleString()}
+                  {grandQty.toLocaleString('en-IN')}
                 </Text>
               </td>
               <td style={tdStyle} />
@@ -402,6 +417,11 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           loading={printLoading}
           onClick={handlePrint}
         />
+        {isMultiBranch && hasPermission('orders', 'update') && ![ORDER_STATUS.CANCELLED, ORDER_STATUS.COMPLETED].includes(status) && (
+          <Button icon={<BankOutlined />} onClick={() => setAllocOpen(true)}>
+            Branch Allocation
+          </Button>
+        )}
 
         {/* Request decisions route through the centralized approval engine when a flow
             is configured; legacy Popconfirm buttons are the no-flow fallback. */}
@@ -528,7 +548,19 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
   const heroConfig = {
     title: orderNo,
-    status: <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />,
+    status: (
+      <>
+        <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />
+        {orderData?.orderType === 'SAMPLE' && <SampleOrderTag />}
+        {hasDispatchDelay(orderData) && (
+          <Tooltip title={orderData.dispatchDelaySource}>
+            <Tag color="warning" icon={<CalendarOutlined />} style={{ marginInlineStart: 4, cursor: 'help' }}>
+              Dispatch +{orderData.dispatchDelayDays}d
+            </Tag>
+          </Tooltip>
+        )}
+      </>
+    ),
     subtitle: buyerName,
     subtitleIcon: <ShoppingOutlined />,
     image: styleImageElement,
@@ -563,10 +595,12 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           />
         </div>
 
+        <ApprovalHistoryPanel entityType="ORDER" entityId={orderData.id} style={{ marginBottom: 16 }} />
+
         {/* ── Refer-back request input ── */}
         {showReferBackInput && (
           <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-refer-back-color)' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Text strong>Reason for Referring Back:</Text>
               <Input.TextArea
                 ref={referBackTextareaRef}
@@ -610,7 +644,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
         {/* ── Cancel request input ── */}
         {showCancelInput && (
           <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-delete-color)' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Text strong style={{ color: 'var(--btn-delete-color)' }}>Reason for Cancellation:</Text>
               <Input.TextArea
                 ref={cancelTextareaRef}
@@ -657,7 +691,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Refer Back Requested — Pending Approval"
+            title="Refer Back Requested — Pending Approval"
             description={existingReferBackReason}
           />
         )}
@@ -668,7 +702,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Cancellation Requested — Pending Approval"
+            title="Cancellation Requested — Pending Approval"
             description={existingCancelReason}
           />
         )}
@@ -717,7 +751,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           />
           <DetailCard.Field
             label="Order Qty"
-            value={<Text strong>{(totalOrderQty || 0).toLocaleString()}</Text>}
+            value={<Text strong>{(totalOrderQty || 0).toLocaleString('en-IN')}</Text>}
             span={8}
           />
           <DetailCard.Field
@@ -734,6 +768,30 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             <DetailCard.Field label="Remarks" value={remarks} span={24} />
           )}
         </DetailCard>
+
+        {/* ── Branch Allocation (multi-branch companies only) ── */}
+        {isMultiBranch && (() => {
+          const rows = savedAllocations ?? orderData.allocations ?? [];
+          const allocated = rows.reduce((s, a) => s + (a.qty || 0), 0);
+          const unallocated = (totalOrderQty || 0) - allocated;
+          return (
+            <Card
+              size="small"
+              title={<Space><BankOutlined /><span>Branch Allocation</span></Space>}
+              extra={unallocated > 0 ? <Tag color="warning">{unallocated.toLocaleString('en-IN')} pcs unallocated</Tag> : <Tag color="success">Fully allocated</Tag>}
+              style={{ marginBottom: 16 }}
+            >
+              <Space wrap>
+                {rows.map((a) => (
+                  <Tag key={a.branchId} color="geekblue">
+                    {a.branchName || branchName(a.branchId)}{a.unitName ? ` / ${a.unitName}` : ''}: <Text strong>{(a.qty || 0).toLocaleString('en-IN')}</Text> pcs
+                  </Tag>
+                ))}
+                {rows.length === 0 && <Text type="secondary">Not allocated to any branch yet</Text>}
+              </Space>
+            </Card>
+          );
+        })()}
 
         {/* ── Assortment Summary ── */}
         {assortmentSummary.length > 0 && (
@@ -777,7 +835,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   width: 100,
                   align: 'center',
                   onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
-                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString('en-IN')}</Text>,
                 },
                 {
                   title: 'Avg Price',
@@ -808,6 +866,10 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           </Card>
         )}
 
+        {/* ── Sample Requests raised against this order ── */}
+        <OrderSampleRequestSummaryCard orderNo={orderNo} />
+        <OrderPackingSummaryCard orderNo={orderNo} />
+
         {/* ── Order Lines ── */}
         <Title level={5} style={{ marginBottom: 12 }}>
           Order Lines ({orderLines.length})
@@ -821,8 +883,26 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
               subtitle={line.destination || undefined}
               amount={fmtCurrency(line.lineTotal)}
               pills={[
-                { label: 'Qty', value: (line.lineQty || 0).toLocaleString() },
-                ...(line.dispatchDate ? [{ label: 'Dispatch', value: formatDate(line.dispatchDate) }] : []),
+                { label: 'Qty', value: (line.lineQty || 0).toLocaleString('en-IN') },
+                // The committed date never changes. When an upstream slip (a supplier PO or a
+                // sample request running late) has been applied to the order, the date the line
+                // is now tracking to follows it, with the cause on hover.
+                ...(line.dispatchDate ? [{
+                  label: 'Dispatch',
+                  value: line.revisedDispatchDate
+                    ? <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{formatDate(line.dispatchDate)}</span>
+                    : formatDate(line.dispatchDate),
+                }] : []),
+                ...(line.revisedDispatchDate ? [{
+                  label: 'Revised Dispatch',
+                  value: (
+                    <Tooltip title={`+${orderData.dispatchDelayDays} day${orderData.dispatchDelayDays === 1 ? '' : 's'} — ${orderData.dispatchDelaySource}`}>
+                      <span style={{ color: 'var(--error-color)', cursor: 'help' }}>
+                        {formatDate(line.revisedDispatchDate)} (+{orderData.dispatchDelayDays}d)
+                      </span>
+                    </Tooltip>
+                  ),
+                }] : []),
                 ...(line.leadTime != null ? [{ label: 'Lead Time', value: `${line.leadTime} days` }] : []),
               ]}
               style={{ marginBottom: 12 }}
@@ -832,6 +912,14 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           );
         })}
       </DraftWatermark>
+      {isMultiBranch && (
+        <OrderBranchAllocation
+          open={allocOpen}
+          orderId={orderData.id}
+          onClose={() => setAllocOpen(false)}
+          onSaved={(view) => setSavedAllocations(view?.rows || [])}
+        />
+      )}
     </ViewDialog>
   );
 };

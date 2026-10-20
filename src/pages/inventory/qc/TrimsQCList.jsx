@@ -51,7 +51,7 @@ const STATUS_OPTIONS = [
  * via the View / Edit modes. Keeps the list mobile-friendly and visually
  * consistent with the Fabric QC list.
  */
-const TrimsQCList = ({ embedded = false }) => {
+const TrimsQCList = ({ embedded = false, refreshToken = 0 }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
 
@@ -105,7 +105,9 @@ const TrimsQCList = ({ embedded = false }) => {
     });
   }, [modal, message, loadData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // `refreshToken` lets the page above force a refetch (e.g. after the
+  // deep-linked view modal approves a QC) without remounting the list.
+  useEffect(() => { loadData(); }, [loadData, refreshToken]);
 
   const filteredData = useMemo(() => {
     let result = data;
@@ -211,11 +213,14 @@ const TrimsQCList = ({ embedded = false }) => {
           locale={{ emptyText: <EmptyState title="No accessories QC inspections found" description="Create a new inspection to get started" /> }}
         />
       </Card>
+      {/* onUpdated: an approval inside the modal changes the QC server-side —
+          reload so the row behind it shows the new status without a page refresh. */}
       <QCViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer({ open: false, record: null })}
         record={viewDrawer.record}
         type="trims"
+        onUpdated={() => loadData()}
       />
     </>
   );
@@ -225,7 +230,7 @@ const TrimsQCList = ({ embedded = false }) => {
   return (
     <div className="animate-fade-in-up inv-page">
       <PageHeader title="Accessories Quality Control">
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-qc" operation="add">
           <ActionButton action="create" text="New Accessories Inspection" onClick={() => navigate('/inventory/qc/trims/new')} />
         </PermissionGuard>
       </PageHeader>

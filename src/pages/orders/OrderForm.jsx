@@ -23,6 +23,7 @@ import {
   Upload,
   Alert,
   Image,
+  Segmented,
 } from 'antd';
 import { numericInputProps, integerInputProps, getZeroClearHandlers, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
@@ -46,8 +47,10 @@ import StatusTag from '../../components/StatusTag';
 import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
+import { useStore } from '../../context/StoreContext';
 import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orders/orderService';
 import { getBuyers, getBuyerById } from '../../services/master/buyerService';
 import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
@@ -113,7 +116,16 @@ const getFileIcon = (fileType) => {
   return <FileOutlined style={{ fontSize: 28, color: 'var(--primary-color)' }} />;
 };
 
+/**
+ * Row keys for newly added lines. Date.now() repeats when two rows are added
+ * inside the same millisecond — a fast double-click on "Add Color" was enough —
+ * which gives React duplicate keys and lets the rows swap state.
+ */
+let rowKeySeq = 0;
+const nextRowKey = (prefix) => `${prefix}_${++rowKeySeq}`;
+
 const CostingAttachmentCard = ({ attachment }) => {
+  const { message } = App.useApp();
   const [blobUrl, setBlobUrl] = useState(null);
   const isImage = attachment.fileType?.startsWith('image/');
 
@@ -181,6 +193,7 @@ const CostingAttachmentCard = ({ attachment }) => {
 // ==================== COMPONENT DETAILS DIALOG ====================
 
 const ComponentDialog = ({ open, components, onSave, onCancel }) => {
+  const { message } = App.useApp();
   const [rows, setRows] = useState(() =>
     components && components.length > 0
       ? components
@@ -211,7 +224,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
   const handleAdd = () => {
     setRows((prev) => [
       ...prev,
-      { key: `c_${Date.now()}`, name: '', description: '', qtyPerSet: 1 },
+      { key: nextRowKey('c'), name: '', description: '', qtyPerSet: 1 },
     ]);
   };
 
@@ -237,7 +250,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       title: 'Component Name *',
       dataIndex: 'name',
       render: (v, r) => (
-        <Input
+        <Input name="name"
           size="small"
           value={v}
           placeholder="e.g. Top, Bottom, Jacket"
@@ -249,7 +262,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       title: 'Description',
       dataIndex: 'description',
       render: (v, r) => (
-        <Input
+        <Input name="description"
           size="small"
           value={v}
           placeholder="Optional"
@@ -262,7 +275,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       dataIndex: 'qtyPerSet',
       width: 90,
       render: (v, r) => (
-        <InputNumber
+        <InputNumber name="qtyPerSet"
           size="small"
           min={1}
           controls={false}
@@ -320,6 +333,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
 // ==================== SIZE BREAKDOWN TABLE ====================
 
 const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePresets = [] }) => {
+  const { message } = App.useApp();
   const {
     sizes = [],
     sizePrices = {},
@@ -371,6 +385,9 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
   };
 
   // Handle custom size tags change
+  // UNWIRED: the only writer of customSizes. Nothing calls it, and the size
+  // preset dropdown never offers the CUSTOM option that would read it.
+  // eslint-disable-next-line no-unused-vars
   const handleCustomSizesChange = (tags) => {
     const newSizePrices = {};
     tags.forEach((s) => {
@@ -425,7 +442,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
 
   // Add color row
   const handleAddColor = () => {
-    const newKey = `c_${Date.now()}`;
+    const newKey = nextRowKey('c');
     const quantities = {};
     sizes.forEach((s) => { quantities[s] = 0; });
     onLineChange({
@@ -492,7 +509,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
               <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
                 Set price for all sizes:
               </Text>
-              <InputNumber
+              <InputNumber name="bulkPrice"
                 min={0}
                 step={0.01}
                 precision={2}
@@ -549,7 +566,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     {readOnly ? (
                       <Text style={{ color: 'var(--primary-color)' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
                     ) : (
-                      <InputNumber
+                      <InputNumber name="sizePrice"
                         size="small"
                         min={0}
                         step={0.01}
@@ -576,7 +593,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     {readOnly ? (
                       <Text>{row.colorName || '-'}</Text>
                     ) : (
-                      <Input
+                      <Input name="colorPrintName"
                         size="small"
                         placeholder="Color/Print name *"
                         value={row.colorName}
@@ -590,7 +607,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                       {readOnly ? (
                         <Text>{row.quantities?.[s] || 0}</Text>
                       ) : (
-                        <InputNumber
+                        <InputNumber name="sizeQuantity"
                           size="small"
                           min={0}
                           step={1}
@@ -605,7 +622,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     </td>
                   ))}
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <Text strong>{(row.total || 0).toLocaleString()}</Text>
+                    <Text strong>{(row.total || 0).toLocaleString('en-IN')}</Text>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <Text>{`${currSymbol} ${(row.rowValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
@@ -635,7 +652,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   <Text strong style={{ color: grandQty > 0 ? 'var(--success-color, #10b981)' : 'var(--error-color)', fontSize: 14 }}>
-                    {grandQty.toLocaleString()}
+                    {grandQty.toLocaleString('en-IN')}
                   </Text>
                 </td>
                 <td style={tdStyle}></td>
@@ -677,6 +694,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
 // ==================== QUICK-ADD SIZE PRESET MODAL ====================
 
 const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
+  const { message } = App.useApp();
   const [presetName, setPresetName] = useState('');
   const [category, setCategory] = useState('');
   const [region, setRegion] = useState('');
@@ -714,7 +732,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
       confirmLoading={saving}
       okText="Create & Use"
       centered
-      destroyOnClose
+      destroyOnHidden
       afterClose={() => {
         setPresetName('');
         setCategory('');
@@ -725,7 +743,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
         type="info"
         showIcon
         icon={<ExclamationCircleOutlined />}
-        message="New sizes detected from buyer PO"
+        title="New sizes detected from buyer PO"
         description={
           <span>
             The extracted sizes <strong>[{sizes.join(', ')}]</strong> don't match any existing size preset.
@@ -736,7 +754,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
       />
       <Form layout="vertical">
         <Form.Item label="Preset Name" required>
-          <Input
+          <Input name="presetName"
             placeholder='e.g. "US Women XS-3XL"'
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
@@ -808,7 +826,7 @@ const tdStyle = {
 // ==================== EMPTY LINE TEMPLATE ====================
 
 const createEmptyLine = () => ({
-  key: `line_${Date.now()}`,
+  key: nextRowKey('line'),
   lineId: null, // backend ID — null for new lines
   buyerPoNo: '',
   destination: '',
@@ -818,7 +836,7 @@ const createEmptyLine = () => ({
   sizes: [],
   sizePrices: {},
   colorRows: [
-    { key: `c_${Date.now()}`, colorName: '', quantities: {}, total: 0, rowValue: 0 },
+    { key: nextRowKey('c'), colorName: '', quantities: {}, total: 0, rowValue: 0 },
   ],
   lineQty: 0,
   lineTotal: 0,
@@ -839,7 +857,6 @@ const OrderForm = () => {
   // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
   const [pageLoading, setPageLoading] = useState(!!id);
-  const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [existingOrder, setExistingOrder] = useState(null);
@@ -910,6 +927,11 @@ const OrderForm = () => {
   const formCurrency = Form.useWatch('currency', form);
   const watchedBuyerId = Form.useWatch('buyerId', form);
   const watchedStyleNo = Form.useWatch('styleNo', form);
+  const watchedOrderType = Form.useWatch('orderType', form);
+  // Sample orders skip costing (bulk costing is raised only after the buyer confirms
+  // the sample), so buyer/style/season fields become directly editable in sample mode.
+  const isSample = watchedOrderType === 'SAMPLE';
+  const { invalidateCache } = useStore();
 
   // Buyer destinations derived from selected buyer
   const buyerDestinations = useMemo(() => {
@@ -961,7 +983,8 @@ const OrderForm = () => {
     setResolvedGarmentName(order.garmentName || '');
     if (order.styleId) loadStyleImage(order.styleId);
     form.setFieldsValue({
-      costingId: order.costingId,
+      orderType: order.orderType || 'BULK',
+      costingId: order.costingId || 'CST/',
       buyerId: order.buyerId,
       styleNo: order.styleNo,
       garmentType: order.garmentType,
@@ -976,7 +999,7 @@ const OrderForm = () => {
     });
     if (order.components?.length > 0) setFormComponents(order.components);
     const lines = (order.orderLines || []).map((l) => ({
-      key: `line_${l.id || Date.now() + Math.random()}`,
+      key: l.id ? `line_${l.id}` : nextRowKey('line'),
       lineId: l.id || null,
       buyerPoNo: l.buyerPoNo || '',
       destination: l.destination || '',
@@ -986,7 +1009,7 @@ const OrderForm = () => {
       sizes: Object.keys(l.sizePrices || {}),
       sizePrices: l.sizePrices || {},
       colorRows: (l.colorRows || []).map((c) => ({
-        key: `c_${c.id || Date.now() + Math.random()}`,
+        key: c.id ? `c_${c.id}` : nextRowKey('c'),
         colorName: c.colorName || '',
         quantities: c.quantities || {},
         total: c.total || 0,
@@ -1014,7 +1037,6 @@ const OrderForm = () => {
       setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setStyleImageLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, form]);
 
   // Load existing order for edit — use passed location state first, fall back to API
@@ -1031,13 +1053,13 @@ const OrderForm = () => {
         }
         if (!EDITABLE_STATUSES.includes(order.status)) {
           message.warning('This order cannot be edited in its current status');
-          navigate('/orders/list');
+          navigate(listPath('/orders/list'));
           return;
         }
         populateForm(order);
       } catch {
         message.error('Failed to load order');
-        navigate('/orders/list');
+        navigate(listPath('/orders/list'));
       } finally {
         // Defer so React paints the form with populated values before hiding the skeleton
         requestAnimationFrame(() => setPageLoading(false));
@@ -1193,7 +1215,7 @@ const OrderForm = () => {
         });
 
         // Build color rows from extraction
-        const colorRows = (data.colorRows || []).map((cr, idx) => {
+        const colorRows = (data.colorRows || []).map((cr) => {
           const quantities = {};
           sizes.forEach((s) => {
             const q = cr.quantities;
@@ -1210,7 +1232,7 @@ const OrderForm = () => {
             0
           );
           return {
-            key: `c_${Date.now()}_${idx}`,
+            key: nextRowKey('c'),
             colorName: cr.colorName || '',
             quantities,
             total,
@@ -1457,13 +1479,18 @@ const OrderForm = () => {
     const values = form.getFieldsValue();
 
     // ── Order Details (in form layout order) ──
-    if (!values.costingId?.trim() || values.costingId.trim() === 'CST/') {
-      errors.push('Costing ID is required');
+    // Costing is optional for SAMPLE orders — bulk costing is raised only after
+    // the buyer confirms the sample.
+    const isSampleOrder = values.orderType === 'SAMPLE';
+    const costingBlank = !values.costingId?.trim() || values.costingId.trim() === 'CST/';
+    if (costingBlank) {
+      if (!isSampleOrder) errors.push('Costing ID is required');
     } else if (!COSTING_ID_PATTERN.test(values.costingId.trim())) {
       errors.push('Costing ID format is invalid (expected: CST/25-26/1001)');
     } else if (!values.buyerId) {
       errors.push('Costing ID has not been verified — click outside the field or press Enter to look it up');
     }
+    if (isSampleOrder && !values.buyerId) errors.push('Buyer is required for a sample order');
     if (!values.material) errors.push('Material is required');
     if (!values.component) errors.push('Component is required');
     if (values.component === 'Multiple' && formComponents.length < 2) {
@@ -1543,14 +1570,17 @@ const OrderForm = () => {
 
   // ==================== BUILD ORDER DATA ====================
 
-  const buildOrderData = (status) => {
+  const buildOrderData = () => {
     const values = form.getFieldsValue();
     const buyer = buyers.find((b) => b.id === values.buyerId);
     const orderDate = dayjs();
 
+    const costingBlank = !values.costingId?.trim() || values.costingId.trim() === 'CST/';
+
     return {
       version: entityVersion,
-      costingId: values.costingId,
+      orderType: values.orderType || 'BULK',
+      costingId: costingBlank ? null : values.costingId,
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
       orderDate: orderDate.format('YYYY-MM-DD'),
@@ -1615,9 +1645,10 @@ const OrderForm = () => {
         message.success('Order saved as draft');
       }
       if (saved?.version != null) setEntityVersion(saved.version);
+      invalidateCache('sampleOrderNos');
       setIsDirty(false);
       clearDirty();
-      navigate('/orders/list');
+      navigate(listPath('/orders/list'));
     } catch {
       message.error('Failed to save order');
     } finally {
@@ -1654,11 +1685,12 @@ const OrderForm = () => {
             savedOrder = await createOrder(data);
           }
           if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
+          invalidateCache('sampleOrderNos');
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED, null, savedOrder.version);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
           clearDirty();
-          navigate('/orders/list');
+          navigate(listPath('/orders/list'));
         } catch {
           message.error('Failed to submit order');
         } finally {
@@ -1681,7 +1713,7 @@ const OrderForm = () => {
         <Tag color="blue">#{idx + 1}</Tag>
         <Text strong>{destShort}</Text>
         <Text type="secondary">|</Text>
-        <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
+        <Text>Qty: {(line.lineQty || 0).toLocaleString('en-IN')}</Text>
         <Text type="secondary">|</Text>
         <Text style={{ color: 'var(--success-color, #10b981)' }}>
           {getCurrencySymbol(formCurrency)}{' '}
@@ -1813,6 +1845,7 @@ const OrderForm = () => {
         initialValues={{
           orderDate: dayjs(),
           costingId: 'CST/',
+          orderType: 'BULK',
         }}
         onValuesChange={() => setIsDirty(true)}
       >
@@ -1822,13 +1855,28 @@ const OrderForm = () => {
           <div style={{ flex: 1, minWidth: 0 }}>
           <Title level={5} style={{ marginBottom: 16 }}>Order Details</Title>
 
-          {/* Row 1: Costing ID, Order No, Buyer, Style No, Garment Type, Season, Component */}
+          {/* Row 1: Order Type, Costing ID, Order No, Buyer, Style No, Garment Type, Season */}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item
+                name="orderType"
+                label="Order Type"
+                tooltip="Sample orders (15–30 pcs for buyer approval) can skip costing; cutting is handled manually. Locked once the order leaves Draft."
+              >
+                <Segmented
+                  options={[
+                    { label: 'Bulk', value: 'BULK' },
+                    { label: 'Sample', value: 'SAMPLE' },
+                  ]}
+                  disabled={isEdit && existingOrder?.status !== ORDER_STATUS.DRAFT}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
                 name="costingId"
-                label="Costing ID"
-                rules={[{ required: true, message: 'Enter costing ID' }]}
+                label={isSample ? 'Costing ID (optional)' : 'Costing ID'}
+                rules={[{ required: !isSample, message: 'Enter costing ID' }]}
                 normalize={(val, prevVal) => formatCostingId(val || '', prevVal || '')}
               >
                 <Input
@@ -1853,7 +1901,7 @@ const OrderForm = () => {
             {isEdit && (
               <Col xs={24} sm={12} md={8} lg={4}>
                 <Form.Item label="Order No">
-                  <Input
+                  <Input name="orderNo"
                     value={existingOrder?.orderNo || ''}
                     disabled
                     style={{ backgroundColor: 'var(--bg-tertiary)' }}
@@ -1861,42 +1909,58 @@ const OrderForm = () => {
                 </Form.Item>
               </Col>
             )}
-            {/* buyerId hidden — used for destination lookup; value set from costing */}
-            <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>
+            {/* buyerId: hidden (set from costing lookup) for bulk; direct select for samples */}
+            {!isSample && <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>}
             <Col xs={24} sm={12} md={8} lg={4}>
-              <Form.Item label="Buyer">
-                <Input
-                  value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
-                />
-              </Form.Item>
+              {isSample ? (
+                <Form.Item
+                  name="buyerId"
+                  label="Buyer"
+                  rules={[{ required: true, message: 'Select buyer' }]}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select buyer"
+                    loading={buyersLoading}
+                    options={buyers.map((b) => ({ value: b.id, label: b.name }))}
+                  />
+                </Form.Item>
+              ) : (
+                <Form.Item label="Buyer">
+                  <Input name="buyer"
+                    value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
+                    placeholder="Populated from costing"
+                    disabled
+                    style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  />
+                </Form.Item>
+              )}
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="styleNo" label="Style No">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'Enter style no' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="garmentType" label="Garment Type">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. Polo Shirt' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="season" label="Season">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. SS27' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
@@ -1953,9 +2017,9 @@ const OrderForm = () => {
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="currency" label="Currency">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. USD' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
@@ -2079,7 +2143,7 @@ const OrderForm = () => {
                 styles={{ body: { padding: '12px 16px' } }}
               >
                 <div style={{ fontSize: 12, color: 'var(--text-secondary, #8c8c8c)', marginBottom: 4 }}>Order Qty</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }}>{totalOrderQty.toLocaleString()}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }}>{totalOrderQty.toLocaleString('en-IN')}</div>
               </Card>
             </Col>
             <Col xs={12} sm={8} md={6} lg={4}>
@@ -2122,7 +2186,7 @@ const OrderForm = () => {
             <Alert
               type="info"
               showIcon
-              message="Enter a valid Costing ID above to enable order lines"
+              title="Enter a valid Costing ID above to enable order lines"
               style={{ marginBottom: 16 }}
             />
           )}
@@ -2179,7 +2243,7 @@ const OrderForm = () => {
                         label={<span>Buyer PO No <span style={{ color: 'var(--error-color)' }}>*</span></span>}
                         style={{ marginBottom: 12 }}
                       >
-                        <Input
+                        <Input name="buyerPoNumber"
                           placeholder="Buyer PO Number"
                           value={line.buyerPoNo}
                           onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
@@ -2217,7 +2281,7 @@ const OrderForm = () => {
                     </Col>
                     <Col xs={24} sm={12}>
                       <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
-                        <Input
+                        <Input name="leadTime"
                           disabled
                           style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
                           prefix={<ClockCircleOutlined />}
@@ -2362,7 +2426,7 @@ const OrderForm = () => {
                       >
                         <Alert
                           type={lineExtractionMsg[line.key].type}
-                          message={lineExtractionMsg[line.key].text}
+                          title={lineExtractionMsg[line.key].text}
                           showIcon
                           closable
                           onClose={() => dismissLineMessage(line.key)}
@@ -2428,7 +2492,7 @@ const OrderForm = () => {
                   width: 100,
                   align: 'center',
                   onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
-                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString('en-IN')}</Text>,
                 },
                 {
                   title: 'Avg Price',
@@ -2468,7 +2532,7 @@ const OrderForm = () => {
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={2} align="center">
                       <Text strong style={{ fontSize: 15 }}>
-                        {totalOrderQty.toLocaleString()}
+                        {totalOrderQty.toLocaleString('en-IN')}
                       </Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={3} align="center">

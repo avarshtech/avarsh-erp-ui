@@ -6,10 +6,12 @@ Use this template when dispatching a code quality reviewer subagent.
 
 **Only dispatch after spec compliance review passes.**
 
+**Agent type:** `feature-dev:code-reviewer` when it is listed as available; otherwise `general-purpose` with the same prompt.
+
 ```
 Agent({
   description: "Review code quality for Task N",
-  subagent_type: "superpowers:code-reviewer",
+  subagent_type: "feature-dev:code-reviewer",
   prompt: |
     Review code quality for Task N implementation in a Garment Export ERP system.
 
@@ -53,7 +55,8 @@ Agent({
     - Never returning entities from controllers — DTO mapping via MapStruct?
     - @Valid on controller request body parameters?
     - N+1 prevention: @EntityGraph or JOIN FETCH for relationships in list queries?
-    - Immutable Flyway migrations (V1-V34 untouched)?
+    - @RequiresPermission("<key>") on every new controller method?
+    - No applied Flyway migration edited or renamed; new migration timestamp-versioned with its H2 twin?
 
     ### Karpathy Guidelines Compliance
     - Simplicity: minimum code that solves the problem?

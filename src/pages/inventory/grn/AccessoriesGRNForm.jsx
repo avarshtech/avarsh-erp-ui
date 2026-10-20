@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { App, Form, Input, Select, DatePicker, Card, Row, Col, Typography, Space, Tag, Skeleton } from 'antd';
 import { SaveOutlined, SendOutlined, FileSearchOutlined, InboxOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -18,7 +18,8 @@ import {
 import { getFilesByEntity } from '../../../services/core/fileService';
 import { processGrnAttachments } from './grnAttachments';
 import { validateTrimsGRN } from '../../../utils/grnValidation';
-import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { GRN_STATUS, GRN_CATEGORY, matchesGrnCategory, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
 import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -26,23 +27,25 @@ import POLineItemPicker from './POLineItemPicker';
 import AccessoriesGRNItemTable from './AccessoriesGRNItemTable';
 import AccessoriesGRNCartonTable from './AccessoriesGRNCartonTable';
 import AccessoriesGRNSummaryPanel from './AccessoriesGRNSummaryPanel';
+import BranchField from '../../../components/branch/BranchField';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Title } = Typography;
 const { TextArea } = Input;
 
 const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
-// Exact mst_categories.name denormalized onto each PO line item as categoryName.
-// The UI labels this form/category "Accessories", but the master-data category
-// for buttons/zippers/elastic/etc. is named "Trims" — keep these in sync with
-// the POLineItemPicker category prop below.
-const PO_CATEGORY = 'Trims';
+// Everything that is not fabric is received here as cartons — trims (local and
+// imported), packing materials, and any other user-defined category. See
+// matchesGrnCategory in utils/inventoryConstants.
+const PO_CATEGORY = GRN_CATEGORY.ACCESSORIES;
 
 const AccessoriesGRNForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const { id } = useParams();
   const [form] = Form.useForm();
+  const { isMultiBranch } = useBranch();
   const isEdit = Boolean(id);
 
   const [savingDraft, setSavingDraft] = useState(false);
@@ -71,7 +74,7 @@ const AccessoriesGRNForm = () => {
   // belongs to the Trims category.
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => li.categoryName === PO_CATEGORY))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => matchesGrnCategory(li.categoryName, PO_CATEGORY)))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
@@ -102,6 +105,7 @@ const AccessoriesGRNForm = () => {
 
         form.setFieldsValue({
           poId: grn.poId,
+          branchId: grn.branchId,
           challanNo: grn.challanNo,
           invoiceDate: grn.invoiceDate ? dayjs(grn.invoiceDate) : null,
           deliveryChallanDate: grn.deliveryChallanDate ? dayjs(grn.deliveryChallanDate) : null,
@@ -134,30 +138,40 @@ const AccessoriesGRNForm = () => {
     const po = purchaseOrders.find((p) => p.id === poId);
     const enriched = po ? await enrichPOWithReceipts(po, grnRecord?.id) : null;
     setSelectedPO(enriched);
+    // A new GRN receives where its PO is delivered (the field stays editable)
+    if (!grnRecord?.id && po?.deliveryBranchId != null) form.setFieldsValue({ branchId: po.deliveryBranchId });
     setSelectedLineItemIds([]);
     setItems([]);
     setCartons([]);
     setIsDirty(true);
-  }, [purchaseOrders, grnRecord?.id]);
+  }, [purchaseOrders, grnRecord?.id, form]);
 
   // Merge items + cartons when selection changes — preserving user-entered Receiving Qty,
   // Carton #, and Quantity for line items that remain selected.
   useEffect(() => {
     if (!selectedPO) return;
+    let cancelled = false;
+    // Resolve variant identity up front (async API), then reconcile items + cartons.
+    const variantIds = selectedLineItemIds.map(
+      (id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId,
+    );
+    getItemVariantsBulk(variantIds).then((variants) => {
+      if (cancelled) return;
+      const variantByLineId = new Map(selectedLineItemIds.map((id, i) => [id, variants[i]]));
 
     setItems((prevItems) => {
       const kept = prevItems.filter((it) => selectedLineItemIds.includes(it.poLineItemId));
       const existingIds = new Set(prevItems.map((it) => it.poLineItemId));
       const newIds = selectedLineItemIds.filter((id) => !existingIds.has(id));
       if (newIds.length === 0 && kept.length === prevItems.length) return prevItems;
-      const newVariantIds = newIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshItems = newIds.map((id, idx) => {
+      const freshItems = newIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           variantId: li?.variantId,
+          variantName: li?.variantName,
+          variantCode: li?.variantCode,
           itemCode: li?.itemCode,
           description: li?.description,
           color: v?.color || '—',
@@ -181,11 +195,9 @@ const AccessoriesGRNForm = () => {
       const existingLineItemIds = new Set(prevCartons.map((c) => c.poLineItemId));
       const newLineIds = selectedLineItemIds.filter((id) => !existingLineItemIds.has(id));
       if (newLineIds.length === 0 && kept.length === prevCartons.length) return prevCartons;
-      const newVariantIds = newLineIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshCartons = newLineIds.map((id, idx) => {
+      const freshCartons = newLineIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           cartonNumber: '',
@@ -194,7 +206,11 @@ const AccessoriesGRNForm = () => {
           color: v?.color || '—',
           size: v?.size || '—',
           quantity: null,
-          uom: v?.secondaryUom || v?.primaryUom || li?.uom,
+          // A carton's quantity is part of the receipt — validation requires the cartons
+          // to add up to the received quantity — so it is counted in the SAME unit the
+          // line was received in. Preferring the secondary UOM labelled 210 cones of
+          // thread as metres.
+          uom: v?.primaryUom || li?.uom,
         };
       });
       // Preserve multiple cartons per line item (for edit mode)
@@ -209,6 +225,8 @@ const AccessoriesGRNForm = () => {
       });
       return result;
     });
+    });
+    return () => { cancelled = true; };
   }, [selectedPO, selectedLineItemIds]);
 
   const handleItemChange = useCallback((idx, field, value) => {
@@ -239,6 +257,8 @@ const AccessoriesGRNForm = () => {
       vehicleNumber: values.vehicleNumber,
       transporter: values.transporter,
       remarks: values.remarks,
+      // Received into a branch; a missing value leaves an existing GRN where it is
+      branchId: values.branchId ?? grnRecord?.branchId ?? null,
       lineItems: selectedLineItemIds,
       items,
       cartons,
@@ -364,12 +384,13 @@ const AccessoriesGRNForm = () => {
                 <Row gutter={16}>
                   <Col xs={24} md={12}>
                     <Form.Item label="GRN #">
-                      <Input value={grnRecord?.grnNumber || ''} disabled />
+                      <Input name="grn" value={grnRecord?.grnNumber || ''} disabled />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>
                     <Form.Item label="GRN Date">
                       <DatePicker
+                        format={DATE_FORMAT}
                         style={{ width: '100%' }}
                         value={grnRecord?.grnDate ? dayjs(grnRecord.grnDate) : null}
                         disabled
@@ -379,6 +400,10 @@ const AccessoriesGRNForm = () => {
                 </Row>
               )}
               <Row gutter={16}>
+                {/* Which branch's store receives the goods; hidden for a single-branch company */}
+                {isMultiBranch ? (
+                  <Col xs={24} md={12}><BranchField label="Received At (Branch)" disabled={readOnly} /></Col>
+                ) : <BranchField />}
                 <Col xs={24} md={12}>
                   <Form.Item name="poId" label="Purchase Order" rules={[{ required: true, message: 'Select a PO' }]}>
                     <Select placeholder="Select PO" options={poOptions} onChange={handlePOChange} showSearch optionFilterProp="label" disabled={readOnly} />
@@ -407,6 +432,7 @@ const AccessoriesGRNForm = () => {
                     rules={[{ required: true, message: 'Invoice Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {
@@ -427,6 +453,7 @@ const AccessoriesGRNForm = () => {
                     rules={[{ required: true, message: 'Delivery Challan Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {
@@ -474,6 +501,7 @@ const AccessoriesGRNForm = () => {
                       compact
                       placeholder="Upload DC image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
                         setDcImage((prev) => ({
@@ -511,6 +539,7 @@ const AccessoriesGRNForm = () => {
                       compact
                       placeholder="Upload invoice image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
                         setSupplierInvoice((prev) => ({

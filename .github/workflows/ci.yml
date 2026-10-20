@@ -1,0 +1,165 @@
+name: CI
+
+# Lint, unit-test, build and audit every push to dev and to release branches, and every pull request into dev.
+# Netlify still builds and deploys dev on its own; this workflow is the check that the build is sound.
+# A push to a release branch also drafts that release on GitHub (the `release` job; see RELEASING.md).
+#
+# Lint ratchet: the errors that existed on 2026-10-12 are recorded in eslint-suppressions.json, so
+# only NEW errors fail, and warnings are capped (`npm run lint`). When you fix a suppressed error,
+# run `npm run lint:prune` and commit the smaller file in the same commit — a stale suppression
+# fails the run, which is what keeps the baseline shrinking.
+on:
+  push:
+    branches: [dev, 'avarsh/release/**']
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact: ${{ steps.version.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Before anything is fetched: every package comes from registry.npmjs.org with an integrity hash
+      - name: Lockfile sources and hashes
+        run: npm run check:lockfile
+
+      - name: Install
+        run: npm ci
+
+      # Fails on a missing, invalid or extraneous package, including an unmet peer dependency.
+      - name: Dependency tree is consistent (peers included)
+        run: npm ls --all > /dev/null
+
+      - name: Version
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "artifact=avarsh-erp-ui-v${version}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Release branch matches package.json
+        if: startsWith(github.ref_name, 'avarsh/release/')
+        run: node scripts/check-release-branch.mjs "$GITHUB_REF_NAME"
+
+      - name: Lint (new errors and extra warnings fail)
+        run: npm run lint
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle within budget (budgets.json)
+        run: npm run check:bundle
+
+      - name: Audit shipped dependencies (high and critical fail)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: dist/
+          retention-days: 14
+
+  # A release branch also gets a DRAFT GitHub release v<version>: the build the job above checked,
+  # zipped, and a changelog of the commit subjects since the previous release tag. It deploys
+  # nothing; a person reviews the draft and publishes it (RELEASING.md).
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'avarsh/release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # every commit and tag, for the changelog
+
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
+
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+
+          # A published release is never changed; a later fix is a hotfix release of its own.
+          draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          tagged="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" || true)"
+          if [ "$draft" = "false" ]; then
+            if [ "$tagged" = "$GITHUB_SHA" ]; then
+              echo "$tag is already published from this commit; nothing to do."
+              exit 0
+            fi
+            echo "::error::$tag is already published from ${tagged:-another commit}. A fix goes out as a hotfix release (RELEASING.md)."
+            exit 1
+          fi
+
+          # Tag the commit this release is built from: a draft gets no tag of its own until it is
+          # published, and the next release's changelog starts from this tag.
+          if [ -z "$tagged" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" > /dev/null
+          elif [ "$tagged" != "$GITHUB_SHA" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+          fi
+
+          # The changelog: commit subjects since the newest earlier release tag this commit descends from.
+          prev="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude "$tag" HEAD 2>/dev/null || true)"
+          notes="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "Built from \`${GITHUB_SHA::7}\` on \`$GITHUB_REF_NAME\`. The zip is the build CI checked; Netlify builds the deployed copy from the same commit."
+            echo
+            if [ -n "$prev" ]; then
+              echo "## Changes since $prev"
+              echo
+              git log --no-merges --format='- %s (%h)' "$prev..HEAD"
+            else
+              echo "## Latest changes"
+              echo
+              echo "No earlier release is tagged, so this lists the last 50 commits."
+              echo
+              git log --no-merges --format='- %s (%h)' -n 50 HEAD
+            fi
+          } > "$notes"
+
+          asset="$RUNNER_TEMP/avarsh-erp-ui-$tag-${GITHUB_SHA::7}.zip"
+          (cd dist && zip -qr "$asset" .)
+
+          if [ "$draft" = "true" ]; then
+            # The draft carries one zip, of the commit it now names
+            gh release view "$tag" --json assets --jq '.assets[].name' | while read -r old; do
+              if [ -n "$old" ]; then gh release delete-asset "$tag" "$old" --yes; fi
+            done
+            gh release edit "$tag" --notes-file "$notes"
+            gh release upload "$tag" "$asset"
+          else
+            gh release create "$tag" --draft --verify-tag --title "$tag" --notes-file "$notes" "$asset"
+          fi

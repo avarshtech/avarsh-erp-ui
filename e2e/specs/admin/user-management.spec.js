@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antTableWaitForData, antModalConfirm, antPopconfirmYes, antDatePickerToday } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
+import { antTableWaitForData } from '../../helpers/antd-helpers.js';
+import { ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
 
 let api;
 let createdUserId;
@@ -56,17 +56,20 @@ test.describe('User Management — API Tests', () => {
   test('Reset password', async () => {
     expect(createdUserId).toBeDefined();
 
-    const res = await api.post(`/users/${createdUserId}/reset-password`, {
+    // Self-service reset (/users/{id}/reset-password) requires currentPassword; an
+    // admin resetting someone else's password uses the dedicated admin endpoint.
+    const res = await api.post('/admin/reset-password', {
+      userId: createdUserId,
       newPassword: 'NewTest@12345',
     });
-    expect(res.status).toBe(200);
+    expect([200, 204]).toContain(res.status);
   });
 
   test('Delete user', async () => {
     expect(createdUserId).toBeDefined();
 
     const res = await api.delete(`/users/${createdUserId}`);
-    expect(res.status).toBe(200);
+    expect([200, 204]).toContain(res.status);
     createdUserId = null;
   });
 
@@ -103,9 +106,11 @@ test.describe('User Management — UI Tests', () => {
     const formContainer = page.locator('.ant-modal, .ant-drawer').first();
     await expect(formContainer).toBeVisible();
 
-    await expect(formContainer.locator('text=Name').or(formContainer.getByLabel('Name'))).toBeVisible();
-    await expect(formContainer.locator('text=Username').or(formContainer.getByLabel('Username'))).toBeVisible();
-    await expect(formContainer.locator('text=Email').or(formContainer.getByLabel('Email'))).toBeVisible();
-    await expect(formContainer.locator('text=Role').or(formContainer.getByLabel('Role'))).toBeVisible();
+    // .first() everywhere: "Name" also substring-matches "Username", which trips
+    // strict mode when both labels render.
+    await expect(formContainer.locator('text=Name').or(formContainer.getByLabel('Name')).first()).toBeVisible();
+    await expect(formContainer.locator('text=Username').or(formContainer.getByLabel('Username')).first()).toBeVisible();
+    await expect(formContainer.locator('text=Email').or(formContainer.getByLabel('Email')).first()).toBeVisible();
+    await expect(formContainer.locator('text=Role').or(formContainer.getByLabel('Role')).first()).toBeVisible();
   });
 });

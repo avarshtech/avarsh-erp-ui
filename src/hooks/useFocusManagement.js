@@ -16,9 +16,19 @@ const useFocusManagement = () => {
   useEffect(() => {
     // Delay lets the new route render and any component-level
     // focus calls (typically 0–100ms) execute first.
-    const timer = setTimeout(() => {
+    let timer;
+    let waits = 0;
+    const attempt = () => {
       const main = document.getElementById('main-content');
       if (!main) return;
+
+      // A lazy screen still downloading shows the route skeleton (App.jsx); look again once the
+      // screen itself is there, for up to 5 s, so it gets the same focus as one already loaded.
+      if (main.querySelector('[data-route-loading]') && waits < 50) {
+        waits += 1;
+        timer = setTimeout(attempt, 100);
+        return;
+      }
 
       // Don't steal focus if a component already focused an element.
       // Only proceed if focus is on body, document, or the main container itself
@@ -46,7 +56,8 @@ const useFocusManagement = () => {
         // No form element found — focus the content area itself
         main.focus({ preventScroll: true });
       }
-    }, 200);
+    };
+    timer = setTimeout(attempt, 200);
 
     return () => clearTimeout(timer);
   }, [pathname]);

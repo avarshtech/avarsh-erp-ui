@@ -1,0 +1,291 @@
+/* ============================================================
+   ROLE & ACCESS — the access table (view dialog and editor),
+   the editor's section nav and the view dialog's summary card.
+   Theme tokens only (src/index.css), so light and dark both work.
+   Every table rule is scoped to .access-grid: the app-wide table
+   rules in index.css are !important, so these out-specify them.
+   ============================================================ */
+
+/* ── access table ────────────────────────────────────────── */
+
+.access-grid .ant-table {
+  border-radius: var(--radius-md) !important;
+}
+
+.access-grid .ant-table-thead > tr > th {
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+}
+.access-grid .ant-table-thead > tr > th.ag-col-screen,
+.access-grid .ant-table-thead > tr > th.ag-col-other {
+  text-align: start !important;
+}
+
+.access-grid .ant-table-tbody > tr > td {
+  vertical-align: middle;
+}
+
+/* A right changed since the role was opened — DetailCard's count-pill tint */
+.access-grid .ant-table-tbody > tr > td.is-changed,
+.access-grid .ant-checkbox-wrapper.is-changed {
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--card-bg)) !important;
+}
+.access-grid .ant-checkbox-wrapper.is-changed {
+  border-radius: var(--radius-sm);
+}
+
+.access-grid .ag-row-blocked .ag-screen-name {
+  color: var(--text-muted);
+}
+
+.ag-screen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ag-screen.is-bundle { padding-inline-start: 6px; }
+.ag-screen-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.ag-bundle-glyph { color: var(--text-muted); }
+
+.ag-blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--primary-color);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ag-blocked:hover { text-decoration: underline; }
+.ag-blocked:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+.ag-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ag-tick { color: var(--primary-color); font-size: 14px; }
+.ag-na { color: var(--text-muted); }
+.ag-renamed {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: help;
+}
+.ag-renamed:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; border-radius: 50%; }
+
+/* Other rights wrap: a screen's own wording runs to ~90 characters */
+.ag-other {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.ag-other .ant-checkbox-wrapper { margin-inline-start: 0; padding: 0 4px; font-size: 12px; }
+.ag-other-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* ── editor: section nav (the Master Data workspace's look) ─ */
+
+.ag-split {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ag-nav {
+  flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ag-nav.is-collapsed { width: 56px; }
+
+.ag-nav-list {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.ag-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 1px 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ag-nav-item:hover {
+  background: var(--primary-light);
+  color: var(--primary-color);
+}
+.ag-nav-item.is-active {
+  background: var(--primary-light);
+  color: var(--primary-color);
+  border-left-color: var(--primary-color);
+  font-weight: 600;
+}
+.ag-nav-item:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+.ag-nav-item.is-dimmed { opacity: 0.5; }
+
+.ag-nav-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ag-nav-item.is-empty:not(.is-active) .ag-nav-label { color: var(--text-muted); }
+.ag-nav-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.ag-nav-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-color);
+}
+
+.ag-nav.is-collapsed .ag-nav-item {
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 2px auto;
+  padding: 0;
+  border-left: 0;
+  font-size: 16px;
+}
+.ag-nav.is-collapsed .ag-nav-dot { position: absolute; top: 4px; right: 4px; }
+
+.ag-nav-foot {
+  display: flex;
+  justify-content: center;
+  padding: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.ag-panel { flex: 1; min-width: 0; }
+.ag-panel-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ag-panel-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.ag-panel-count { font-size: 12px; color: var(--text-secondary); }
+.ag-panel-note { margin: -4px 0 10px; font-size: 12px; color: var(--text-muted); }
+
+/* ── view dialog: Access header, summary card, chips ─────── */
+
+.ag-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.ag-summary-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+
+.ag-sum-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.ag-sum-line strong { color: var(--text-primary); font-weight: 500; }
+
+/* POView's Grand Total pill */
+.ag-sum-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ag-sum-pill strong { font-size: 18px; }
+
+.ag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ag-chips .ant-tag { margin-inline-end: 0; }
+.ag-chip-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* ── editor: the Review popover (what Save will send) ────── */
+
+.ag-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ag-review-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-color);
+  cursor: pointer;
+}
+.ag-review-head:hover { text-decoration: underline; }
+.ag-review-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.ag-review-count { font-weight: 400; color: var(--text-muted); }
+.ag-review-list {
+  margin: 4px 0 0;
+  padding-inline-start: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ag-review-list .is-added::marker { color: var(--success-color); }
+.ag-review-list .is-removed::marker { color: var(--error-color); }
+.ag-review-more { list-style: none; color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-nav,
+  .ag-nav-item { transition: none; }
+}

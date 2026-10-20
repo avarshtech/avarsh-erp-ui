@@ -92,14 +92,28 @@ export const createPurchaseOrder = async (poData) => {
 
 /**
  * Update an existing purchase order
- * Backend expects POST with id in body
+ * PUT /{id} is the edit route; the id still rides in the body so the payload shape is
+ * identical to create. The old POST upsert still works server-side, so a stale tab is safe.
  * @param {number} id - Purchase order ID
  * @param {Object} poData - Updated purchase order data
  * @returns {Promise<Object>} Updated purchase order
  */
 export const updatePurchaseOrder = async (id, poData) => {
   const payload = { id, ...poData };
-  const response = await axiosInstance.post(ENDPOINTS.PURCHASE_ORDERS, payload);
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}`, payload);
+  return response.data;
+};
+
+/**
+ * Submit an existing Draft, Referred_Back or Rejected PO for approval, as it was last saved;
+ * its draft lines go in progress. Approved at once when no approval flow is configured.
+ * POST /purchase-orders/{id}/submit
+ * @param {number} id - Purchase order ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const submitPurchaseOrder = async (id, version) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/submit`, { version });
   return response.data;
 };
 
@@ -124,6 +138,18 @@ export const deletePurchaseOrder = async (id) => {
  */
 export const approvePurchaseOrder = async (id, data = {}) => {
   const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/approve`, data);
+  return response.data;
+};
+
+/**
+ * Revise the delivery date of a PO that is already with the supplier, moving the
+ * targets of its incomplete processing stages with it.
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { revisedDeliveryDate: 'YYYY-MM-DD', reason, stageUpdates: [{ lineItemId, stageIndex, completionDate }] }
+ * @returns {Promise<Object>} Updated purchase order, including lineItems and activities
+ */
+export const reviseDeliveryDate = async (id, data) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/revise-delivery-date`, data);
   return response.data;
 };
 
@@ -285,6 +311,7 @@ export default {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
+  submitPurchaseOrder,
   deletePurchaseOrder,
   createActivity,
   getPoVersionHistory,

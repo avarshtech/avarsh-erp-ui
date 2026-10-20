@@ -8,6 +8,7 @@ const StatusSteps = memo(function StatusSteps({
   currentStatus,
   statusConfig = {},
   getLabel,
+  getDescription,
   size = 'default',
   direction = 'horizontal',
   className,
@@ -37,15 +38,16 @@ const StatusSteps = memo(function StatusSteps({
         title: getLabel ? getLabel(status) : status,
         status: stepStatus,
         icon: IconComponent ? <IconComponent /> : undefined,
+        description: getDescription ? getDescription(status) : undefined,
       };
     });
-  }, [statusFlow, currentStatus, currentIndex, isError, statusConfig, getLabel]);
+  }, [statusFlow, currentStatus, currentIndex, isError, statusConfig, getLabel, getDescription]);
 
   return (
     <Steps
       items={items}
       size={size}
-      direction={direction}
+      orientation={direction}
       className={className}
       style={style}
       {...restProps}

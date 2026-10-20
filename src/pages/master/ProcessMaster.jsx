@@ -1,26 +1,60 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Row, Col, Divider, Select, Alert, Segmented } from 'antd';
-import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined, DollarOutlined, PercentageOutlined } from '@ant-design/icons';
+import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Row, Col, Divider, Select, Alert } from 'antd';
+import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
+import ProcessJobWorkFields from './jobWork/ProcessJobWorkFields';
+import { jobWorkDefaultsFor } from '../../utils/jobWorkConstants';
 
 const { Text } = Typography;
 import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/master/processService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
-import { useStore } from '../../context/StoreContext';
 
 const MODULE_ID = 'process-master';
 
+/**
+ * Process categories — the category alone decides which module consumes the process
+ * and, consequently, which defaults the form collects.
+ *
+ *   Manufacturing → cost sheet Section D. Carries a default cost only; the cost sheet
+ *                   auto-fills the manufacturing row from it.
+ *   Fabric        → BOM fabric lines.  ┐ Carry the four allowance defaults, which
+ *   Trims         → BOM trims lines.   ┘ ProcessAllowanceModal seeds to derive
+ *                   purchase qty. A fabric line offers only Fabric processes, a trims
+ *                   line only Trims processes.
+ *   Cut Panel     → Cut Panel Requirement and Cut Panel PO (work on cut panels:
+ *                   printing, embroidery…).
+ *   Garment       → Garment Process Requirement and Garment Process PO (work on sewn
+ *                   garments: washing, dyeing…).
+ *                   These two carry neither a cost nor allowances. They carry the job-work
+ *                   PO defaults instead — SAC code, GST %, billing unit, instructions,
+ *                   artwork required (ProcessJobWorkFields); the API keeps those on these
+ *                   two categories only.
+ *
+ * Cost sheet Section E (Overhead / Markup) is NOT a consumer of this master — its rows
+ * come from the separate Overhead master (mst_overheads), so there is no Overheads
+ * category here.
+ *
+ * These are the exact values the consumers query, so they must not be sourced from the
+ * item-category master.
+ */
+const CATEGORY_OPTIONS = [
+  { value: 'Manufacturing', label: 'Manufacturing' },
+  { value: 'Fabric', label: 'Fabric' },
+  { value: 'Trims', label: 'Trims' },
+  { value: 'Cut Panel', label: 'Cut Panel' },
+  { value: 'Garment', label: 'Garment' },
+];
+
+/** Manufacturing is cost-bearing; Fabric and Trims are allowance-bearing. */
+const isCostCategory = (category) => category === 'Manufacturing';
+
+/** Cut Panel and Garment feed the BOM requirement screens and carry no defaults. */
+const isRequirementCategory = (category) => category === 'Cut Panel' || category === 'Garment';
+
 const ProcessMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
-  const { categories } = useStore();
-
-  const categoryOptions = useMemo(() =>
-    (categories || [])
-      .filter((c) => c.isActive !== false)
-      .map((c) => ({ value: c.name, label: c.name })),
-  [categories]);
 
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -70,9 +104,11 @@ const ProcessMaster = ({ onDirtyChange }) => {
       title: 'Type',
       width: 90,
       render: (_, record) => {
-        if (record.defaultCost > 0) return <Tag color="blue">Cost</Tag>;
-        if (record.defaultShrinkageInches || record.defaultProcessLossPercent || record.defaultRejectionPercent || record.defaultShipmentAllowancePercent) return <Tag color="purple">Allowance</Tag>;
-        return <Tag color="default">—</Tag>;
+        if (!record.category) return <Tag color="default">—</Tag>;
+        if (isRequirementCategory(record.category)) return <Tag color="cyan">Requirement</Tag>;
+        return isCostCategory(record.category)
+          ? <Tag color="blue">Cost</Tag>
+          : <Tag color="purple">Allowance</Tag>;
       },
     },
     {
@@ -91,7 +127,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ isActive: true, category: null, processDefaultType: 'COST', defaultCost: null, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
+    form.setFieldsValue({ isActive: true, category: null, defaultCost: null, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
@@ -101,13 +137,9 @@ const ProcessMaster = ({ onDirtyChange }) => {
     skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
-    const hasAllowance = !!(record.defaultShrinkageInches || record.defaultProcessLossPercent || record.defaultRejectionPercent || record.defaultShipmentAllowancePercent);
-    const hasCost = !!(record.defaultCost);
-    const processDefaultType = hasCost ? 'COST' : hasAllowance ? 'ALLOWANCE' : 'COST';
     form.setFieldsValue({
       ...record,
       isActive: record.isActive !== false,
-      processDefaultType,
     });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
@@ -119,15 +151,28 @@ const ProcessMaster = ({ onDirtyChange }) => {
 
     setSubmitting(true);
     try {
-      const { processDefaultType, ...payload } = values;
-      if (processDefaultType !== 'ALLOWANCE') {
+      // The category decides which set of defaults is meaningful; the other set is
+      // zeroed so a process can never carry both a cost and an allowance. Blank inputs
+      // are coerced to 0 because every default_* column is NOT NULL.
+      const payload = { ...values };
+      if (isRequirementCategory(values.category)) {
+        payload.defaultCost = 0;
         payload.defaultShrinkageInches = 0;
         payload.defaultProcessLossPercent = 0;
         payload.defaultRejectionPercent = 0;
         payload.defaultShipmentAllowancePercent = 0;
-      }
-      if (processDefaultType !== 'COST') {
+      } else if (isCostCategory(values.category)) {
+        payload.defaultCost = values.defaultCost ?? 0;
+        payload.defaultShrinkageInches = 0;
+        payload.defaultProcessLossPercent = 0;
+        payload.defaultRejectionPercent = 0;
+        payload.defaultShipmentAllowancePercent = 0;
+      } else {
         payload.defaultCost = 0;
+        payload.defaultShrinkageInches = values.defaultShrinkageInches ?? 0;
+        payload.defaultProcessLossPercent = values.defaultProcessLossPercent ?? 0;
+        payload.defaultRejectionPercent = values.defaultRejectionPercent ?? 0;
+        payload.defaultShipmentAllowancePercent = values.defaultShipmentAllowancePercent ?? 0;
       }
       if (selectedId) {
         const selectedRecord = data.find(p => p.id === selectedId);
@@ -191,7 +236,8 @@ const ProcessMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Processes"
       subtitle="Manufacturing"
       addLabel="Add Process"
@@ -225,7 +271,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
                 {selectedId ? (isReadOnly ? 'View Process' : 'Edit Process') : 'New Process'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the process details below' : 'Define a new manufacturing process for BOM routing'}
+                {selectedId ? 'Modify the process details below' : 'Define a new process — the category decides where it is used and whether it carries a cost or allowances'}
               </Text>
             </div>
             <Space>
@@ -260,80 +306,68 @@ const ProcessMaster = ({ onDirtyChange }) => {
                 layout="vertical"
                 onFinish={handleSave}
                 disabled={isReadOnly}
-                onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
+                onValuesChange={(changed) => {
+                  if (!skipDirty.current) markDirty(true);
+                  if (isRequirementCategory(changed.category)) {
+                    const current = form.getFieldsValue(['sacCode', 'gstRatePercent', 'defaultUom', 'artworkRequired']);
+                    form.setFieldsValue(jobWorkDefaultsFor(changed.category, current));
+                  }
+                }}
               >
                 <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
                   <Input placeholder="e.g. Fabric Dyeing" maxLength={200} />
                 </Form.Item>
                 <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
-                  <Select placeholder="Select category" options={categoryOptions} showSearch optionFilterProp="label" allowClear />
+                  <Select placeholder="Select category" options={CATEGORY_OPTIONS} allowClear />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />
                 </Form.Item>
 
-                <Divider orientation="left" style={{ margin: '8px 0 16px' }}>Process Defaults</Divider>
-                <Form.Item name="processDefaultType" label="Default Type" style={{ marginBottom: 12 }}>
-                  <Segmented
-                    block
-                    options={[
-                      { label: <Space><DollarOutlined /> Cost</Space>, value: 'COST' },
-                      { label: <Space><PercentageOutlined /> Allowance</Space>, value: 'ALLOWANCE' },
-                    ]}
-                  />
-                </Form.Item>
-
-                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.processDefaultType !== cur.processDefaultType}>
+                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.category !== cur.category}>
                   {() => {
-                    const type = form.getFieldValue('processDefaultType');
-                    if (type === 'COST') return (
-                      <>
-                        <Alert
-                          type="info"
-                          showIcon
-                          icon={<InfoCircleOutlined />}
-                          message="Set a default cost for this process. When selected in a Costing sheet, this value will be auto-filled as the process cost."
-                          style={{ marginBottom: 16, fontSize: 12 }}
-                        />
-                        <Form.Item name="defaultCost" label="Default Cost">
-                          <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
-                        </Form.Item>
-                      </>
+                    const category = form.getFieldValue('category');
+                    if (!category) return null;
+                    if (isRequirementCategory(category)) return <ProcessJobWorkFields category={category} />;
+                    if (isCostCategory(category)) return (
+                      <Form.Item name="defaultCost" label="Default Cost">
+                        <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
+                      </Form.Item>
                     );
-                    if (type === 'ALLOWANCE') return (
+                    return (
                       <>
+                        <Divider titlePlacement="start" style={{ margin: '8px 0 16px' }}>Process Defaults</Divider>
                         <Alert
                           type="info"
                           showIcon
                           icon={<InfoCircleOutlined />}
-                          message="Set default allowance values for this process. When selected in a BOM, these values will be auto-applied to calculate purchase quantities."
+                          title="Set default allowance values for this process. When selected in a BOM, these values will be auto-applied to calculate purchase quantities."
                           style={{ marginBottom: 16, fontSize: 12 }}
                         />
                         <Row gutter={16}>
                           <Col span={6}>
                             <Form.Item name="defaultShrinkageInches" label="Shrinkage">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="in" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" suffix="in" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultProcessLossPercent" label="Process Loss">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultRejectionPercent" label="Rejection">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultShipmentAllowancePercent" label="Shipment">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                         </Row>
                       </>
                     );
-                    return null;
                   }}
                 </Form.Item>
 

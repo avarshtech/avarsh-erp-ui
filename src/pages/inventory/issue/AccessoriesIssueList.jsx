@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Space, Input, DatePicker, Row, Col } from 'antd';
+import { App, Table, Card, Space, Input, DatePicker, Row, Col, Tag } from 'antd';
 import { SearchOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -10,16 +10,22 @@ import StatCard from '../../../components/StatCard';
 import RecordLink from '../../../components/RecordLink';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { getAccessoriesIssueList, getApprovedWorkOrders } from '../../../services/inventory/inventoryService';
+import { listIssues, getIssueWorkOrders } from '../../../services/inventory/materialIssueService';
 import { formatNumber } from '../../../utils/formatters';
 import { generateAccessoriesIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
+import CancelIssueModal from './CancelIssueModal';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const { RangePicker } = DatePicker;
 
 const AccessoriesIssueList = ({ embedded = false }) => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters the register server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -28,11 +34,12 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, record: null });
+  const [cancelModal, setCancelModal] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAccessoriesIssueList({ search: searchText });
+      const res = await listIssues('ACCESSORY', { search: searchText });
       setData(res.content || []);
       setTotalElements(res.totalElements ?? (res.content || []).length);
     } catch {
@@ -40,12 +47,12 @@ const AccessoriesIssueList = ({ embedded = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, message]);
+  }, [searchText, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    getApprovedWorkOrders()
+    getIssueWorkOrders()
       .then((res) => setPendingWOCount(res.totalElements ?? (res.content || []).length))
       .catch(() => { /* non-blocking */ });
   }, []);
@@ -72,6 +79,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   const columns = useMemo(() => [
     { title: 'Issue #', dataIndex: 'issueNumber', key: 'issueNumber', width: 160, align: 'center', render: (val, record) => <RecordLink text={val} onClick={() => setViewDrawer({ open: true, record })} /> },
     { title: 'Date', dataIndex: 'issueDate', key: 'issueDate', width: 120, align: 'center', render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    ...branchColumn,
     { title: 'Work Order', dataIndex: 'workOrder', key: 'workOrder', width: 160, align: 'center' },
     { title: 'Style', dataIndex: 'style', key: 'style', width: 130, align: 'center' },
     { title: 'Items', dataIndex: 'itemsCount', key: 'itemsCount', width: 80, align: 'center' },
@@ -91,26 +99,42 @@ const AccessoriesIssueList = ({ embedded = false }) => {
       },
     },
     {
-      title: 'Actions', key: 'actions', width: 110, fixed: 'right', align: 'center',
+      title: 'Status', dataIndex: 'status', key: 'status', width: 110, align: 'center',
+      render: (s) => s === 'CANCELLED'
+        ? <Tag color="default" style={{ textDecoration: 'line-through' }}>Cancelled</Tag>
+        : <Tag color="success">Completed</Tag>,
+    },
+    {
+      title: 'Actions', key: 'actions', width: 120, fixed: 'right', align: 'center',
       render: (_, record) => (
         <Space size={4}>
           <ActionButton action="view" size="small" onClick={() => setViewDrawer({ open: true, record })} />
-          {hasPermission('inventory-issue', 'update') && (
-            <ActionButton action="edit" size="small" onClick={() => navigate(`/inventory/issue/accessories/${record.id}`)} />
+          {record.status !== 'CANCELLED' && (
+            <ActionButton action="print" size="small" onClick={() => generateAccessoriesIssueSlipPdf(record)} />
           )}
-          <ActionButton action="print" size="small" onClick={() => generateAccessoriesIssueSlipPdf(record)} />
+          {record.status !== 'CANCELLED' && hasPermission('inventory-issue', 'update') && (
+            <ActionButton action="cancel" size="small" onClick={() => setCancelModal({ open: true, record })} />
+          )}
         </Space>
       ),
     },
-  ], [navigate]);
+  ], [branchColumn]);
 
   const drawer = (
-    <IssueViewDrawer
-      open={viewDrawer.open}
-      onClose={() => setViewDrawer({ open: false, record: null })}
-      record={viewDrawer.record}
-      type="accessories"
-    />
+    <>
+      <IssueViewDrawer
+        open={viewDrawer.open}
+        onClose={() => setViewDrawer({ open: false, record: null })}
+        record={viewDrawer.record}
+        type="accessories"
+      />
+      <CancelIssueModal
+        open={cancelModal.open}
+        record={cancelModal.record}
+        onClose={() => setCancelModal({ open: false, record: null })}
+        onCancelled={loadData}
+      />
+    </>
   );
 
   const content = (

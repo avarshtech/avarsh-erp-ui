@@ -20,6 +20,7 @@ import LiveActivityFeedEnableCard from '../../components/LiveActivityFeed/LiveAc
 import EmptyState from '../../components/EmptyState';
 import { ActionButton } from '../../components/buttons';
 import { getTablePagination } from '../../utils/paginationConfig';
+import { thenById } from '../../utils/tableSort';
 
 dayjs.extend(relativeTime);
 
@@ -71,8 +72,9 @@ const AdminDashboard = () => {
     if (!dateRange || dateRange.length !== 2) return;
     setActivityLoading(true);
     try {
-      const startDate = dateRange[0].startOf('day').toISOString();
-      const endDate = dateRange[1].endOf('day').toISOString();
+      // Local wall time, as the API stores activity (IST): a UTC instant here shifted the range by 5h30 (U311)
+      const startDate = dateRange[0].startOf('day').format('YYYY-MM-DDTHH:mm:ss');
+      const endDate = dateRange[1].endOf('day').format('YYYY-MM-DDTHH:mm:ss.SSS');
       const data = await getActivityLogsByDateRange(startDate, endDate);
       const logs = Array.isArray(data) ? data : (data?.content || []);
       setActivityLogs(logs);
@@ -122,7 +124,7 @@ const AdminDashboard = () => {
       title: 'Time',
       dataIndex: 'activityTimestamp',
       width: 170,
-      sorter: (a, b) => dayjs(a.activityTimestamp).unix() - dayjs(b.activityTimestamp).unix(),
+      sorter: thenById((a, b) => dayjs(a.activityTimestamp).unix() - dayjs(b.activityTimestamp).unix()),
       defaultSortOrder: 'descend',
       render: (val) => val ? (
         <Tooltip title={dayjs(val).format('YYYY-MM-DD HH:mm:ss')}>
@@ -170,7 +172,7 @@ const AdminDashboard = () => {
       title: 'Device / Browser',
       width: 200,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Space size={4}>
             {record.deviceType?.toLowerCase() === 'mobile'
               ? <MobileOutlined style={{ color: 'var(--text-muted)' }} />

@@ -138,9 +138,9 @@ const PageLoader = () => (
 </Suspense>
 ```
 
-**Vite chunk configuration:**
+**Vite chunk configuration** — not applied yet: `vite.config.js` has no `manualChunks` (2026-09-24). Add it only when a bundle analysis shows a reason:
 ```js
-// vite.config.js
+// vite.config.js (proposed)
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -322,6 +322,15 @@ for (BomLine line : bom.getLines()) {
 }
 ```
 
+#### The safety net: batch fetching is on everywhere
+
+`application.properties` sets `hibernate.default_batch_fetch_size=64` (P0.11a): a lazy association or
+collection touched across a page of rows loads in `IN` batches of up to 64, not one query per row. It
+takes the N+1 out of every list without changing what is loaded, but it is still several queries: a
+list endpoint that reads an association for every row should fetch it (Fix 1) or batch-load it (Fix 2).
+`hibernate.log_slow_query=500` logs any query slower than half a second with its SQL, so a slow list
+shows up in the logs.
+
 ---
 
 ### Server-Side Caching
@@ -422,42 +431,41 @@ try (InputStream inputStream = file.getInputStream()) {
 
 ---
 
-### Async for Long-Running Operations
+### Long-Running Work and Side Effects on Cloud Run
 
-Operations taking > 2 seconds MUST be async:
+Cloud Run bills request-based CPU: once the response is sent the container's CPU is throttled, so
+work handed to an executor after the response stalls, and a deploy or scale-in drops it. Do not
+reach for `@Async` to make a slow call "non-blocking" (review finding G3.1).
 
-```java
-@Configuration
-@EnableAsync
-public class AsyncConfig {
-    @Bean("geminiTaskExecutor")
-    public TaskExecutor geminiTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(5);
-        executor.setQueueCapacity(10);
-        executor.setThreadNamePrefix("gemini-");
-        return executor;
-    }
-}
+| Work | Where it runs |
+|------|---------------|
+| A remote call the user waits for (Gemini extraction, e-way bill) | In the request, with a timeout, **outside** any `@Transactional` method |
+| A side effect that must happen (supplier e-mail, WhatsApp) | A row written in the business transaction, sent by the outbox job (roadmap P0.12, not built yet). Until then: never inside the transaction. The cost-sheet WhatsApp registers an `afterCommit` synchronization and hands the send to `notificationTaskExecutor` (`CostSheetService.afterCommit`); the PO e-mail runs on `emailTaskExecutor` via `PoEmailEventListener` |
+| A side effect that may be lost (push) | Synchronously in `afterCommit`, before the response |
 
-@Service
-public class GeminiService {
-    @Async("geminiTaskExecutor")
-    public CompletableFuture<ExtractionResult> extractFromPdf(MultipartFile file) {
-        // 5-30 second Gemini API call — doesn't block request thread
-    }
-}
-```
+Work that leaves the request thread never reads the `HttpServletRequest`: Tomcat recycles it once the
+response is sent, so a later read throws or returns another request's headers. Capture what is needed first
+(`activity/userlog/RequestInfo.of(request)` for the address and user agent). An `@Async` method that names no
+executor runs on `defaultAsyncExecutor` (2-8 threads, 500 queued, caller-runs); every executor finishes within
+the 8 s shutdown phase.
+
+Outbound HTTP goes through the auto-configured `RestClient.Builder`, which carries the global
+`spring.http.clients.connect-timeout` (10 s) and `read-timeout` (150 s); never build a client without them. An API
+key goes in a header (Gemini: `x-goog-api-key`), never in the URL, where logs and error messages print it.
+
+Where `@Async` remains, its method returns `void` or a `Future` — never a value. Spring rejects
+any other return type on **every** call (`AsyncExecutionAspectSupport.doSubmit`), which is how
+`@Async UUID sendEmailAsync` silently stopped every PO e-mail. `config/AsyncMethodContractTest`
+fails the build on it. Never chain two `@Async` hops.
 
 ---
 
 ### Rate Limiting
 
-Auth and expensive endpoints MUST have rate limiting:
+Auth and expensive endpoints SHOULD have rate limiting. Neither Bucket4j nor Resilience4j is in `build.gradle` (2026-09-24), so this is a new-dependency decision for the user (Core Behavior Rule 6), not something to add silently:
 
 ```java
-// Using Bucket4j or similar
+// Example with Resilience4j — NOT present in the codebase
 @RateLimiter(name = "authLogin", fallbackMethod = "rateLimitFallback")
 @PostMapping("/login")
 public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) { ... }
@@ -574,10 +582,12 @@ console.debug('CategoryMaster: categories from store, count=', categories?.lengt
 // ACCEPTABLE — error logging in catch blocks (but prefer centralized logger)
 console.error('Failed to save item:', error);
 
-// BEST — centralized logger
+// BEST — a centralized logger. `utils/logger.js` does NOT exist (2026-09-24); user-facing
+// errors go through utils/apiError.js (errorText, toastUnlessHandled). If you add a logger,
+// this is the shape:
 import { logger } from '../utils/logger';
 
-// utils/logger.js
+// utils/logger.js (proposed)
 const isDev = import.meta.env.DEV;
 
 export const logger = {
@@ -722,10 +732,12 @@ public class CostSheetService {
 
 @Component
 public class CostSheetNotificationListener {
-    @TransactionalEventListener(phase = AFTER_COMMIT)
-    @Async
+    // BEFORE_COMMIT: the notification is recorded in the same transaction as the cost sheet,
+    // and the outbox job (roadmap P0.12) sends it. Not AFTER_COMMIT + @Async: Cloud Run stalls that work
+    // once the response is out (see "Long-Running Work and Side Effects on Cloud Run").
+    @TransactionalEventListener(phase = BEFORE_COMMIT)
     public void onCostSheetCreated(CostSheetCreatedEvent event) {
-        whatsAppService.sendCostingNotification(event.getCostSheet());
+        outbox.enqueueWhatsApp(event.getCostSheet());
     }
 }
 ```
@@ -772,7 +784,7 @@ BomService (474 lines) →
 - [ ] Mutation methods have `@CacheEvict`
 - [ ] List endpoints return summary DTOs (not full object graphs)
 - [ ] File uploads stream to storage (no full memory load)
-- [ ] Long-running operations (> 2s) are `@Async`
+- [ ] Slow remote calls run in the request with a timeout and outside a transaction; must-happen side effects go through the outbox, never after-response `@Async`
 - [ ] All monetary fields use `BigDecimal` (never Double/Float)
 - [ ] No broad `catch (Exception e)` — use specific types
 - [ ] Auth endpoints have rate limiting

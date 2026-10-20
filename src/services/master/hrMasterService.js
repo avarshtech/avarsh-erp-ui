@@ -14,8 +14,8 @@ export const getActiveDepartments = async () => {
   return response.data;
 };
 
-export const getActiveDepartmentsByFactory = async (factoryId) => {
-  const response = await axiosInstance.get(`${DEPT_URL}/active`, { params: { factoryId } });
+export const getActiveDepartmentsByUnit = async (unitId) => {
+  const response = await axiosInstance.get(`${DEPT_URL}/active`, { params: { unitId } });
   return response.data;
 };
 
@@ -106,10 +106,11 @@ export const getAllHolidays = async () => {
   return response.data;
 };
 
-export const getHolidaysByYear = async (year, factoryId) => {
-  const params = { year };
-  if (factoryId) params.factoryId = factoryId;
-  const response = await axiosInstance.get(HOLIDAY_URL, { params });
+// GET /hr/holidays/by-year — the root mapping takes no params, so sending
+// ?year= there was silently ignored and returned every holiday.
+// Holidays are the company's, so the year is the only thing left to narrow by.
+export const getHolidaysByYear = async (year) => {
+  const response = await axiosInstance.get(`${HOLIDAY_URL}/by-year`, { params: { year } });
   return response.data;
 };
 

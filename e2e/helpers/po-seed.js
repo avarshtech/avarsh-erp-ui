@@ -31,7 +31,9 @@ export async function loadPoRefs(api) {
 
   return {
     localSupplier,
-    item: { id: item.id, code: item.itemCode ?? item.code, name: item.name ?? item.itemName, uom: item.uomName, uomId: item.uomId ?? null, hsn: item.hsnCode ?? null, category: item.categoryName ?? null },
+    // /items enriches each item with its ACTIVE variants, and an item always has at
+    // least one. A PO line is raised against the variant, so carry the first one.
+    item: { id: item.id, code: item.itemCode ?? item.code, name: item.name ?? item.itemName, uom: item.uomName, uomId: item.uomId ?? null, hsn: item.hsnCode ?? null, category: item.categoryName ?? null, variantId: (item.variants || [])[0]?.id ?? null },
     terms,
   };
 }
@@ -67,7 +69,7 @@ export function computeLine(item, qty, unitPrice, gst, isIgst) {
     itemId: item.id, itemCode: item.code, itemName: item.name,
     description: `${item.name} — E2E`, quantity: qty, uomId: item.uomId, uomName: item.uom,
     unitPrice, hsnCode: item.hsn, categoryName: item.category,
-    variantId: null, variantAttributes: null, processingStages: null, bomLineSources: null,
+    variantId: item.variantId ?? null, variantAttributes: null, processingStages: null, bomLineSources: null,
     totalAmount: r2(base * (1 + gst / 100)),
     taxValue: r2(gstAmount),
   };

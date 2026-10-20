@@ -54,8 +54,8 @@ const ActivityTimeline = memo(({
     return {
       key: activity.id,
       color: config.color,
-      dot: config.icon,
-      children: renderComment
+      icon: config.icon,
+      content: renderComment
         ? renderComment(activity)
         : <DefaultActivityContent activity={activity} />,
     };

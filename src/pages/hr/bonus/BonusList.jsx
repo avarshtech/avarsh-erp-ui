@@ -1,20 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
+import { Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { getAllBonusRuns } from '../../../services/hr/bonusService';
 import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(BONUS_STATUS.map((s) => [s.value, s]));
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const BonusList = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -28,11 +25,11 @@ const BonusList = () => {
       const result = await getAllBonusRuns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load bonus runs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -49,20 +46,18 @@ const BonusList = () => {
         title: 'Year Period',
         key: 'yearPeriod',
         width: 180,
-        render: (_, r) => {
-          const from = r.yearFrom || r.periodFrom;
-          const to = r.yearTo || r.periodTo;
-          return from && to
-            ? `${dayjs(from).format('MMM YYYY')} - ${dayjs(to).format('MMM YYYY')}`
-            : `${r.yearFrom || '-'} - ${r.yearTo || '-'}`;
-        },
-        sorter: (a, b) => (a.yearFrom || '').localeCompare(b.yearFrom || ''),
+        // yearFrom and yearTo are plain years, not dates. Passing them through
+        // dayjs treated 2025 as a millisecond timestamp and rendered "Jan 1970".
+        render: (_, r) => (r.yearFrom && r.yearTo
+          ? `${r.yearFrom}-${String(r.yearTo).slice(2)} (Apr ${r.yearFrom} to Mar ${r.yearTo})`
+          : '-'),
+        sorter: thenById((a, b) => (a.yearFrom || 0) - (b.yearFrom || 0)),
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },
@@ -87,7 +82,7 @@ const BonusList = () => {
         key: 'totalAmount',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',
@@ -108,7 +103,7 @@ const BonusList = () => {
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/hr/bonus`, { state: { viewId: r.id } })}
+            onClick={(e) => { e.stopPropagation(); navigate(`/hr/bonus/${r.id}`); }}
           >
             View
           </Button>
@@ -147,6 +142,7 @@ const BonusList = () => {
         loading={loading}
         scroll={{ x: 900 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} runs` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/bonus/${r.id}`), style: { cursor: 'pointer' } })}
       />
     </>
   );

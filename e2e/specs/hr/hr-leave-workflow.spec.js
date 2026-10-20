@@ -17,9 +17,11 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { ensureLeaveType } from '../../helpers/hr-leave-seed.js';
 import {
-  antSelect,
-  antDatePickerToday,
+  antDatePickerType,
+  dayAhead,
   antTableWaitForData,
   antMessageContains,
   antFormFill,
@@ -33,6 +35,10 @@ import {
 } from '../../helpers/navigation.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
+
+// One day per application: the server refuses leave overlapping a pending or approved one, and these
+// tests all apply for the first employee. 40+ keeps clear of hr-leave-crud's days (80+).
+let nextDay = 40;
 
 /**
  * Helper: Apply a leave application through the UI drawer.
@@ -49,19 +55,14 @@ async function applyLeaveViaDrawer(page, reason) {
   // Select first available leave type
   await antFormSelect(page, 'Leave Type', null, { first: true });
 
-  // Pick From Date (today)
-  const fromDateFormItem = page
+  // A day no other application in this run has taken. One day is the drawer's default Duration, which
+  // asks for a single Leave Date; From and To are for "Multiple Days"
+  const day = dayAhead(nextDay++);
+  const leaveDateFormItem = page
     .locator('.ant-form-item')
-    .filter({ hasText: 'From Date' })
+    .filter({ hasText: 'Leave Date' })
     .first();
-  await antDatePickerToday(page, fromDateFormItem.locator('.ant-picker').first());
-
-  // Pick To Date (today)
-  const toDateFormItem = page
-    .locator('.ant-form-item')
-    .filter({ hasText: 'To Date' })
-    .first();
-  await antDatePickerToday(page, toDateFormItem.locator('.ant-picker').first());
+  await antDatePickerType(page, leaveDateFormItem.locator('.ant-picker').first(), day);
 
   // Fill reason with unique stamp to identify this specific application
   const uniqueReason = reason || `E2E leave ${STAMP()}`;
@@ -88,6 +89,16 @@ async function applyLeaveViaDrawer(page, reason) {
   return body?.id ?? null;
 }
 
+// The Apply Leave drawer offers the active leave types, and the e2e data seeds none
+test.beforeAll(async () => {
+  const api = await createAuthenticatedClient();
+  try {
+    await ensureLeaveType(api);
+  } finally {
+    await api.dispose();
+  }
+});
+
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
 
@@ -108,7 +119,7 @@ test.describe('HR Leave Workflow — Apply → Approve', () => {
     await antTableWaitForData(page);
 
     // Apply a new leave first so we have a fresh PENDING record to approve
-    const leaveId = await applyLeaveViaDrawer(page, `Approve workflow test ${STAMP()}`);
+    await applyLeaveViaDrawer(page, `Approve workflow test ${STAMP()}`);
 
     // Switch to the Pending tab to locate the freshly submitted leave
     const [pendingResp] = await Promise.all([
@@ -225,8 +236,9 @@ test.describe('HR Leave Workflow — Apply → Reject', () => {
     const modal = page.locator('.ant-modal').last();
     await modal.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Modal title should mention rejection
-    await expect(modal.getByText(/Reject Leave Application/i)).toBeVisible();
+    // Modal title should mention rejection. antd 6's confirm modal renders the title twice, a hidden
+    // .ant-modal-title and the visible .ant-modal-confirm-title, so look for the visible one
+    await expect(modal.getByText(/Reject Leave Application/i).filter({ visible: true })).toBeVisible();
 
     // Textarea for reason should be present
     const reasonTextarea = modal.locator('textarea');

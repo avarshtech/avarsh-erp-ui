@@ -20,6 +20,8 @@ import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { MODAL_WIDTHS } from '../../utils/uiConstants';
+import { NEW_PASSWORD_RULES } from '../../utils/passwordPolicy';
+import { useBranch } from '../../context/BranchContext';
 const { Text } = Typography;
 
 const UserManagement = () => {
@@ -49,6 +51,7 @@ const UserManagement = () => {
 
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role ? isAdminRole(currentUser.role) : false;
+  const { isMultiBranch, branches } = useBranch();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -102,6 +105,8 @@ const UserManagement = () => {
         phone: user.phone || '',
         roleId: user.roleId || user.role?.id,
         isActive: user.isActive ?? true,
+        defaultBranchId: user.defaultBranchId ?? null,
+        branchIds: user.branchIds || [],
       };
       form.setFieldsValue(editValues);
       initialFormValuesRef.current = { ...editValues };
@@ -157,6 +162,10 @@ const UserManagement = () => {
         phone: values.phone,
         roleId: values.roleId,
         isActive: values.isActive ?? true,
+        // Only when the fields were on the form: absent keys leave the user's
+        // branch scope untouched server-side, so a single-branch screen (or a
+        // failed branch fetch) can never wipe it.
+        ...(isMultiBranch ? { defaultBranchId: values.defaultBranchId ?? null, branchIds: values.branchIds ?? [] } : {}),
       };
       if (!editingUser && values.password) {
         payload.password = values.password;
@@ -381,11 +390,26 @@ const UserManagement = () => {
             <Col xs={24} sm={12}><Form.Item name="email" label="Email" rules={[{ required: true, message: 'Please enter email' }, { type: 'email', message: 'Please enter a valid email' }]}><Input placeholder="Enter email address" /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="phone" label="Phone"><Input placeholder="Enter phone number" /></Form.Item></Col>
           </Row>
-          {!editingUser && (<Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter password' }, { min: 6, message: 'Password must be at least 6 characters' }]}><Input.Password placeholder="Enter password" /></Form.Item>)}
+          {!editingUser && (<Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter password' }, ...NEW_PASSWORD_RULES]}><Input.Password placeholder="Enter password" /></Form.Item>)}
           <Row gutter={16}>
             <Col xs={24} sm={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
           </Row>
+          {/* Branch scoping is only a thing once the company has more than one branch */}
+          {isMultiBranch && (
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="defaultBranchId" label="Home Branch" extra="where the branch switcher starts for this user">
+                  <Select allowClear placeholder="Head office" options={branches.map((b) => ({ value: b.id, label: b.branchName }))} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="branchIds" label="Allowed Branches" extra="leave empty to allow every branch">
+                  <Select mode="multiple" allowClear placeholder="All branches" options={branches.map((b) => ({ value: b.id, label: b.branchName }))} />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
         </Form>
       </Modal>
 
@@ -408,7 +432,7 @@ const UserManagement = () => {
         }
       >
         <Form form={resetPwdForm} layout="vertical" onFinish={handleAdminResetPwd} style={{ marginTop: 16 }}>
-          <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Please enter new password' }, { min: 6, message: 'Password must be at least 6 characters' }]}>
+          <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Please enter new password' }, ...NEW_PASSWORD_RULES]}>
             <Input.Password placeholder="Enter new password" prefix={<LockOutlined />} />
           </Form.Item>
           <Form.Item name="confirmPassword" label="Confirm Password" dependencies={['newPassword']} rules={[{ required: true, message: 'Please confirm the password' }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('newPassword') === value) return Promise.resolve(); return Promise.reject(new Error('Passwords do not match')); } })]}>
@@ -434,7 +458,7 @@ const UserManagement = () => {
             <div style={{ marginBottom: 16 }}><Text type="secondary">Last Login</Text><div>{selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt, 'DD MMM YYYY HH:mm') : 'Never'}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Created</Text><div>{formatDate(selectedUser.createdAt, 'DD MMM YYYY HH:mm')}</div></div>
             <Divider />
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <PermissionGuard module="users" operation="update">
                 <ActionButton action="edit" text="Edit User" block onClick={() => { setDrawerVisible(false); openModal(selectedUser); }} />
               </PermissionGuard>

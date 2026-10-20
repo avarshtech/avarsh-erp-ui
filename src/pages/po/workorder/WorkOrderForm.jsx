@@ -6,20 +6,29 @@ import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect, FormDatePicker, FormInputNumber, FormSection } from '../../../components/form';
 import { numericInputProps } from '../../../utils/inputHelpers';
+import useBusyAction from '../../../hooks/useBusyAction';
+import useFormValuesWhenReady from '../../../hooks/useFormValuesWhenReady';
 import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
-import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import PpSampleGate from '../components/PpSampleGate';
+import ReferBackNotice from '../components/ReferBackNotice';
 import OrderCoveragePanel from '../components/OrderCoveragePanel';
-import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, VARIANCE_THRESHOLD, isPpApproved } from '../../../utils/productionConstants';
+import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getOrderForPo, getApprovedCuttingPos, getConsumptionComparison, getStockByBom,
-  getPpApprovalStatus, getSewingLines, getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getOrderCoverage,
-} from '../../../services/po/productionService';
+  getConfirmedOrders, getOrderForPo, getStockByBom,
+  getPpApprovalStatus, setPpApprovalStatus, getSewingLines,
+} from '../../../services/po/production/productionLookupService';
+import { getApprovedCuttingPos } from '../../../services/po/production/cuttingPoService';
+import {
+  getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getWorkOrderCoverage,
+  getWorkOrderJobWorkGaps,
+} from '../../../services/po/production/workOrderService';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
+const JOB_WORK_PO = { CUT_PANEL: 'Cut Panel PO', GARMENT: 'Garment Process PO' };
+const JOB_WORK_GAP_TIP = 'Raise the Cut Panel / Garment Process POs for this order first';
 
 // Trim Allocated defaults to BOM requirement and is editable on the Work Order trim panel.
 const normTrimStock = (rows) => rows.map((r) => ({
@@ -39,30 +48,36 @@ const WorkOrderForm = () => {
   const [cuttingPos, setCuttingPos] = useState([]);
   const [cuttingPo, setCuttingPo] = useState(null);
   const [items, setItems] = useState([]);
-  const [consumption, setConsumption] = useState([]);
-  const [justification, setJustification] = useState('');
   const [stock, setStock] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
   const [lines, setLines] = useState([]);
   const [coverage, setCoverage] = useState(null);
+  // Cut Panel / Garment processes of the order with no PO raised yet: the Work Order waits for them
+  const [jobWorkGaps, setJobWorkGaps] = useState([]);
   const [allowanceWarn, setAllowanceWarn] = useState(null);
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
-  const [saving, setSaving] = useState(false);
+  // An edit shows the form only once the PO has loaded; its values go in after the form mounts
+  const setLoadedValues = useFormValuesWhenReady(form, !booting);
+  const [saved, setSaved] = useState(null); // the work order being edited, for its refer-back notice
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => { getConfirmedOrders().then(setOrders); getSewingLines().then(setLines); }, []);
 
-  const hydrateOrder = useCallback(async (orderId) => {
+  // branchId: the edited Work Order's own, or the form's (a new one); the form is not mounted while an edit loads
+  const hydrateOrder = useCallback(async (orderId, branchId = form.getFieldValue('branchId')) => {
     const [o, pp, cps] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId), getApprovedCuttingPos(orderId)]);
     setOrder(o); setPpStatus(pp); setCuttingPos(cps);
-    setStock(normTrimStock(await getStockByBom(orderId, 'trim')));
+    setStock(normTrimStock(await getStockByBom(o, 'trim', { branchId })));
     return o;
-  }, []);
+  }, [form]);
 
-  const applyCuttingPo = useCallback(async (cp, o) => {
+  // Consumption is settled on the cutting PO; a work order inherits it and does not
+  // review it again, so there is no consumption screen here.
+  const applyCuttingPo = useCallback((cp, o) => {
     setCuttingPo(cp);
-    setConsumption(await getConsumptionComparison(o.id, cp.cadConsumptionPerPc));
     setItems((cp.items || o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
   }, []);
 
@@ -70,17 +85,21 @@ const WorkOrderForm = () => {
     if (!isEdit) return;
     getWorkOrder(id).then(async (wo) => {
       if (!wo) { message.error('Work Order not found'); return navigate('/purchase-orders/work-order/list'); }
-      const o = await hydrateOrder(wo.orderId);
-      getOrderCoverage(PO_TYPE.WORK_ORDER, wo.orderId, id).then(setCoverage);
+      setSaved(wo);
+      const o = await hydrateOrder(wo.orderId, wo.branchId);
+      getWorkOrderCoverage(wo.orderId, id).then(setCoverage);
+      getWorkOrderJobWorkGaps(wo.orderId).then(setJobWorkGaps);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
         setAllowanceWarn({ stored: wo.allowancePercent, live: o.allowancePercent });
       }
-      const cp = (await getApprovedCuttingPos(wo.orderId)).find((c) => c.id === wo.cuttingPoId) || { id: wo.cuttingPoId, cuttingPoNo: wo.cuttingPoNo, cadConsumptionPerPc: wo.cadConsumptionPerPc, items: wo.items };
+      const cp = (await getApprovedCuttingPos(wo.orderId)).find((c) => c.id === wo.cuttingPoId) || {
+        id: wo.cuttingPoId, cuttingPoNo: wo.cuttingPoNo, branchId: wo.branchId, items: wo.items,
+        bomConsumptionPerPc: wo.bomConsumptionPerPc, cadConsumptionPerPc: wo.cadConsumptionPerPc,
+      };
       setCuttingPo(cp);
-      setConsumption(await getConsumptionComparison(wo.orderId, wo.cadConsumptionPerPc));
       setItems(wo.items || []);
-      form.setFieldsValue({
-        orderId: wo.orderId, cuttingPoId: wo.cuttingPoId,
+      setLoadedValues({
+        orderId: wo.orderId, cuttingPoId: wo.cuttingPoId, branchId: wo.branchId,
         plannedStartDate: wo.plannedStartDate ? dayjs(wo.plannedStartDate) : null,
         plannedEndDate: wo.plannedEndDate ? dayjs(wo.plannedEndDate) : null,
         plannedDeliveryDate: wo.plannedDeliveryDate ? dayjs(wo.plannedDeliveryDate) : null,
@@ -91,15 +110,21 @@ const WorkOrderForm = () => {
   }, [id, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOrderSelect = async (orderId) => {
-    form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]); setConsumption([]);
+    form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]);
     setAllowanceWarn(null);
-    await hydrateOrder(orderId);
-    getOrderCoverage(PO_TYPE.WORK_ORDER, orderId).then(setCoverage);
+    const o = await hydrateOrder(orderId);
+    // the order's delivery date (its earliest line dispatch date) is the default; still editable
+    form.setFieldValue('plannedDeliveryDate', o?.deliveryDate ? dayjs(o.deliveryDate) : null);
+    getWorkOrderCoverage(orderId).then(setCoverage);
+    setJobWorkGaps([]);
+    getWorkOrderJobWorkGaps(orderId).then(setJobWorkGaps);
   };
 
   const handleCuttingPoSelect = async (cpId) => {
     const cp = cuttingPos.find((c) => c.id === cpId);
-    if (cp && order) await applyCuttingPo(cp, order);
+    if (cp && order) applyCuttingPo(cp, order);
+    // Made where the cutting was: the unit picker narrows to that branch's units
+    form.setFieldsValue({ branchId: cp?.branchId, processingUnitId: undefined, processingUnitName: '' });
   };
 
   const applyBulkRate = () => {
@@ -107,24 +132,21 @@ const WorkOrderForm = () => {
     setItems(items.map((i) => ({ ...i, ratePerPiece: bulkRate })));
   };
 
-  // Editing Planned Qty re-derives the BOM-based requirement in the consumption totals
-  // and the trim stock panel (requirement per garment = BOM consumption).
+  // Editing Planned Qty re-derives the BOM-based requirement in the trim stock panel
+  // (requirement per garment = BOM consumption).
   const onItemsChange = (newItems) => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
-    setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order.id, 'trim', { plannedQty: total }).then((s) => setStock(normTrimStock(s)));
+    if (order) getStockByBom(order, 'trim', { plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normTrimStock(s)));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
   const overAuth = coverage && (coverage.authorizedQty + thisPoQty) > coverage.orderQty;
-  const redVariance = consumption.some((r) => Math.abs(computeVariancePercent(r.cadPerPc, r.bomPerPc)) > VARIANCE_THRESHOLD.YELLOW);
 
   const confirmWarnings = () => {
     const reasons = [];
     if (hasShortage) reasons.push('trim/accessory shortage');
     if (overAuth) reasons.push('quantity over the order qty');
-    if (redVariance) reasons.push('consumption variance > 5%');
     if (!reasons.length) return Promise.resolve(true);
     return new Promise((res) => modal.confirm({
       title: 'Submit despite warnings?',
@@ -137,16 +159,17 @@ const WorkOrderForm = () => {
   const buildPayload = (values) => ({
     orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
     buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
-    cuttingPoId: cuttingPo?.id, cuttingPoNo: cuttingPo?.cuttingPoNo,
+    cuttingPoId: cuttingPo?.id, cuttingPoNo: cuttingPo?.cuttingPoNo, branchId: cuttingPo?.branchId ?? values.branchId ?? null,
     processingUnitType: values.processingUnitType, processingUnitId: values.processingUnitId, processingUnitName: values.processingUnitName,
     sewingLineId: values.sewingLineId, samMinutes: values.samMinutes, targetDailyOutput: values.targetDailyOutput,
     plannedStartDate: values.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: values.plannedEndDate?.format('YYYY-MM-DD'),
     plannedDeliveryDate: values.plannedDeliveryDate?.format('YYYY-MM-DD'),
     totalOrderQty: sum(items, 'orderQty'), allowancePercent: order.allowancePercent, totalPlannedQty: sum(items, 'plannedQty'),
-    bomConsumptionPerPc: consumption[0]?.bomPerPc, cadConsumptionPerPc: consumption[0]?.cadPerPc,
-    consumptionVariance: +computeVariancePercent(consumption[0]?.cadPerPc, consumption[0]?.bomPerPc).toFixed(2),
+    // Carried over from the cutting PO for the record; the work order does not revisit them.
+    bomConsumptionPerPc: cuttingPo?.bomConsumptionPerPc, cadConsumptionPerPc: cuttingPo?.cadConsumptionPerPc,
+    consumptionVariance: +computeVariancePercent(cuttingPo?.cadConsumptionPerPc, cuttingPo?.bomConsumptionPerPc).toFixed(2),
     garmentProcesses: order.garmentProcesses || [],
-    consumptionOverrideNote: justification || null, items, remarks: values.remarks,
+    consumptionOverrideNote: null, items, remarks: values.remarks,
   });
 
   const save = async (submit) => {
@@ -158,26 +181,38 @@ const WorkOrderForm = () => {
       return message.warning('Enter a rate/price for every size-color row before saving');
     }
     if (submit && !(await confirmWarnings())) return;
-    setSaving(true);
+    setBusy(submit ? 'submit' : 'draft');
     try {
       const payload = buildPayload(values);
       const saved = isEdit ? await updateWorkOrder(id, payload) : await createWorkOrder(payload);
-      if (submit) await changeWorkOrderStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeWorkOrderStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.workOrderNo} ${submit ? 'submitted' : 'saved'}`);
       navigate('/purchase-orders/work-order/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
-    } finally { setSaving(false); }
+    } finally { setBusy(null); }
   };
 
   if (booting) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
   const ppApproved = isPpApproved(ppStatus);
+  const blockedByJobWork = jobWorkGaps.length > 0;
   const isVendor = unitType === PROCESSING_UNIT_TYPE.VENDOR;
 
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
-        {ppStatus && <PpSampleGate status={ppStatus} />}
+        <ReferBackNotice record={saved} />
+        {ppStatus && (
+          <PpSampleGate
+            status={ppStatus}
+            onMarkApproved={order ? async () => {
+              const next = await setPpApprovalStatus(order.id, 'COMPLETED');
+              setPpStatus(next);
+              message.success('PP Sample marked approved for this order');
+            } : undefined}
+          />
+        )}
         <FormSection title="Order & Cutting PO" columns={2}>
           <Form.Item name="orderId" label="Confirmed Order" rules={[{ required: true, message: 'Select an order' }]}>
             <FormSelect placeholder="Select order" disabled={isEdit} onChange={handleOrderSelect}
@@ -187,13 +222,15 @@ const WorkOrderForm = () => {
             <FormSelect placeholder="Select approved cutting PO" disabled={isEdit || !order} onChange={handleCuttingPoSelect}
               options={cuttingPos.map((c) => ({ value: c.id, label: c.cuttingPoNo }))} />
           </Form.Item>
+          {/* The cutting PO's branch; the unit picker narrows to it. Never chosen here. */}
+          <Form.Item name="branchId" hidden><Input /></Form.Item>
         </FormSection>
         {order?.garmentProcesses?.length > 0 && (
           <Alert
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message="This garment requires additional process(es)"
+            title="This garment requires additional process(es)"
             description={
               <Space wrap style={{ marginTop: 4 }}>
                 {order.garmentProcesses.map((p) => <Tag key={p} color="purple">{p}</Tag>)}
@@ -202,9 +239,22 @@ const WorkOrderForm = () => {
             }
           />
         )}
+        {jobWorkGaps.length > 0 && (
+          <Alert type="error" showIcon style={{ marginBottom: 16 }}
+            title="Raise the job-work POs for this order before its Work Order"
+            description={(
+              <Space wrap style={{ marginTop: 4 }}>
+                {jobWorkGaps.map((g) => (
+                  <Tag key={`${g.kind}-${g.requirementId}-${g.processName}`} color={g.kind === 'GARMENT' ? 'purple' : 'geekblue'}>
+                    {JOB_WORK_PO[g.kind]} · {g.processName} ({g.requirementNo})
+                  </Tag>
+                ))}
+              </Space>
+            )} />
+        )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-            message={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
+            title={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
         )}
         {coverage && (
           <OrderCoveragePanel orderQty={coverage.orderQty} authorizedQty={coverage.authorizedQty}
@@ -239,10 +289,6 @@ const WorkOrderForm = () => {
         <SizeColorMatrix items={items} onChange={onItemsChange} editable allowanceEditable={false} plannedQtyEditable />
       </>
     ) },
-    { key: 'consumption', label: 'Consumption', disabled: !cuttingPo, children: (
-      <ConsumptionComparisonPanel rows={consumption} mode="inherited" onChange={setConsumption}
-        justification={justification} onJustificationChange={setJustification} />
-    ) },
     { key: 'stock', label: 'Trim Stock', disabled: !order, children: (
       <MaterialStockPanel rows={stock} materialType="trim" allocatedEditable onChange={setStock} onShortageChange={setHasShortage} />
     ) },
@@ -251,9 +297,12 @@ const WorkOrderForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={isEdit ? 'Edit Work Order' : 'New Work Order'} backPath="/purchase-orders/work-order/list">
-        <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} disabled={!cuttingPo} />
-        <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!cuttingPo || !ppApproved}
-          tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
+        {/* A new Work Order waits for its job-work POs; a saved draft can still be edited, not submitted */}
+        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft', !cuttingPo || (!isEdit && blockedByJobWork))}
+          tooltip={!isEdit && blockedByJobWork ? JOB_WORK_GAP_TIP : undefined} onClick={() => save(false)} />
+        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !cuttingPo || !ppApproved || blockedByJobWork)}
+          tooltip={blockedByJobWork ? JOB_WORK_GAP_TIP : (!ppApproved ? 'PP Sample not yet approved for this order' : undefined)}
+          onClick={() => save(true)} />
       </PageHeader>
       <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>
     </div>

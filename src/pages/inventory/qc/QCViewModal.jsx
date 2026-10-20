@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Row, Col, Card, Table, Tag, Typography, Avatar, Divider, Alert, Space, Skeleton } from 'antd';
 import useResponsive from '../../../hooks/useResponsive';
 import {
@@ -16,7 +16,7 @@ import {
 import StatusTag from '../../../components/StatusTag';
 import { ActionButton } from '../../../components/buttons';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { QC_STATUS, ROLL_RESULT, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { formatNumber, formatDate } from '../../../utils/formatters';
 import { generateFabricQCPdf } from '../../../utils/fabricQCPdfGenerator';
 import { generateTrimsQCPdf } from '../../../utils/trimsQCPdfGenerator';
@@ -53,12 +53,24 @@ const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase',
 
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text> },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => <Text code style={{ fontSize: 12 }}>{r.variantCode || v || '—'}</Text> },
   { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
   { title: 'Width', dataIndex: 'stdWidth', align: 'center', width: 100 },
   { title: 'GSM', dataIndex: 'stdGsm', align: 'center', width: 100 },
   { title: 'Actual Width', dataIndex: 'actualWidth', align: 'center', width: 110 },
   { title: 'Actual GSM', dataIndex: 'actualGsm', align: 'center', width: 110 },
+  {
+    // Recorded verdict. Inspections saved before the result became a stored field
+    // have none — shown as a dash rather than guessed at.
+    title: 'Result',
+    dataIndex: 'result',
+    align: 'center',
+    width: 100,
+    render: (v) =>
+      v === ROLL_RESULT.PASS ? <Tag color="success">PASS</Tag>
+        : v === ROLL_RESULT.FAIL ? <Tag color="error">FAIL</Tag>
+        : <Text type="secondary">—</Text>,
+  },
 ];
 
 const fabricDefectColumns = [
@@ -80,12 +92,24 @@ const trimsCriteriaColumns = [
   { title: 'Remarks', dataIndex: 'remarks', align: 'center', ellipsis: true },
 ];
 
-const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) => {
+/**
+ * `onUpdated` fires whenever an approval action changes the QC server-side.
+ * The modal adopts the returned record itself; the parent needs the signal to
+ * reload its list, otherwise the row behind the modal keeps the old status
+ * until the page is reloaded. It is called with `null` when the action
+ * succeeded but the follow-up refetch did not — the list must still reload.
+ */
+const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric', onUpdated }) => {
   const [qc, setQc] = useState(initialRecord);
   const { isMobile, isTablet } = useResponsive();
   const modalWidth = isMobile ? '100vw' : isTablet ? '94vw' : 1200;
 
   useEffect(() => { setQc(initialRecord); }, [initialRecord]);
+
+  const handleQcUpdated = useCallback((updated) => {
+    if (updated) setQc(updated);
+    onUpdated?.(updated);
+  }, [onUpdated]);
 
   const isFabric = type === 'fabric';
   const accent = HERO_ACCENT[qc?.status] || 'var(--primary-color)';
@@ -95,22 +119,9 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
     if (isFabric) {
       const rolls = qc.rolls || [];
       const defects = qc.defects || [];
-      const defectsByRoll = new Map();
-      defects.forEach((d) => {
-        const arr = defectsByRoll.get(d.rollNumber) || [];
-        arr.push(d);
-        defectsByRoll.set(d.rollNumber, arr);
-      });
-      let passed = 0;
-      let failed = 0;
-      rolls.forEach((r) => {
-        const widthOk = r.stdWidth && r.actualWidth != null && Math.abs(r.actualWidth - r.stdWidth) <= r.stdWidth * 0.05;
-        const gsmOk = r.stdGsm && r.actualGsm != null && Math.abs(r.actualGsm - r.stdGsm) <= r.stdGsm * 0.05;
-        const dc = (defectsByRoll.get(r.rollNumber) || []).reduce((s, d) => s + (Number(d.count) || 0), 0);
-        if (r.actualWidth == null || r.actualGsm == null) return;
-        if (widthOk && gsmOk && dc <= 3) passed += 1;
-        else failed += 1;
-      });
+      // Read back the inspector's recorded verdict rather than re-deriving one.
+      const passed = rolls.filter((r) => r.result === ROLL_RESULT.PASS).length;
+      const failed = rolls.filter((r) => r.result === ROLL_RESULT.FAIL).length;
       return { rolls: rolls.length, passed, failed, defects: defects.length, criteria: 0, ok: 0, notOk: 0 };
     }
     const criteria = qc.criteriaRows || qc.criteriaChecks || [];
@@ -148,7 +159,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                 onClick={() => (isFabric ? generateFabricQCPdf(qc) : generateTrimsQCPdf(qc))}
               />
             )}
-            <QCApprovalActions qc={qc} type={type} onUpdated={(updated) => setQc(updated)} />
+            <QCApprovalActions qc={qc} type={type} onUpdated={handleQcUpdated} />
           </Space>
           <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
@@ -389,8 +400,8 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
 
             {(qc.referBackReason || qc.rejectionReason) && (
               <div style={{ marginBottom: 20 }}>
-                {qc.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} message="Refer-back reason" description={qc.referBackReason} />}
-                {qc.rejectionReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} message="Rejection reason" description={qc.rejectionReason} />}
+                {qc.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} title="Refer-back reason" description={qc.referBackReason} />}
+                {qc.rejectionReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} title="Rejection reason" description={qc.rejectionReason} />}
               </div>
             )}
 
@@ -406,7 +417,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 840 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${qc.rolls.indexOf(r)}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 840 }} />
               </Card>
             )}
 
@@ -422,7 +433,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricDefectColumns} dataSource={qc.defects} pagination={false} size="small" scroll={{ x: 600 }} />
+                <Table rowKey={(r) => `${r.rollNumber}-${qc.defects.indexOf(r)}`} columns={fabricDefectColumns} dataSource={qc.defects} pagination={false} size="small" scroll={{ x: 600 }} />
               </Card>
             )}
 

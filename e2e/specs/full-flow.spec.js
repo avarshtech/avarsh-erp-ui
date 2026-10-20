@@ -7,18 +7,16 @@
  * Run: npx playwright test --project=full-flow
  */
 
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { createAuthenticatedClient } from '../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antDatePickerToday } from '../helpers/antd-helpers.js';
+import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
+
+// The credentials every other spec signs in with (e2e/helpers/navigation.js): the e2e seed's
+// superadmin (admin123) by default; any other database needs E2E_PASSWORD set explicitly.
+const E2E_USERNAME = process.env.E2E_USERNAME || 'superadmin';
+const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin123';
 
 const runId = Date.now();
-const today = new Date().toISOString().split('T')[0];
-const futureDate = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-};
-
 /** Navigate, re-login if needed, wait for ready */
 async function goTo(page, path) {
   await page.goto(path);
@@ -29,8 +27,8 @@ async function goTo(page, path) {
     sidebar.waitFor({ state: 'visible', timeout: 10000 }),
   ]).catch(() => {});
   if (await loginField.isVisible().catch(() => false)) {
-    await loginField.fill('superadmin');
-    await page.getByPlaceholder('Password').fill('admin123');
+    await loginField.fill(E2E_USERNAME);
+    await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
       page.getByRole('button', { name: /Sign In/i }).click(),
@@ -48,12 +46,6 @@ async function dismissModals(page) {
   if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) await btn.click();
 }
 
-/** Helper to pick a select option within a specific row/context */
-async function selectInContext(page, container, optionText, opts = {}) {
-  const sel = container.locator('.ant-select').first();
-  await antSelect(page, sel, optionText, opts);
-}
-
 test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('avarsh-notif-prompt-dismissed', Date.now().toString());
@@ -67,9 +59,9 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     console.log('\n  ── LOGIN ──────────────────────────────────────');
     await page.goto('/login');
     await page.waitForLoadState('networkidle');
-    await page.getByPlaceholder('Username').fill('superadmin');
+    await page.getByPlaceholder('Username').fill(E2E_USERNAME);
     await page.waitForTimeout(600);
-    await page.getByPlaceholder('Password').fill('admin123');
+    await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
     await page.waitForTimeout(600);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
@@ -155,7 +147,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
 
     if (costSheetId) {
       const { data: draft } = await api.get(`/cost-sheets/${costSheetId}`);
-      const { data: result } = await api.post('/cost-sheets', { ...draft, status: 'Final' });
+      const { data: result } = await api.post(`/cost-sheets/${costSheetId}/submit`, { version: draft.version });
       if (result.status === 'Final') {
         const { data: f } = await api.get(`/cost-sheets/${costSheetId}`);
         await api.post('/cost-sheets', { ...f, status: 'Approved' });
@@ -315,7 +307,6 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     }
 
     const bomId = bomData?.id;
-    const bomVersion = bomData?.version;
     console.log(`  ✓ BOM ID: ${bomId}`);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -327,7 +318,9 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     console.log('  ✓ BOM List loaded');
 
     if (bomId != null) {
-      await api.patch(`/boms/${bomId}/status`, { status: 'CREATED', version: bomVersion ?? 0 });
+      // Released by its own command, sent the version the BOM holds now
+      const { data: bomNow } = await api.get(`/boms/${bomId}`);
+      await api.post(`/boms/${bomId}/release`, { version: bomNow.version });
       console.log(`  ✓ BOM FINALIZED — id=${bomId} → CREATED`);
     }
     await page.reload();
@@ -339,7 +332,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PHASE 4: PURCHASE ORDER — Supplier, Dates, T&C, Line Item
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PHASE 4: NEW PURCHASE ORDER ────────────────');
-    await goTo(page, '/purchase-orders/new');
+    await goTo(page, '/purchase-orders/supplier-po/new');
     await dismissModals(page);
     await page.waitForTimeout(2000);
 
@@ -384,7 +377,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PO LIST
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PO LIST ────────────────────────────────────');
-    await goTo(page, '/purchase-orders/list');
+    await goTo(page, '/purchase-orders/supplier-po/list');
     await page.waitForTimeout(2500);
     console.log('  ✓ PO List loaded');
 

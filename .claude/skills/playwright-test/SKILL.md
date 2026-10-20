@@ -1,8 +1,9 @@
 ---
 name: playwright-test
 description: >
-  Create, run, and fix Playwright E2E tests for the Avarsh ERP UI with headed browser and slow motion
-  so the user can visually watch each step. Records video of every test run. Use this skill whenever
+  Create, run, and fix Playwright E2E tests for the Avarsh ERP UI, against the local e2e stack only.
+  Runs headless by default; headed (and slowed down) only when the user wants to watch locally,
+  never in CI. Use this skill whenever
   the user asks to: write E2E tests, test a page/module, create Playwright specs, record a test,
   run tests visually, debug a failing test, fix flaky tests, or says anything like "test this page",
   "write a spec for X", "run the tests", "check if X works", "record a test for Y", "watch the test",
@@ -12,14 +13,26 @@ description: >
 
 # Playwright Test Skill
 
-Create, execute, and fix Playwright E2E tests for the Avarsh Garment ERP UI. Every test run uses a **headed browser with slow motion** so the user can see exactly what's happening, and **records video** for future reference.
+Create, execute, and fix Playwright E2E tests for the Avarsh Garment ERP UI. The rules for specs are
+rules 42–45 of [`docs/engineering/ui-standards.md`](../../../docs/engineering/ui-standards.md); how to run
+the stack, the projects, the fixtures and the known failures are in [`e2e/README.md`](../../../e2e/README.md).
+Read both before writing or running a spec.
 
 ## Core Principles
 
-1. **Headed + SlowMo always** — Tests run with `headless: false` and `slowMo: 800` so the user watches each action in real-time. This is non-negotiable for this skill.
-2. **Video recording on every run** — Every test records video saved to `e2e/videos/`. These persist for the user to review later.
-3. **Follow existing patterns** — The project already has robust helpers and conventions in `e2e/`. Never reinvent what already exists.
-4. **Fix what you break** — When tests fail, diagnose the root cause. Ask the user whether it's a test issue or an app bug before fixing.
+1. **Local stack only** — specs run against the e2e API on 8088 (H2, rebuilt at every boot) and
+   `vite --mode e2e` on a pinned port. `e2e/config/env.js` refuses any other server unless
+   `E2E_ALLOW_REMOTE=1`; never set it to reach a shared or production API.
+2. **Headless by default; headed only to watch** — when the user wants to watch locally, run with
+   `--headed` (or `--ui` to step through). CI is always headless (`CI` set). Do not make headed or
+   slow motion the default in any config.
+3. **New specs use the fixtures** — `import { test, expect } from '../../fixtures.js'`: `authedPage`
+   (signed in per test through the API), `api` (an API client per worker) and `consoleGuard`
+   (fails on a page or console error). Seed through the API with unique data; no `waitForTimeout`,
+   no empty `.catch()`, no copied helpers, no passwords or production URLs.
+4. **Follow existing patterns** — reuse `e2e/helpers/`; never reinvent what already exists.
+5. **Fix what you break** — when tests fail, diagnose the root cause. Ask the user whether it's a
+   test issue or an app bug before fixing app code. Check the known failures in e2e/README.md first.
 
 ---
 
@@ -69,39 +82,23 @@ Every test file must follow this structure:
  *   - {any seed data or setup needed}
  */
 
-import { test, expect } from '@playwright/test';
-import {
-  antSelect, antDatePickerToday, antTableWaitForData,
-  antModalConfirm, antPopconfirmYes, antMessageContains,
-  antFormFill, antFormSelect, antDrawerWaitOpen, antDrawerClose
-} from '../../helpers/antd-helpers.js';
-import {
-  navigateWithAuth, ensureSessionActive, goToListPage,
-  goToModule, waitForPageReady, goToMasterEntity
-} from '../../helpers/navigation.js';
+import { test, expect } from '../../fixtures.js';
+import { antTableWaitForData } from '../../helpers/antd-helpers.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
 
-test.beforeEach(async ({ page }) => {
-  await ensureSessionActive(page);
-
-  // Capture browser errors for debugging
-  page.on('console', (msg) => {
-    if (msg.type() === 'error' || msg.type() === 'warning') {
-      console.log(`[browser:${msg.type()}] ${msg.text()}`);
-    }
-  });
-  page.on('pageerror', (err) => {
-    console.log(`[browser:pageerror] ${err.message}`);
-  });
-});
-
 test.describe('{Module Name} — {Test Category}', () => {
-  test('{descriptive test name}', async ({ page }) => {
-    // Test implementation using helpers
+  test('{descriptive test name}', async ({ api, authedPage, consoleGuard }) => {
+    // Seed through `api`, drive the screen through `authedPage`; consoleGuard fails the test on a
+    // page error or console error.
+    await authedPage.goto('/{route}');
+    await antTableWaitForData(authedPage);
   });
 });
 ```
+
+Older specs use `@playwright/test` with the saved login (`ensureSessionActive`, `navigateWithAuth`);
+leave them as they are unless you are asked to migrate them.
 
 ### Must-Use Helpers
 
@@ -119,7 +116,10 @@ Never write raw selectors for Ant Design components. Always use the helpers from
 | Select in form by label | `antFormSelect(page, label, text)` | `antd-helpers.js` |
 | Open drawer | `antDrawerWaitOpen(page)` | `antd-helpers.js` |
 | Close drawer | `antDrawerClose(page)` | `antd-helpers.js` |
-| Navigate with auth | `navigateWithAuth(page, path)` | `navigation.js` |
+| Signed-in page per test | the `authedPage` fixture | `fixtures.js` |
+| API client (seed, verify) | the `api` fixture | `fixtures.js` |
+| Fail on console errors | the `consoleGuard` fixture | `fixtures.js` |
+| Navigate with auth (older specs) | `navigateWithAuth(page, path)` | `navigation.js` |
 | Session setup | `ensureSessionActive(page)` | `navigation.js` |
 | Go to list page | `goToListPage(page, path)` | `navigation.js` |
 | Go to master entity | `goToMasterEntity(page, name)` | `navigation.js` |
@@ -202,60 +202,47 @@ expect(response.status()).toBeLessThan(300);
 
 ## Phase 2: Running Tests
 
-### Headed + SlowMo + Video (Default)
+### Scope: the affected spec file(s) only (owner's rule, 2026-10-06)
 
-Always run tests with this command so the user can watch:
+Run only the spec file(s) that cover the screen or flow you changed — like a unit test. A whole module
+folder, a whole project, several projects or the full suite run **only when the user asks** for them
+(the full suite took 2.2 h on this machine). Boot the local e2e stack only when a spec must run, reuse
+it across iterations, and stop it when done. A failure in a spec you did not touch is reported, not
+investigated, unless the user asks. Same rule as erp-dev SKILL.md Rule 7.
+
+### Running a spec
+
+Start the local stack first (e2e/README.md): the API on 8088 with the e2e profile, then
+`npx vite --mode e2e --port 3001 --strictPort`, warmed with one request to `/src/main.jsx`.
 
 ```bash
-E2E_HEADED=1 npx playwright test e2e/specs/{module}/ \
-  --headed \
-  --project={project-name} \
-  --reporter=list \
-  -- --slow-mo=800 \
-  2>&1
+E2E_BASE_URL=http://localhost:3001 E2E_PASSWORD=admin123 \
+  npx playwright test e2e/specs/{module}/{file}.spec.js --project={project-name} --reporter=list
 ```
 
-If the test isn't in a specific project, or for running a single spec file:
+### Watching it (local only, when the user asks)
+
+Add `--headed` to see the browser, or use `--ui` to step through and replay. Playwright has no
+`--slow-mo` or `--video` CLI flag: slow motion and always-on video are config settings, used
+by the `full-flow` demo in `playwright.demo.config.js`. For a one-off slowed run, copy that
+project's `use` block into a temporary config; do not change the main config.
+
+### Video and traces
+
+`playwright.config.js` keeps videos and screenshots of failed tests (`test-results/`), and records
+a trace on the first retry; local runs do not retry, so pass `--trace on` when you need one. CI
+uploads the report, junit and traces as artifacts.
+
+### Running All Tests (only when the user asks)
 
 ```bash
-npx playwright test e2e/specs/{module}/{file}.spec.js \
-  --headed \
-  --config=playwright.config.js \
-  2>&1
+E2E_BASE_URL=http://localhost:3001 npx playwright test --reporter=list   # runs every project; nightly CI does this
 ```
 
-To ensure headed + slowMo + video regardless of config, create a temporary override config or use the existing `full-flow` project settings as reference.
-
-**Recommended approach** — run using the Bash tool with environment variables:
+### Running a Specific Module (only when the user asks)
 
 ```bash
-E2E_HEADED=1 npx playwright test {spec-path} \
-  --headed \
-  --reporter=list
-```
-
-The `E2E_HEADED` env var is already wired in `playwright.config.js` to disable headless mode.
-
-### Video Recording
-
-Videos are configured in `playwright.config.js` (`video: 'retain-on-failure'`). The `--video` flag is NOT a valid Playwright CLI option — do NOT pass it on the command line.
-
-To record video on all runs (not just failures), the `full-flow` project already has `video: 'on'`. For other projects, videos are automatically saved on failure to `test-results/` directory.
-
-After a test run, inform the user where videos are stored and how to view them:
-- **HTML report:** `npx playwright show-report e2e-report`
-- **Test results:** `test-results/{test-name}/video.webm`
-
-### Running All Tests
-
-```bash
-E2E_HEADED=1 npx playwright test --headed --reporter=list
-```
-
-### Running a Specific Module
-
-```bash
-E2E_HEADED=1 npx playwright test e2e/specs/{module}/ --headed --project={project-name} --reporter=list
+E2E_BASE_URL=http://localhost:3001 npx playwright test --project={project-name} --reporter=list
 ```
 
 ### Viewing Results
@@ -326,7 +313,7 @@ When a test fails, follow this sequence:
 | API returned 4xx/5xx | Backend issue or wrong request payload | App code (ask user first) |
 | Unexpected text/value | Business logic changed | Could be either — investigate |
 | Flaky pass/fail | Race condition, animation timing | Test code — add proper waits |
-| Auth redirect to /login | Session expired, token issue | Test setup — check `ensureSessionActive` |
+| Auth redirect to /login | A shared saved login went stale (the API rotates refresh tokens) | Use the `authedPage` fixture |
 
 ### 3. Fix Strategy
 
@@ -343,10 +330,10 @@ For test code fixes, common solutions:
 
 ### 4. Re-run After Fix
 
-After fixing, always re-run the specific failing test in headed mode to verify:
+After fixing, re-run the specific failing test (headed if the user wants to watch):
 
 ```bash
-E2E_HEADED=1 npx playwright test {spec-path} --headed --reporter=list --video=on
+E2E_BASE_URL=http://localhost:3001 npx playwright test {spec-path} --project={project-name} --reporter=list
 ```
 
 ---
@@ -364,13 +351,10 @@ Read `references/project-config.md` for details on the existing Playwright setup
 
 ## Checklist Before Delivering a Test
 
-- [ ] Uses existing helpers from `e2e/helpers/` (never raw Ant Design selectors)
-- [ ] Has `ensureSessionActive(page)` in `beforeEach`
-- [ ] Captures browser console errors for debugging
-- [ ] Uses `STAMP()` or `test-data.js` factories for unique test data
-- [ ] Waits for API responses on mutations (create/update/delete)
-- [ ] Uses role/text selectors over CSS selectors
-- [ ] File placed in correct `e2e/specs/{module}/` directory
-- [ ] Test names are descriptive (describe what the test proves)
-- [ ] No hardcoded IDs or data that could conflict between runs
-- [ ] Ran successfully in headed mode with user watching
+- [ ] New spec imports `test`/`expect` from `e2e/fixtures.js` and uses `authedPage`, `api`, `consoleGuard`
+- [ ] Uses existing helpers from `e2e/helpers/`; role, label or `#id` selectors before `.ant-*` classes
+- [ ] Unique data via `STAMP()` or the `test-data.js` factories, seeded through the API
+- [ ] Waits for API responses on mutations (create/update/delete); no `waitForTimeout`, no empty `.catch()`
+- [ ] No hardcoded IDs, passwords or production URLs
+- [ ] File placed in the right `e2e/specs/{module}/` folder; test names say what the test proves
+- [ ] Ran green against the local e2e stack (headed only if the user watched)

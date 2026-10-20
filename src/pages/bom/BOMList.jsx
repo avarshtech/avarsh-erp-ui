@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   App,
   Table,
@@ -19,28 +19,34 @@ import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
 import SearchFilterBar from '../../components/SearchFilterBar';
 import RecordLink from '../../components/RecordLink';
+import SampleOrderTag from '../../components/SampleOrderTag';
 import EmptyState from '../../components/EmptyState';
 import { BOM_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getTablePagination } from '../../utils/paginationConfig';
-import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import useServerList from '../../hooks/useServerList';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 
 const { Text } = Typography;
+
+const BOM_FILTERS = { status: undefined };
+const BOM_LIST_OPTIONS = { defaultSort: { field: 'id', order: 'descend' }, urlState: true };
+
+const fetchBomPage = ({ page, size, search, sort, direction, status }) => {
+  const params = { page: page - 1, size, sort, direction };
+  if (search) params.search = search;
+  if (status) params.status = status;
+  return searchBoms(params);
+};
 
 const BOMList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const { isSampleOrder } = useSampleOrderNos();
   const [deletingId, setDeletingId] = useState(null);
-  const [data, setData] = useState([]);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
-  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [statusFilter, setStatusFilter] = useState(undefined);
-  const [sortField, setSortField] = useState('id');
-  const [sortDirection, setSortDirection] = useState('desc');
+  // Page, sort, search and filters live in the URL, so a refresh or the way back from a form keeps them;
+  // with no column sorter the list is newest first (id descending), as it always was.
+  const list = useServerList(fetchBomPage, BOM_FILTERS, 'Failed to load BOMs', BOM_LIST_OPTIONS);
+  const { load: reload, sortOrderFor } = list;
 
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -48,49 +54,8 @@ const BOMList = () => {
 
   // Permissions
   const canView = hasPermission('bom', 'view');
-  const canAdd = hasPermission('bom', 'add');
   const canUpdate = hasPermission('bom', 'update');
   const canDelete = hasPermission('bom', 'delete');
-
-  const fetchData = useCallback(async (page, size, sort, direction) => {
-    setLoading(true);
-    try {
-      const params = {
-        page: (page || pagination.current) - 1,
-        size: size || pagination.pageSize,
-        sort: sort || sortField,
-        direction: direction || sortDirection,
-      };
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (statusFilter) params.status = statusFilter;
-
-      const res = await searchBoms(params);
-      setData(res.content || []);
-      setPagination((prev) => ({
-        ...prev,
-        current: (res.page ?? 0) + 1,
-        pageSize: res.size || prev.pageSize,
-        total: res.totalElements || 0,
-      }));
-    } catch {
-      message.error('Failed to load BOMs');
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, statusFilter, pagination.current, pagination.pageSize, sortField, sortDirection]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Table change (pagination, sorting)
-  const handleTableChange = (pag, _filters, sorter) => {
-    const newSort = sorter.field || sortField;
-    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
-    setSortField(newSort);
-    setSortDirection(newDirection);
-    fetchData(pag.current, pag.pageSize, newSort, newDirection);
-  };
 
   // Delete
   const handleDelete = useCallback(async (record) => {
@@ -98,13 +63,13 @@ const BOMList = () => {
     try {
       await deleteBom(record.id);
       message.success(`${record.orderNo} deleted successfully`);
-      fetchData(pagination.current, pagination.pageSize);
+      reload();
     } catch {
       message.error('Failed to delete BOM');
     } finally {
       setDeletingId(null);
     }
-  }, [fetchData, pagination.current, pagination.pageSize]);
+  }, [reload, message]);
 
   // View
   const handleView = useCallback((record) => {
@@ -127,8 +92,12 @@ const BOMList = () => {
       fixed: 'left',
       width: 160,
       sorter: true,
+      sortOrder: sortOrderFor('orderNo'),
       render: (text, record) => (
-        <RecordLink text={text} onClick={() => handleView(record)} />
+        <span style={{ whiteSpace: 'nowrap' }}>
+          <RecordLink text={text} onClick={() => handleView(record)} />
+          {isSampleOrder(text) && <SampleOrderTag />}
+        </span>
       ),
     },
     {
@@ -137,6 +106,7 @@ const BOMList = () => {
       key: 'styleName',
       width: 140,
       sorter: true,
+      sortOrder: sortOrderFor('styleName'),
       render: (text) => <Text strong>{text || '-'}</Text>,
     },
     {
@@ -168,7 +138,7 @@ const BOMList = () => {
       key: 'totalPurchaseQty',
       width: 130,
       align: 'right',
-      sorter: true,
+      // Summed from the lines, so the server cannot sort by it (it answered a 500 before API 7120044)
       render: (qty) => qty ? <Text strong>{Number(qty).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text> : '-',
     },
     {
@@ -218,7 +188,7 @@ const BOMList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, isSampleOrder, sortOrderFor]);
 
   return (
     <div className="animate-fade-in-up">
@@ -234,33 +204,33 @@ const BOMList = () => {
 
       <Card>
         <SearchFilterBar
-          searchText={searchText}
-          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchText={list.searchText}
+          onSearchChange={(e) => list.setSearchText(e.target.value)}
           searchPlaceholder="Search order no, style, buyer..."
           filters={[
             {
               type: 'select',
               props: {
                 placeholder: 'Status',
-                value: statusFilter,
-                onChange: setStatusFilter,
+                value: list.filters.status,
+                onChange: list.setFilter('status'),
                 options: statusFilterOptions,
               },
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
             },
           ]}
-          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          onRefresh={reload}
           style={{ marginBottom: 16 }}
         />
 
         <Table
           columns={columns}
-          dataSource={data}
-          loading={loading}
+          dataSource={list.rows}
+          loading={list.loading}
           rowKey="id"
           scroll={{ x: 1000 }}
-          onChange={handleTableChange}
-          pagination={getTablePagination(pagination, 'BOMs')}
+          onChange={list.onTableChange}
+          pagination={getTablePagination({ ...list.pagination, total: list.total }, 'BOMs')}
           locale={{
             emptyText: (
               <EmptyState
@@ -283,7 +253,7 @@ const BOMList = () => {
         onStatusChange={() => {
           setViewModalVisible(false);
           setViewingBom(null);
-          fetchData(pagination.current, pagination.pageSize);
+          reload();
         }}
       />
     </div>

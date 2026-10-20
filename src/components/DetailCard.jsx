@@ -37,10 +37,16 @@ const Field = memo(({
 
 Field.displayName = 'DetailCard.Field';
 
+/**
+ * A titled section card — primary icon + title (+ `count` pill), `extra` on the right — whose body is a grid of
+ * `DetailCard.Field`s, or, with `bare`, any content (a table, a form) without the grid.
+ */
 const DetailCard = memo(({
   title,
   icon,
+  count,
   extra,
+  bare = false,
   gutter = [24, 14],
   className,
   style,
@@ -62,20 +68,32 @@ const DetailCard = memo(({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 8,
         padding: '14px 20px',
         borderBottom: '1px solid var(--border-color)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14 }}>
           {icon && <span style={{ display: 'flex', color: 'var(--primary-color)' }}>{icon}</span>}
           <span>{title}</span>
+          {count != null && (
+            <span style={{
+              fontSize: 12, fontWeight: 600, lineHeight: '18px', padding: '0 8px', borderRadius: 999,
+              color: 'var(--primary-color)', background: 'color-mix(in srgb, var(--primary-color) 12%, transparent)',
+            }}>
+              {count}
+            </span>
+          )}
         </div>
         {extra && <div>{extra}</div>}
       </div>
     )}
     <div style={{ padding: '16px 20px' }}>
-      <Row gutter={gutter}>
-        {children}
-      </Row>
+      {bare ? children : (
+        <Row gutter={gutter}>
+          {children}
+        </Row>
+      )}
     </div>
   </div>
 ));

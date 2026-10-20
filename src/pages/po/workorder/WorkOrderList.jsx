@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Table, Card, Space } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -8,22 +8,28 @@ import StatusTag from '../../../components/StatusTag';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import ProductionPoView from '../components/ProductionPoView';
+import PoNoLink from '../components/PoNoLink';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   PROD_PO_STATUS, getStatusLabel, EDITABLE_STATUSES, PROCESSING_UNIT_OPTIONS, PO_TYPE,
 } from '../../../utils/productionConstants';
-import { listWorkOrders } from '../../../services/po/productionService';
-import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { listWorkOrders, getWorkOrder } from '../../../services/po/production/workOrderService';
+import { printWorkOrder } from '../../../utils/workOrderPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
 const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) * (i.ratePerPiece || 0), 0);
 
 const WorkOrderList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters this list server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [status, setStatus] = useState();
   const [unitType, setUnitType] = useState();
@@ -46,43 +52,66 @@ const WorkOrderList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, unitType, buyer, dateRange, message]);
+  }, [debouncedSearch, status, unitType, buyer, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep link from My Approvals (?viewId=X) — GRNList pattern.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getWorkOrder(viewId)
+      .then((wo) => wo && setView({ open: true, record: wo }))
+      .catch(() => message.error('Work Order not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const printRow = useCallback(async (r) => {
+    try {
+      if (!(await printWorkOrder(r.id))) message.warning('Allow pop-ups for this site to print the work order');
+    } catch (e) {
+      message.error(e.message || 'Could not prepare the work order print');
+    }
+  }, [message]);
 
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
 
   const columns = useMemo(() => [
-    { title: 'Work Order', dataIndex: 'workOrderNo', width: 150, fixed: 'left' },
+    { title: 'Work Order', dataIndex: 'workOrderNo', width: 150, fixed: 'left',
+      render: (v, r) => <PoNoLink text={v} onOpen={() => setView({ open: true, record: r })} /> },
     { title: 'Order', dataIndex: 'orderNo', width: 130 },
     { title: 'Style', dataIndex: 'styleNo', width: 130 },
     { title: 'Buyer', dataIndex: 'buyer', width: 150, ellipsis: true },
     { title: 'Cutting PO', dataIndex: 'cuttingPoNo', width: 150 },
+    ...branchColumn,
     { title: 'Processing Unit', dataIndex: 'processingUnitName', width: 180, ellipsis: true },
     { title: 'Start Date', dataIndex: 'plannedStartDate', width: 110, render: fmtDate },
-    { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
-    { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString() },
+    { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString('en-IN') },
+    { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString('en-IN') },
     { title: 'PO Value', key: 'poValue', width: 120, align: 'right', render: (_, r) => `₹ ${poValue(r).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
     { title: 'Status', dataIndex: 'status', width: 150, align: 'center',
       render: (s) => <StatusTag status={s} config={PRODUCTION_PO_STATUS_CONFIG} getLabel={getStatusLabel} /> },
     { title: 'Actions', key: 'actions', width: 140, fixed: 'right',
-      render: (_, r) => (
+      // a cancelled PO has nothing left to do: open it from its number instead
+      render: (_, r) => (r.status === PROD_PO_STATUS.CANCELLED ? null : (
         <Space size={0}>
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
-          <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.WORK_ORDER)} />
+          <ActionButton action="print" onClick={() => printRow(r)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="work-order" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/work-order/edit/${r.id}`)} />
             </PermissionGuard>
           )}
         </Space>
-      ) },
-  ], [navigate]);
+      )) },
+  ], [navigate, branchColumn, printRow]);
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Work Orders (Sewing)">
-        <PermissionGuard module="production" operation="add">
+        <PermissionGuard module="work-order" operation="add">
           <ActionButton action="create" text="New Work Order" onClick={() => navigate('/purchase-orders/work-order/new')} />
         </PermissionGuard>
       </PageHeader>

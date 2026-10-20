@@ -33,10 +33,11 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import { useTheme } from '../../context/ThemeContext';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../utils/permissions';
-import { createBom, updateBom, getBomById } from '../../services/bom/bomService';
+import { createBom, updateBom, getBomById, releaseBom, reopenBom } from '../../services/bom/bomService';
 import { getActiveProcesses } from '../../services/master/processService';
 import { getOrderByOrderNo, getRecentOrders } from '../../services/orders/orderService';
 import { searchItems, getItemMetaData, getItemsByIds } from '../../services/master/itemService';
@@ -47,11 +48,12 @@ import {
   QTY_CALC_BASIS,
   CONSUMPTION_MODE,
   CONSUMPTION_MODE_OPTIONS,
-  calcPurchaseQty,
+  calcLinePurchaseQty,
   calcTrimsTotal,
   buildOrderQtyGrid,
   calcMatrixTotal,
 } from '../../utils/bomConstants';
+import { conversionApplies, convertToPrimary, formatConversionLabel } from '../../utils/uomConversions';
 import ProcessAllowanceModal from './ProcessAllowanceModal';
 import ConsumptionMatrixDialog from './ConsumptionMatrixDialog';
 import ConsumptionCalcModal from '../costing/ConsumptionCalcModal';
@@ -84,10 +86,13 @@ const createEmptyLine = () => ({
   secondaryUom: '',
   secondaryUomId: null,
   uom: '',
+  uomConversionFactor: null,
+  purchaseUom: '',
   partsName: '',
   consumptionPerGarment: null,
   colorInvalid: false, // true when variant color not found in order lines
   overrideBaseQty: null, // manual base qty when variant color not in order (fabric only)
+  overrideBaseQtyColor: null, // order color the override was picked from — disambiguates colors sharing a qty
   qtyCalcBasis: 'TOTAL', // per-line calc basis
   consumptionMode: 'SIMPLE', // 'SIMPLE', 'SIZE_WISE', 'VARIANT_PER_SIZE'
   consumptionMatrix: null, // { color: { size: consumption } }
@@ -100,6 +105,13 @@ const createEmptyLine = () => ({
   isPoGenerated: false,
   remarks: '',
 });
+
+/**
+ * Sentinel option value for a base qty restored from a saved BOM whose source colour
+ * can no longer be identified — only the number is persisted, so when several order
+ * colours share that quantity the origin is genuinely unknowable.
+ */
+const SAVED_BASE_QTY = '__saved_base_qty__';
 
 /** Check if a BOM line's category is Fabric */
 const isFabricCategory = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
@@ -146,107 +158,6 @@ const variantsToTags = (variants) => {
   return Object.entries(variants)
     .filter(([, v]) => v !== '' && v != null)
     .map(([k, v]) => `${k}:${v}`);
-};
-
-// ==================== ITEM SEARCH (Debounced AutoComplete) ====================
-
-const BomItemSearch = ({ value, onSelect, onClear, disabled, categoryId, subCategoryId, itemTypeId }) => {
-  const [searchText, setSearchText] = useState(value || '');
-  const [options, setOptions] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef(null);
-  const noResultPrefixRef = useRef('');
-  const lastQueryRef = useRef('');
-
-  useEffect(() => { setSearchText(value || ''); }, [value]);
-
-  const handleSearch = (text) => {
-    setSearchText(text);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text || text.length < 3) {
-      setOptions([]);
-      lastQueryRef.current = '';
-      noResultPrefixRef.current = '';
-      return;
-    }
-    const isShortening = text.length < lastQueryRef.current.length;
-    if (isShortening && noResultPrefixRef.current) {
-      if (text.length < noResultPrefixRef.current.length ||
-          !text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        noResultPrefixRef.current = '';
-      }
-    }
-    if (noResultPrefixRef.current && text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-      setOptions([]);
-      lastQueryRef.current = text;
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await searchItems({
-          search: text,
-          categoryId,
-          subCategoryId,
-          itemTypeId,
-          size: 20,
-        });
-        const payload = response?.data || response || {};
-        const items = Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : [];
-        lastQueryRef.current = text;
-        if (items.length === 0) { noResultPrefixRef.current = text; } else { noResultPrefixRef.current = ''; }
-        setOptions(items.map((item) => {
-          const displayText = `${item.itemCode || ''} - ${item.itemName || ''}`;
-          return {
-            // value must match what handleSelect sets on searchText
-            // so that onChange (which fires after onSelect) doesn't overwrite it
-            value: item.itemName || '',
-            key: item.id,
-            label: (
-              <Tooltip title={displayText} placement="right" mouseEnterDelay={0.4}>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
-                  {displayText}
-                </div>
-              </Tooltip>
-            ),
-            item,
-          };
-        }));
-      } catch { setOptions([]); }
-      finally { setSearching(false); }
-    }, 300);
-  };
-
-  const handleSelect = (_, option) => {
-    setSearchText(option.item.itemName || '');
-    setOptions([]);
-    if (onSelect) onSelect(option.item);
-  };
-
-  const handleChange = (text) => {
-    setSearchText(text || '');
-    if (!text) {
-      setOptions([]);
-      if (onClear) onClear();
-    }
-  };
-
-  return (
-    <AutoComplete
-      value={searchText}
-      options={options}
-      onSearch={handleSearch}
-      onSelect={handleSelect}
-      onChange={handleChange}
-      placeholder={!itemTypeId ? 'Select item type first' : 'Search items (min 3 chars)...'}
-      disabled={disabled}
-      style={{ width: '100%' }}
-      size="small"
-      allowClear
-      popupMatchSelectWidth={true}
-      notFoundContent={searching ? <Spin size="small" /> : null}
-    />
-  );
 };
 
 // ==================== COMPONENT ====================
@@ -340,6 +251,10 @@ const BOMForm = () => {
 
   // ── Trims Match By Modal ────────────────────────────────────────
   const [matchByModalOpen, setMatchByModalOpen] = useState(false);
+  // UNWIRED: nothing calls setMatchByLineKey, so this stays null and the
+  // buyer-PO match panel below can never open. Kept rather than deleted because
+  // the panel itself is fully built - it just has no entry point.
+  // eslint-disable-next-line no-unused-vars
   const [matchByLineKey, setMatchByLineKey] = useState(null);
   const [matrixDialogLineKey, setMatrixDialogLineKey] = useState(null);
 
@@ -368,11 +283,18 @@ const BOMForm = () => {
     if (dropdownFetchedRef.current) return;
     dropdownFetchedRef.current = true;
     const loadData = async () => {
-      const [processResult, metaResult, partsResult] = await Promise.allSettled([getActiveProcesses(), getItemMetaData(), getActiveParts()]);
-      if (processResult.status === 'fulfilled') {
-        const res = processResult.value;
-        setProcessesList(Array.isArray(res) ? res : res?.data || []);
-      }
+      // BOM only ever offers Fabric and Trims processes — the cost categories
+      // (Manufacturing / Overheads) belong to the cost sheet. Ask the server for
+      // just those two rather than pulling every process and filtering client-side.
+      const [fabricResult, trimResult, metaResult, partsResult] = await Promise.allSettled([
+        getActiveProcesses('Fabric'), getActiveProcesses('Trims'), getItemMetaData(), getActiveParts(),
+      ]);
+      const unwrap = (r) => {
+        if (r.status !== 'fulfilled') return [];
+        const res = r.value;
+        return Array.isArray(res) ? res : res?.data || [];
+      };
+      setProcessesList([...unwrap(fabricResult), ...unwrap(trimResult)]);
       if (metaResult.status === 'fulfilled') {
         const res = metaResult.value;
         setMetaData(Array.isArray(res) ? res : res?.data || []);
@@ -437,12 +359,18 @@ const BOMForm = () => {
               itemTypeName: l.itemTypeName || '',
               variants: l.variants || {},
               variantId: l.variantId || null,
+              variantCode: l.variantCode || '',
+              variantName: l.variantName || '',
               availableVariants: [],
               primaryUom: l.uom || '',
               primaryUomId: null,
               secondaryUom: '',
               secondaryUomId: null,
               uom: l.uom || '',
+              // Saved snapshot — kept so PO-generated/untouched lines still render their
+              // original conversion; refreshed from the item master just below when editable.
+              uomConversionFactor: l.uomConversionFactor ?? null,
+              purchaseUom: l.purchaseUom || '',
               partsName: l.partsName || [],
               consumptionPerGarment: l.consumptionPerGarment,
               processes: Array.isArray(l.processes) ? l.processes.map((p) => (typeof p === 'object' ? p.id : p)) : [],
@@ -475,7 +403,12 @@ const BOMForm = () => {
                   ...line,
                   availableVariants: activeVariants,
                   primaryUom: item.uomSymbol || line.primaryUom,
+                  primaryUomId: item.uomId ?? null,
                   secondaryUom: item.secondaryUomSymbol || '',
+                  secondaryUomId: item.secondaryUomId ?? null,
+                  // Editable lines follow the item master's current factor; the saved
+                  // snapshot only survives on locked (PO-generated) lines.
+                  uomConversionFactor: item.uomConversionFactor ?? line.uomConversionFactor ?? null,
                   itemTypeId: line.itemTypeId || item.itemTypeId || null,
                 };
               });
@@ -505,7 +438,7 @@ const BOMForm = () => {
         }
       } catch {
         message.error('Failed to load BOM');
-        navigate('/bom/list');
+        navigate(listPath('/bom/list'));
       } finally {
         // Defer so React paints the form with populated values before hiding the skeleton
         requestAnimationFrame(() => setLoading(false));
@@ -721,11 +654,15 @@ const BOMForm = () => {
   const resetItemFields = {
     itemId: null, itemName: '', itemCode: '',
     variants: {}, variantId: null, availableVariants: [],
-    primaryUom: '', secondaryUom: '', uom: '',
+    primaryUom: '', secondaryUom: '', uom: '', uomConversionFactor: null, purchaseUom: '',
     consumptionPerGarment: null, colorInvalid: false,
     partsName: '', processes: [], processAllowances: [],
     consumptionMode: 'SIMPLE', consumptionMatrix: null, variantMapping: null,
   };
+
+  // Holds the latest populateLineFromItem so the earlier-defined handleItemTypeChange
+  // can call it without a temporal-dead-zone reference.
+  const populateLineFromItemRef = useRef(null);
 
   const handleCategoryChange = useCallback(
     (lineKey, categoryId) => {
@@ -767,7 +704,7 @@ const BOMForm = () => {
 
   const handleItemTypeChange = useCallback(
     (lineKey, itemTypeId, categoryId, subCategoryId) => {
-      const doChange = () => {
+      const doChange = async () => {
         const cat = metaData.find((c) => c.id === categoryId);
         const sub = (cat?.subCategories || []).find((sc) => sc.id === subCategoryId);
         const it = (sub?.itemTypes || []).find((t) => t.id === itemTypeId);
@@ -775,10 +712,24 @@ const BOMForm = () => {
           itemTypeId, itemTypeName: it?.name || '',
           ...resetItemFields,
         });
+        // The Category + Sub-Category + Item Type combination uniquely identifies one item.
+        // Resolve it and load its variants into the Variant dropdown.
+        try {
+          const res = await searchItems({ categoryId, subCategoryId, itemTypeId, page: 0, size: 1, isActive: true });
+          const payload = res?.data || res || {};
+          const item = Array.isArray(payload) ? payload[0] : payload?.content?.[0];
+          if (item) {
+            populateLineFromItemRef.current?.(lineKey, item);
+          } else {
+            message.warning('No item exists for this Category / Sub-Category / Item Type. Create it in Item Master first.');
+          }
+        } catch {
+          message.error('Failed to load the item for the selected classifiers.');
+        }
       };
       confirmIfHasData(lineKey, doChange);
     },
-    [metaData, updateLineMulti, confirmIfHasData],
+    [metaData, updateLineMulti, confirmIfHasData, message],
   );
 
   /**
@@ -796,8 +747,8 @@ const BOMForm = () => {
     // Direct substring containment
     if (vc.includes(oc) || oc.includes(vc)) return true;
     // Token-based: split variant on " / ", "/", " - " separators → check each token
-    const variantTokens = vc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
-    const orderTokens = oc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
+    const variantTokens = vc.split(/\s*[/]\s*/).map((t) => t.trim()).filter(Boolean);
+    const orderTokens = oc.split(/\s*[/]\s*/).map((t) => t.trim()).filter(Boolean);
     return variantTokens.some((vt) =>
       orderTokens.some((ot) => vt.includes(ot) || ot.includes(vt)),
     );
@@ -873,7 +824,10 @@ const BOMForm = () => {
   };
 
   // ── Item selection from autocomplete ────────────────────────────
-  const handleBomItemSelect = useCallback(
+  // Populate a BOM line from the item resolved for its Category + Sub-Category + Item Type,
+  // loading the item's active variants into the Variant dropdown. Item is uniquely identified
+  // by the classifier combination, so there is no separate item-name search.
+  const populateLineFromItem = useCallback(
     (lineKey, item) => {
       const doChange = () => {
         const line = lines.find((l) => l.key === lineKey);
@@ -896,9 +850,14 @@ const BOMForm = () => {
           primaryUomId: item.uomId || null,
           secondaryUom: item.secondaryUomSymbol || '',
           secondaryUomId: item.secondaryUomId || null,
+          // uom is the CONSUMPTION unit — what consumption/garment is entered in
           uom: item.secondaryUomSymbol || item.uomSymbol || '',
+          // Snapshotted at save time so the PO quantity converts to the purchase UOM.
+          uomConversionFactor: item.uomConversionFactor ?? null,
           availableVariants: activeVariants,
           variantId: firstVariant?.id || null,
+          variantCode: firstVariant?.variantCode || '',
+          variantName: firstVariant?.variantName || '',
           variants: firstVariant ? selectedAttrs : {},
           colorInvalid: firstVariant ? !valid : false,
           consumptionPerGarment: null,
@@ -910,21 +869,22 @@ const BOMForm = () => {
       };
       confirmIfHasData(lineKey, doChange);
     },
-    [lines, updateLineMulti, validateVariantInOrder, confirmIfHasData, isVariantDuplicate],
+    [lines, updateLineMulti, validateVariantInOrder, isVariantDuplicate, confirmIfHasData],
   );
+  populateLineFromItemRef.current = populateLineFromItem;
 
   // ── Variant selection (when item has multiple variants) ─────────
   const handleVariantSelect = useCallback(
     (lineKey, variantId) => {
       if (variantId === null) {
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, overrideBaseQtyColor: null, consumptionMatrix: null, variantMapping: null });
         return;
       }
       // Check duplicate
       if (isVariantDuplicate(variantId, lineKey)) {
         message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
         // Clear selection and keep dropdown open
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, overrideBaseQtyColor: null, consumptionMatrix: null, variantMapping: null });
         setVariantEditLineKey(lineKey);
         return;
       }
@@ -936,7 +896,7 @@ const BOMForm = () => {
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
         if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
-          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, consumptionMatrix: null, variantMapping: null } : l,
+          l.key === lineKey ? { ...l, variantId, variantCode: variant?.variantCode || '', variantName: variant?.variantName || '', variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, overrideBaseQtyColor: !valid ? l.overrideBaseQtyColor : null, consumptionMatrix: null, variantMapping: null } : l,
         );
       });
       setIsDirty(true);
@@ -1240,19 +1200,23 @@ const BOMForm = () => {
       }));
   }, [processesList]);
 
-  /** Filtered process options per line category */
+  /**
+   * Filtered process options per line category.
+   *
+   * `Process.category` routes a process to exactly one consumer: 'Manufacturing'
+   * belongs to cost sheet Section D and carries a default cost, while 'Fabric' and
+   * 'Trims' belong here and carry the allowance defaults that ProcessAllowanceModal
+   * seeds. A fabric line therefore offers only Fabric processes and a trims line only
+   * Trims processes — Manufacturing processes never appear in BOM.
+   */
   const getProcessOptionsForLine = useCallback((line) => {
-    const fabric = isFabricCategory(line);
-    const matchCategory = fabric ? 'fabric' : 'trims';
-    return allProcessOptions.filter((opt) => {
-      const cat = (opt.process.category || '').toLowerCase();
-      // Show if: category matches, or is "general", or no category set
-      return !cat || cat === 'general' || cat === matchCategory;
-    });
+    const matchCategory = isFabricCategory(line) ? 'fabric' : 'trims';
+    return allProcessOptions.filter(
+      (opt) => (opt.process.category || '').toLowerCase() === matchCategory,
+    );
   }, [allProcessOptions]);
 
   // Backward-compat: flat list used in other places (allowance dialog, payload builder)
-  const processOptions = allProcessOptions;
 
   // ==================== SUMMARY ====================
 
@@ -1273,37 +1237,11 @@ const BOMForm = () => {
       return true;
     }).length;
     const totalPurchaseQty = lines.reduce((sum, l) => {
-      const tq = computeTotalQty(l);
-      if (!tq) return sum;
-      const allowances = l.processAllowances || [];
-      if (!allowances.length) return sum + tq;
-      const cMode = l.consumptionMode || 'SIMPLE';
-      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-      if (isMatrixMode && l.consumptionMatrix) {
-        const oqg = buildOrderQtyGrid(orderLineSummary);
-        let total = 0;
-        allSizes.forEach((size) => {
-          let sizeReq = 0;
-          Object.entries(l.consumptionMatrix).forEach(([color, szMap]) => {
-            sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-          });
-          let rejTotal = 0, shipTotal = 0;
-          allowances.forEach((a) => {
-            const sa = a.sizeAllowances?.[size];
-            rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-            shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-          });
-          total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-        });
-        return sum + total;
-      }
-      const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-      const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-      const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-      return sum + calcPurchaseQty(tq, loss, rej + ship);
+      const qty = calcLinePurchaseQty(l, computeTotalQty(l), buildOrderQtyGrid(orderLineSummary), allSizes);
+      return sum + (qty || 0);
     }, 0);
     return { total, fabricLines, trimLines, completedLines, totalPurchaseQty };
-  }, [lines, computeTotalQty]);
+  }, [lines, computeTotalQty, orderLineSummary, allSizes]);
 
   // ==================== AI CONSUMPTION CALCULATOR ====================
 
@@ -1317,7 +1255,7 @@ const BOMForm = () => {
     setConsumptionModalOpen(true);
   }, []);
 
-  const handleConsumptionApply = useCallback(({ splitBySizes, consumption, uom, consumptionPerSize, sizes }) => {
+  const handleConsumptionApply = useCallback(({ splitBySizes, consumption, consumptionPerSize }) => {
     if (!consumptionLineKey) return;
     if (!splitBySizes) {
       updateLine(consumptionLineKey, 'consumptionPerGarment', consumption);
@@ -1335,56 +1273,48 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    // Every figure below is computed from the line being mapped. Reading lines[idx] here took the
+    // figures of a different line once a PO-generated line had been filtered out ahead of it (U028).
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map((line) => {
+      const { key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, overrideBaseQtyColor: _obqc, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest } = line;
+      return ({
       ...rest,
       // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
       variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
       baseQty: (() => {
-        const line = lines[idx];
         if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
           return computeMatrixTotalQty(line);
         }
         const { qty } = getColorQty(line);
         return qty || 0;
       })(),
-      totalQty: computeTotalQty(lines[idx]),
-      purchaseQty: (() => {
-        const line = lines[idx];
-        const tq = computeTotalQty(line);
-        if (!tq) return 0;
-        const allowances = rest.processAllowances || [];
-        if (!allowances.length) return tq;
-        const cMode = line.consumptionMode || 'SIMPLE';
-        const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-        if (isMatrixMode && line.consumptionMatrix) {
-          const oqg = buildOrderQtyGrid(orderLineSummary);
-          let total = 0;
-          allSizes.forEach((size) => {
-            let sizeReq = 0;
-            Object.entries(line.consumptionMatrix).forEach(([color, szMap]) => {
-              sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-            });
-            let rejTotal = 0, shipTotal = 0;
-            allowances.forEach((a) => {
-              const sa = a.sizeAllowances?.[size];
-              rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-              shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-            });
-            total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-          });
-          return total;
-        }
-        const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-        const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-        const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-        return calcPurchaseQty(tq, loss, rej + ship);
+      totalQty: computeTotalQty(line),
+      // purchaseQty stays in the consumption (secondary) UOM; purchaseQtyPrimary is the
+      // converted figure the PO is raised in. The factor is snapshotted onto the line so a
+      // later edit to the item master never rewrites this BOM or a PO generated from it.
+      ...(() => {
+        const qty = calcLinePurchaseQty(
+          line,
+          computeTotalQty(line),
+          buildOrderQtyGrid(orderLineSummary),
+          allSizes
+        ) ?? 0;
+        const factor = line.uomConversionFactor;
+        const applies = conversionApplies(line.primaryUomId, line.secondaryUomId, factor);
+        return {
+          purchaseQty: qty,
+          purchaseUom: applies ? line.primaryUom : line.uom,
+          uomConversionFactor: applies ? Number(factor) : null,
+          purchaseQtyPrimary: applies ? convertToPrimary(qty, factor) : qty,
+        };
       })(),
       // Convert process IDs to objects for JSONB storage
       processes: (rest.processes || []).map((pid) => {
         const proc = processesList.find((p) => p.id === pid);
         return proc ? { id: proc.id, processName: proc.processName } : { id: pid };
       }),
-    }));
+    });
+    });
 
     return {
       version: entityVersion,
@@ -1428,7 +1358,6 @@ const BOMForm = () => {
 
     lines.forEach((l, idx) => {
       const n = idx + 1;
-      const fabric = isFabricCategory(l);
       const cMode = l.consumptionMode || 'SIMPLE';
       const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 
@@ -1609,21 +1538,25 @@ const BOMForm = () => {
 
     setSavingDraft(true);
     try {
-      const payload = buildPayload(BOM_STATUS.DRAFT);
       const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
+      let stored;
       if (isEdit) {
-        saved = await updateBom(id, payload);
+        // The save keeps the BOM's status; one that is not a draft is reopened by its own command,
+        // sent the version the save answered
+        saved = await updateBom(id, buildPayload(bomStatus));
+        stored = saved.status === BOM_STATUS.DRAFT ? saved : await reopenBom(id, saved.version);
         message.success('BOM saved as draft');
       } else {
-        saved = await createBom(payload);
+        saved = await createBom(buildPayload(BOM_STATUS.DRAFT));
+        stored = saved;
         message.success('BOM created as draft');
       }
       await uploadStagedCadFiles(saved, priorLineIds);
-      if (saved?.version != null) setEntityVersion(saved.version);
+      if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
-      navigate('/bom/list');
+      navigate(listPath('/bom/list'));
     } catch {
       message.error('Failed to save BOM');
     } finally {
@@ -1644,21 +1577,25 @@ const BOMForm = () => {
 
     setSubmitting(true);
     try {
-      const payload = buildPayload(BOM_STATUS.CREATED);
       const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
+      let stored;
       if (isEdit) {
-        saved = await updateBom(id, payload);
+        // The save keeps the BOM's status; the release command makes it CREATED, sent the version
+        // the save answered. A new BOM is still created released.
+        saved = await updateBom(id, buildPayload(bomStatus));
+        stored = saved.status === BOM_STATUS.CREATED ? saved : await releaseBom(id, saved.version);
         message.success('BOM updated successfully');
       } else {
-        saved = await createBom(payload);
+        saved = await createBom(buildPayload(BOM_STATUS.CREATED));
+        stored = saved;
         message.success('BOM created successfully');
       }
       await uploadStagedCadFiles(saved, priorLineIds);
-      if (saved?.version != null) setEntityVersion(saved.version);
+      if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
-      navigate('/bom/list');
+      navigate(listPath('/bom/list'));
     } catch {
       message.error(isEdit ? 'Failed to update BOM' : 'Failed to create BOM');
     } finally {
@@ -1743,32 +1680,32 @@ const BOMForm = () => {
           );
         },
       },
-      // 5. Item Name (autocomplete search)
-      {
-        title: 'Item Name',
-        dataIndex: 'itemName',
-        width: 280,
-        render: (value, record) => (
-          <BomItemSearch
-            value={value || ''}
-            onSelect={(item) => handleBomItemSelect(record.key, item)}
-            onClear={() => {
-              updateLineMulti(record.key, { ...resetItemFields });
-            }}
-            disabled={!record.itemTypeId}
-            categoryId={record.categoryId}
-            subCategoryId={record.subCategoryId}
-            itemTypeId={record.itemTypeId}
-          />
-        ),
-      },
-      // 6. Item Code (read-only)
+      // 5. Item Code (read-only). Item is resolved from Category + Sub-Category + Item Type.
+      //    Shows the selected variant's code for single-variant modes (SIMPLE/SIZE_WISE); for
+      //    VARIANT_PER_SIZE the line spans many variants, so it falls back to the parent item code.
       {
         title: 'Item Code',
         dataIndex: 'itemCode',
-        width: 100,
+        width: 150,
         align: 'center',
-        render: (value) => <Text type="secondary" style={{ fontSize: 12 }}>{value || '-'}</Text>,
+        render: (value, record) => {
+          const isPerSize = (record.consumptionMode || 'SIMPLE') === CONSUMPTION_MODE.VARIANT_PER_SIZE;
+          const display = isPerSize
+            ? (record.itemCode || '-')
+            : (record.variantCode || '-');
+          // Surface the conversion at the point of item choice, before the qty columns
+          const conversion = conversionApplies(record.primaryUomId, record.secondaryUomId, record.uomConversionFactor)
+            ? formatConversionLabel(record.primaryUom, record.secondaryUom, record.uomConversionFactor)
+            : '';
+          return (
+            <div style={{ lineHeight: 1.3 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>{display || '-'}</Text>
+              {conversion && (
+                <div><Text type="secondary" style={{ fontSize: 10 }}>{conversion}</Text></div>
+              )}
+            </div>
+          );
+        },
       },
       // 7. Variant (resizable)
       {
@@ -1836,13 +1773,17 @@ const BOMForm = () => {
                     onChange={(v) => {
                       const updates = { consumptionMode: v };
                       if (v === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+                        // Line now spans many size-variants; no single variant identity.
                         updates.variantId = null;
+                        updates.variantCode = '';
+                        updates.variantName = '';
                         updates.variants = {};
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = updates.consumptionMatrix || null;
                         updates.variantMapping = updates.variantMapping || {};
                         updates.colorInvalid = false;
                         updates.overrideBaseQty = null;
+                        updates.overrideBaseQtyColor = null;
                       } else if (v === CONSUMPTION_MODE.SIZE_WISE) {
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = record.consumptionMatrix || null;
@@ -1853,6 +1794,8 @@ const BOMForm = () => {
                       // Restore single variant when switching back from VARIANT_PER_SIZE
                       if (v !== CONSUMPTION_MODE.VARIANT_PER_SIZE && !record.variantId && variants.length === 1) {
                         updates.variantId = variants[0].id;
+                        updates.variantCode = variants[0].variantCode || '';
+                        updates.variantName = variants[0].variantName || '';
                         updates.variants = sortAttrs(variants[0].attributes || {});
                       }
                       updateLineMulti(record.key, updates);
@@ -1873,8 +1816,13 @@ const BOMForm = () => {
                         setTimeout(() => { node.focus(); }, 50);
                       }
                     }}
-                    onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
+                    onOpenChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                     options={variants.map((v) => {
+                      // Prefer the variant's own identity; fall back to its attributes for
+                      // legacy variants saved before names existed.
+                      if (v.variantName) {
+                        return { value: v.id, label: v.variantCode ? `${v.variantName} (${v.variantCode})` : v.variantName };
+                      }
                       const entries = Object.entries(v.attributes || {});
                       entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
                       return { value: v.id, label: entries.map(([k, val]) => `${k}: ${val}`).join(' | ') };
@@ -1982,7 +1930,7 @@ const BOMForm = () => {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: showOverrideInput ? 4 : 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <InputNumber
+                <InputNumber name="consumption"
                   min={0}
                   step={0.001}
                   precision={4}
@@ -1993,7 +1941,7 @@ const BOMForm = () => {
                   onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
                   controls={false}
                   disabled={!record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
-                  addonAfter={record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+                  suffix={record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() || undefined : undefined}
                   {...numericInputProps}
                 />
                 {fabric && (
@@ -2024,13 +1972,25 @@ const BOMForm = () => {
                       }
                     });
                   });
+                  // Keyed by COLOUR, not by quantity: two order colours routinely carry the
+                  // same qty (Ivory 800 / Lilac 800), and a shared option value makes AntD
+                  // treat them as one — both highlight as selected and the wrong label shows.
                   const colorOptions = Object.entries(colorQtyMap).map(([name, total]) => ({
-                    value: total,
-                    label: `${name} — ${total.toLocaleString()}`,
+                    value: name,
+                    qty: total,
+                    label: `${name} — ${total.toLocaleString('en-IN')}`,
                   }));
-                  const currentOverride = record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null);
-                  // Find matching option for current value (handle duplicate qty values)
-                  const hasMatch = currentOverride != null && colorOptions.some((o) => o.value === currentOverride);
+
+                  // A saved BOM persists only the number. Resolve it back to a colour when
+                  // exactly one matches; otherwise surface the figure itself rather than
+                  // silently attribute it to whichever colour happens to sort first.
+                  const savedQty = Number(record._savedBaseQty) || 0;
+                  const qtyMatches = savedQty > 0 ? colorOptions.filter((o) => o.qty === savedQty) : [];
+                  const resolvedColor = record.overrideBaseQtyColor || (qtyMatches.length === 1 ? qtyMatches[0].value : null);
+                  const showSaved = !resolvedColor && savedQty > 0;
+                  const options = showSaved
+                    ? [{ value: SAVED_BASE_QTY, qty: savedQty, label: `Saved — ${savedQty.toLocaleString('en-IN')}` }, ...colorOptions]
+                    : colorOptions;
 
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2038,9 +1998,15 @@ const BOMForm = () => {
                         size="small"
                         style={{ flex: 1, minWidth: 0 }}
                         placeholder="Pick base qty"
-                        value={hasMatch ? currentOverride : undefined}
-                        onChange={(v) => updateLine(record.key, 'overrideBaseQty', v || null)}
-                        options={colorOptions}
+                        value={resolvedColor || (showSaved ? SAVED_BASE_QTY : undefined)}
+                        onChange={(name) => {
+                          const opt = options.find((o) => o.value === name);
+                          updateLineMulti(record.key, {
+                            overrideBaseQty: opt?.qty ?? null,
+                            overrideBaseQtyColor: opt && opt.value !== SAVED_BASE_QTY ? opt.value : null,
+                          });
+                        }}
+                        options={options}
                         status="warning"
                         popupMatchSelectWidth={false}
                       />
@@ -2054,7 +2020,7 @@ const BOMForm = () => {
                 if (!qty) return null;
                 return (
                   <Text style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.3, display: 'block', textAlign: 'center' }}>
-                    Base Qty ({color || 'All'}) — {qty.toLocaleString()}
+                    Base Qty ({color || 'All'}) — {qty.toLocaleString('en-IN')}
                   </Text>
                 );
               })()}
@@ -2121,62 +2087,101 @@ const BOMForm = () => {
         ),
       },
       // 13. Calc Basis — REMOVED (moved into consumption matrix dialog for trims, inline for fabric)
-      // 14. Total Qty
+      // 14. Total Qty — the requirement BEFORE allowances, stated in the item's primary
+      // (purchase) UOM. The conversion working lives here rather than on Purchase Qty
+      // because this is the step where the consumption unit becomes the purchase unit;
+      // Purchase Qty only layers allowances on top of an already-converted figure.
       {
         title: 'Total Qty',
-        width: 100,
+        width: 130,
         align: 'center',
         render: (_, record) => {
           const total = computeTotalQty(record);
-          const uom = (record.primaryUom || record.uom || '').toUpperCase();
-          return total != null
-            ? <Text style={{ fontSize: 12 }}>{total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
-            : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+          if (total == null) return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+
+          // Total Qty is a multiple of consumption, so it starts in the CONSUMPTION unit
+          const consumptionUom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
+          const factor = record.uomConversionFactor;
+          const applies = conversionApplies(record.primaryUomId, record.secondaryUomId, factor);
+
+          // No conversion (trim with no secondary UOM, or both units the same) — the
+          // consumption unit already IS the primary unit, so render it plainly.
+          if (!applies) {
+            return (
+              <Text style={{ fontSize: 12 }}>
+                {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{consumptionUom}</Text>
+              </Text>
+            );
+          }
+
+          const converted = convertToPrimary(total, factor);
+          const purchaseUom = (record.primaryUom || '').toUpperCase();
+          return (
+            <Tooltip title={formatConversionLabel(record.primaryUom, record.secondaryUom, factor)}>
+              <div style={{ lineHeight: 1.3 }}>
+                <Text style={{ fontSize: 12 }}>
+                  {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                  <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
+                </Text>
+                {total > 0 && (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 10 }}>
+                      {total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {consumptionUom} ÷ {Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            </Tooltip>
+          );
         },
       },
-      // 15. Purchase Qty (Total Qty + allowances)
+      // 15. Purchase Qty (Total Qty + allowances, converted into the item's purchase UOM)
       {
         title: 'Purchase Qty',
-        width: 110,
+        width: 130,
         align: 'center',
         render: (_, record) => {
           const totalQty = computeTotalQty(record);
           if (!totalQty) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-          const allowances = record.processAllowances || [];
-          if (allowances.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-
-          const cMode = record.consumptionMode || 'SIMPLE';
-          const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-
-          let purchaseQty;
-          if (isMatrixMode && record.consumptionMatrix) {
-            // Per-size allowance calculation
-            const oqg = buildOrderQtyGrid(orderLineSummary);
-            let total = 0;
-            allSizes.forEach((size) => {
-              let sizeReq = 0;
-              Object.entries(record.consumptionMatrix).forEach(([color, szMap]) => {
-                sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-              });
-              let rejTotal = 0, shipTotal = 0;
-              allowances.forEach((a) => {
-                const sa = a.sizeAllowances?.[size];
-                rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-                shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-              });
-              total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-            });
-            purchaseQty = total;
-          } else {
-            // Flat allowance calculation
-            const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-            const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-            const totalShipment = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-            purchaseQty = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShipment);
+          if (!(record.processAllowances || []).length) {
+            return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           }
-          const uom = (record.primaryUom || record.uom || '').toUpperCase();
+
+          const purchaseQty = calcLinePurchaseQty(
+            record,
+            totalQty,
+            buildOrderQtyGrid(orderLineSummary),
+            allSizes
+          );
+          if (purchaseQty == null) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
+
+          const consumptionUom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
+          const factor = record.uomConversionFactor;
+          const applies = conversionApplies(record.primaryUomId, record.secondaryUomId, factor);
+
+          // No conversion (trim with no secondary UOM, or both units the same) — render
+          // exactly as before so the majority of lines stay visually quiet.
+          if (!applies) {
+            return (
+              <Text style={{ fontSize: 12 }}>
+                {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{consumptionUom}</Text>
+              </Text>
+            );
+          }
+
+          // The conversion working is shown once, on Total Qty — repeating it here would
+          // only restate the same factor against a slightly larger number.
+          const converted = convertToPrimary(purchaseQty, factor);
+          const purchaseUom = (record.primaryUom || '').toUpperCase();
           return (
-            <Text style={{ fontSize: 12 }}>{purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
+            <Tooltip title={formatConversionLabel(record.primaryUom, record.secondaryUom, factor)}>
+              <Text style={{ fontSize: 12 }}>
+                {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
+              </Text>
+            </Tooltip>
           );
         },
       },
@@ -2354,7 +2359,7 @@ const BOMForm = () => {
               {!isEdit && <Text strong style={{ color: 'var(--error-color, #ff4d4f)' }}>* </Text>}
               <Text strong>Order No</Text>
             </div>
-            <Input
+            <Input name="orderNo"
               placeholder="SG/25-26/1001"
               inputMode="numeric"
               value={orderNoInput || (isEdit ? '' : 'SG/')}
@@ -2379,31 +2384,31 @@ const BOMForm = () => {
             <div style={{ marginBottom: 4 }}>
               <Text strong>Style No</Text>
             </div>
-            <Input value={styleNo} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="styleNo" value={styleNo} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Garment Name</Text>
             </div>
-            <Input value={garmentName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="garmentName" value={garmentName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Material</Text>
             </div>
-            <Input value={material} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="material" value={material} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Buyer</Text>
             </div>
-            <Input value={buyerName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="buyer" value={buyerName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Order Qty</Text>
             </div>
-            <InputNumber
+            <InputNumber name="orderQty"
               style={{ width: '100%', height: 40 }}
               min={0}
               precision={0}
@@ -2440,12 +2445,12 @@ const BOMForm = () => {
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <Text strong style={{ fontSize: 13 }}>{line.buyerPoNo}</Text>
-                            <Text strong style={{ fontSize: 15, color: 'var(--primary-color)' }}>{line.lineQty.toLocaleString()}</Text>
+                            <Text strong style={{ fontSize: 15, color: 'var(--primary-color)' }}>{line.lineQty.toLocaleString('en-IN')}</Text>
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                             {line.colors.map((c, ci) => (
                               <Tag key={ci} style={{ margin: 0, fontSize: 11 }}>
-                                {c.name}: <strong>{c.qty.toLocaleString()}</strong>
+                                {c.name}: <strong>{c.qty.toLocaleString('en-IN')}</strong>
                               </Tag>
                             ))}
                           </div>
@@ -2728,13 +2733,13 @@ const BOMForm = () => {
         footer={null}
         width={400}
         centered
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
           This color exists in multiple Buyer POs. Select which PO to use for quantity calculation.
         </Text>
-        <Space direction="vertical" style={{ width: '100%' }} size={8}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={8}>
           {buyerPoPickerOptions.map((opt) => (
             <Card
               key={opt.buyerPoNo}
@@ -2746,7 +2751,7 @@ const BOMForm = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text strong>{opt.buyerPoNo}</Text>
-                <Text strong style={{ color: 'var(--primary-color)', fontSize: 16 }}>{opt.qty.toLocaleString()} pcs</Text>
+                <Text strong style={{ color: 'var(--primary-color)', fontSize: 16 }}>{opt.qty.toLocaleString('en-IN')} pcs</Text>
               </div>
             </Card>
           ))}
@@ -2761,7 +2766,7 @@ const BOMForm = () => {
         footer={null}
         width={560}
         centered
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         {(() => {
@@ -2868,7 +2873,7 @@ const BOMForm = () => {
                       placeholder="Select Buyer PO to proceed"
                       value={line.selectedBuyerPoNo || undefined}
                       onChange={(v) => updateLine(matchByLineKey, 'selectedBuyerPoNo', v)}
-                      options={matchingPOs.map((ol) => ({ value: ol.buyerPoNo, label: `${ol.buyerPoNo} (${ol.lineQty.toLocaleString()} pcs)` }))}
+                      options={matchingPOs.map((ol) => ({ value: ol.buyerPoNo, label: `${ol.buyerPoNo} (${ol.lineQty.toLocaleString('en-IN')} pcs)` }))}
                     />
                   )}
                 </div>
@@ -2935,7 +2940,7 @@ const BOMForm = () => {
                                   <td style={{
                                     padding: '3px 8px', textAlign: 'center', borderBottom: '1px solid var(--border-color, #f5f5f5)', fontWeight: 600,
                                     background: isColorMatch ? 'var(--oq-total-cell)' : undefined,
-                                  }}>{cr.qty.toLocaleString()}</td>
+                                  }}>{cr.qty.toLocaleString('en-IN')}</td>
                                 </tr>
                               );
                             }),
@@ -2951,7 +2956,7 @@ const BOMForm = () => {
                     <Text strong style={{ fontSize: 12 }}>Match Base Quantity By</Text>
                     <div><Text type="secondary" style={{ fontSize: 11 }}>Click on a card below to select how the base quantity should be calculated</Text></div>
                   </div>
-                  <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                  <Space orientation="vertical" style={{ width: '100%' }} size={6}>
                     {attrOpts.map((opt) => {
                       const qty = previewQty(opt.value);
                       const isSelected = line.baseQtyMatchAttr === opt.value;
@@ -2980,7 +2985,7 @@ const BOMForm = () => {
                               <Text strong={isSelected} style={{ fontSize: 12, color: isSelected ? 'var(--primary-color)' : noMatch ? 'var(--text-muted)' : undefined }}>{opt.label}</Text>
                             </div>
                             <Tag color={noMatch ? 'default' : 'blue'} style={{ fontSize: 12, margin: 0 }}>
-                              {noMatch ? 'No match' : `${qty.toLocaleString()} pcs`}
+                              {noMatch ? 'No match' : `${qty.toLocaleString('en-IN')} pcs`}
                             </Tag>
                           </div>
                         </Card>

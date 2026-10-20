@@ -1,28 +1,34 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, InputNumber } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const ElEncashmentList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [processOpen, setProcessOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission('hr-statutory', 'add');
+  const canApprove = hasPermission('hr-statutory', 'approve');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -30,16 +36,16 @@ const ElEncashmentList = () => {
       const result = await getAllElEncashmentRuns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load EL encashment runs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, [fetchData]);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+  }, [fetchData, activeBranchId]);
 
   const filteredData = useMemo(() => {
     if (!statusFilter) return data;
@@ -51,7 +57,7 @@ const ElEncashmentList = () => {
       const values = await form.validateFields();
       setProcessing(true);
       await processElEncashment({
-        factoryId: values.factoryId,
+        unitId: values.unitId,
         year: values.year,
         category: values.category,
       });
@@ -61,7 +67,7 @@ const ElEncashmentList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to process EL encashment');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setProcessing(false);
     }
@@ -77,8 +83,8 @@ const ElEncashmentList = () => {
             await approveElEncashment(id);
             message.success('EL encashment approved');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to approve EL encashment');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });
@@ -93,13 +99,13 @@ const ElEncashmentList = () => {
         dataIndex: 'year',
         key: 'year',
         width: 100,
-        sorter: (a, b) => (a.year || 0) - (b.year || 0),
+        sorter: thenById((a, b) => (a.year || 0) - (b.year || 0)),
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },
@@ -111,7 +117,7 @@ const ElEncashmentList = () => {
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',
@@ -122,7 +128,7 @@ const ElEncashmentList = () => {
         key: 'totalAmount',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',
@@ -141,8 +147,8 @@ const ElEncashmentList = () => {
         fixed: 'right',
         render: (_, r) => (
           <Space>
-            {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(r.id)}>
+            {r.status === 'CALCULATED' && canApprove && (
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(r.id); }}>
                 Approve
               </Button>
             )}
@@ -150,7 +156,7 @@ const ElEncashmentList = () => {
         ),
       },
     ],
-    [handleApprove],
+    [handleApprove, canApprove],
   );
 
   return (
@@ -182,6 +188,7 @@ const ElEncashmentList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} runs` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/el/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -191,13 +198,13 @@ const ElEncashmentList = () => {
         onCancel={() => setProcessOpen(false)}
         confirmLoading={processing}
         afterClose={() => form.resetFields()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
+          <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
             <Select
-              placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              placeholder="Select unit"
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />

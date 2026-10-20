@@ -66,10 +66,36 @@ export const getOrganisationById = async (id) => {
   return response;
 };
 
+/**
+ * The organisation to edit, or null when none is configured yet — the Company
+ * Profile screen creates the first one, and every export document reads it.
+ *
+ * Reads the list rather than /active: "not configured" is an ordinary state on
+ * a fresh install, but /active answers it with a 404 and the response
+ * interceptor would toast that as an error before the caller sees it.
+ */
+export const getActiveOrganisation = async () => {
+  const response = await axiosInstance.get(ENDPOINTS.ORGANISATION_INFO);
+  const data = response?.data || response;
+  const orgs = Array.isArray(data) ? data : (data?.content || []);
+  return orgs.find((o) => o.isActive !== false) || orgs[0] || null;
+};
+
+/** Saves the profile and refreshes the in-memory cache the PDFs read from. */
+export const saveOrganisation = async (id, data) => {
+  const { data: saved } = id
+    ? await axiosInstance.put(`${ENDPOINTS.ORGANISATION_INFO}/${id}`, data)
+    : await axiosInstance.post(ENDPOINTS.ORGANISATION_INFO, data);
+  setOrgInfo(saved);
+  return saved;
+};
+
 export default {
   getAllOrganisations,
   fetchAndCacheOrganisation,
   getCachedOrganisation,
   clearCachedOrganisation,
   getOrganisationById,
+  getActiveOrganisation,
+  saveOrganisation,
 };

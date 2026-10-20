@@ -75,6 +75,54 @@ export const calcPurchaseQty = (baseQty, processLossPercent = 0, rejectionPercen
 };
 
 /**
+ * Purchase quantity for a single BOM line, in the line's CONSUMPTION (secondary) UOM.
+ *
+ * Matrix modes apply allowances per size, since rejection and shipment allowances can
+ * differ by size; simple mode applies them flat. Returns null when the line has no
+ * quantity yet, and the bare total when no allowances are configured.
+ *
+ * Convert the result with convertToPrimary() to get the quantity the PO is raised in.
+ *
+ * @param line          BOM line
+ * @param totalQty      pre-computed total qty for the line (consumption UOM)
+ * @param orderQtyGrid  { [color]: { [size]: qty } } — required for matrix modes
+ * @param allSizes      sizes to walk in matrix modes
+ */
+export const calcLinePurchaseQty = (line, totalQty, orderQtyGrid = {}, allSizes = []) => {
+  if (!totalQty) return null;
+  const allowances = line?.processAllowances || [];
+  if (!allowances.length) return totalQty;
+
+  const mode = line?.consumptionMode || CONSUMPTION_MODE.SIMPLE;
+  const isMatrixMode =
+    mode === CONSUMPTION_MODE.SIZE_WISE || mode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
+
+  if (isMatrixMode && line?.consumptionMatrix) {
+    let total = 0;
+    allSizes.forEach((size) => {
+      let sizeReq = 0;
+      Object.entries(line.consumptionMatrix).forEach(([color, szMap]) => {
+        sizeReq += (Number(szMap?.[size]) || 0) * (orderQtyGrid[color]?.[size] || 0);
+      });
+      let rejTotal = 0;
+      let shipTotal = 0;
+      allowances.forEach((a) => {
+        const sa = a.sizeAllowances?.[size];
+        rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
+        shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
+      });
+      total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
+    });
+    return total;
+  }
+
+  const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
+  const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
+  const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
+  return calcPurchaseQty(totalQty, loss, rej + ship);
+};
+
+/**
  * Calculate purchase width with shrinkage (BR-08).
  * Purchase Width = Finished Width + Shrinkage (inches)
  */

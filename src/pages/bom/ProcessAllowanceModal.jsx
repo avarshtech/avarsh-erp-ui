@@ -1,8 +1,8 @@
 import { Modal, Table, InputNumber, Typography, Space, Tag, Button, Tooltip, Row, Col, Card, Select } from 'antd';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { HolderOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
-import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal, calcVariantBreakdown } from '../../utils/bomConstants';
+import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal } from '../../utils/bomConstants';
 
 const { Text } = Typography;
 
@@ -141,7 +141,7 @@ const ProcessAllowanceModal = ({
             value={value}
             onChange={(v) => updateRow(record.processId, 'shrinkageInches', v)}
             onBlur={(e) => handleBlur(record.processId, 'shrinkageInches', e)}
-            addonAfter="in"
+            suffix="in"
             {...numericInputProps}
           />
         ),
@@ -161,7 +161,7 @@ const ProcessAllowanceModal = ({
             value={value}
             onChange={(v) => updateRow(record.processId, 'processLossPercent', v)}
             onBlur={(e) => handleBlur(record.processId, 'processLossPercent', e)}
-            addonAfter="%"
+            suffix="%"
             {...numericInputProps}
           />
         ),
@@ -182,7 +182,7 @@ const ProcessAllowanceModal = ({
           value={value}
           onChange={(v) => updateRow(record.processId, 'rejectionPercent', v)}
           onBlur={(e) => handleBlur(record.processId, 'rejectionPercent', e)}
-          addonAfter={isFabric ? '%' : undefined}
+          suffix={isFabric ? '%' : undefined}
           {...numericInputProps}
         />
       ),
@@ -203,7 +203,7 @@ const ProcessAllowanceModal = ({
           onChange={(v) => updateRow(record.processId, 'shipmentAllowancePercent', v)}
           {...numericInputProps}
           onBlur={(e) => handleBlur(record.processId, 'shipmentAllowancePercent', e)}
-          addonAfter={isFabric ? '%' : undefined}
+          suffix={isFabric ? '%' : undefined}
         />
       ),
     },
@@ -235,40 +235,6 @@ const ProcessAllowanceModal = ({
     );
   };
 
-  // Per-variant breakdown for preview (VARIANT_PER_SIZE only)
-  const variantBreakdown = useMemo(() => {
-    if (!isMatrix || consumptionMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE || !variantMapping || !consumptionMatrix) return [];
-    const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
-    return calcVariantBreakdown(consumptionMatrix, orderQtyGrid, variantMapping, rows);
-  }, [isMatrix, consumptionMode, variantMapping, consumptionMatrix, orderLineSummary, rows]);
-
-  // Overall purchase qty for matrix modes
-  const matrixPurchaseQty = useMemo(() => {
-    if (!isMatrix || !consumptionMatrix) return 0;
-    const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
-    const totalReq = calcMatrixTotal(consumptionMatrix, orderQtyGrid);
-    if (consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
-      return variantBreakdown.reduce((s, v) => s + v.purchaseQty, 0);
-    }
-    // SIZE_WISE: aggregate per-size allowances
-    let total = 0;
-    sizes.forEach((size) => {
-      let sizeReq = 0;
-      Object.entries(consumptionMatrix).forEach(([color, szMap]) => {
-        const c = Number(szMap?.[size]) || 0;
-        const o = orderQtyGrid[color]?.[size] || 0;
-        sizeReq += c * o;
-      });
-      let rejTotal = 0, shipTotal = 0;
-      rows.forEach((r) => {
-        const sa = r.sizeAllowances?.[size];
-        rejTotal += Number(sa?.rejectionPercent ?? r.rejectionPercent) || 0;
-        shipTotal += Number(sa?.shipmentAllowancePercent ?? r.shipmentAllowancePercent) || 0;
-      });
-      total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-    });
-    return total;
-  }, [isMatrix, consumptionMatrix, orderLineSummary, consumptionMode, variantBreakdown, sizes, rows]);
 
   // Variant label helper
   const getVariantLabel = (variantId) => {
@@ -307,7 +273,7 @@ const ProcessAllowanceModal = ({
       title="Process Allowances"
       open={open}
       width={isMatrix ? Math.min(950, 300 + sizes.length * 90) : isFabric ? 850 : 700}
-      destroyOnClose
+      destroyOnHidden
       onCancel={onCancel}
       okText="Apply Allowances"
       onOk={handleApply}
@@ -551,7 +517,7 @@ const ProcessAllowanceModal = ({
           border: '1px solid var(--border-color, #e8e8e8)',
         }}
       >
-        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={4} style={{ width: '100%' }}>
           {isFabric && (
             <Text>
               <Text strong>Purchase Width</Text> = Finished Width ({finishedWidth}") + Shrinkage ({totalShrinkage}") ={' '}
@@ -578,7 +544,7 @@ const ProcessAllowanceModal = ({
               totalShipment += sizeReq * (shipPct / 100);
             });
             return (
-              <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={2} style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Total Consumption</Text>
                   <Text>{totalConsumption.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
@@ -601,7 +567,7 @@ const ProcessAllowanceModal = ({
             );
           })() : (
             <Text>
-              <Text strong>Purchase Qty</Text> = Base Qty ({baseQty.toLocaleString()})
+              <Text strong>Purchase Qty</Text> = Base Qty ({baseQty.toLocaleString('en-IN')})
               {isFabric && <> + Loss ({((baseQty * totalLossPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })})</>}
               {' '}+ Rejection ({((baseQty * totalRejPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })})
               {' '}+ Shipment ({((baseQty * totalShipmentPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}) ={' '}

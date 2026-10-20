@@ -42,6 +42,14 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // The working branch chosen in the header switcher (persisted by BranchContext).
+    // Sent only while one is selected; absent means "all branches".
+    try {
+      const branchId = localStorage.getItem('activeBranchId');
+      if (branchId && branchId !== 'all') config.headers['X-Branch-Id'] = branchId;
+    } catch {
+      // storage unavailable — no branch header
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -81,6 +89,27 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // The working branch sent in X-Branch-Id is not one this user may work in (taken off their
+      // list, or left by another account in this browser): the server names it in `workingBranch`.
+      // Forget it, so the screens refetch with the user's own branches; the server's message still
+      // shows below. A refused record leaves the working branch alone. No retry, so no loop.
+      if (status === 403 && data?.error === 'BRANCH_ACCESS_DENIED' && data?.workingBranch != null) {
+        try {
+          localStorage.setItem('activeBranchId', 'all');
+        } catch {
+          // storage unavailable — nothing was stored to forget
+        }
+        window.dispatchEvent(new Event('erp:branch-reset'));
+      }
+
+      // Sample dispatch blocked on its commercial invoice — the screen shows a
+      // modal naming the uncovered SRs, so skip the default toast
+      if (status === 409 && data?.error === 'INVOICE_REQUIRED') {
+        error.errorMessage = data.message;
+        error.code = 'INVOICE_REQUIRED';
+        return Promise.reject(error);
+      }
+
       // Attempt token refresh on 401 (except for login/refresh/logout endpoints)
       if (
         status === 401 &&
@@ -98,6 +127,7 @@ axiosInstance.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 resolve(axiosInstance(originalRequest));
               } else {
+                error.errorMessage = 'Session expired. Please login again.';
                 reject(error);
               }
             });
@@ -107,32 +137,38 @@ axiosInstance.interceptors.response.use(
         originalRequest._retry = true;
         isRefreshing = true;
 
+        // executeTokenRefresh resolves to null when the refresh fails — it does not throw — so the
+        // outcome is decided by the token, and the flag is released on every path. Before, a failed
+        // refresh left isRefreshing set and the queued requests unsettled, so after an in-app
+        // re-login every later 401 queued behind a refresh that would never come.
+        let newToken = null;
         try {
           // Use the shared lock to prevent concurrent refresh calls
           // (e.g., if SessionContext proactive refresh is already in-flight).
           // Uses raw `axios` (NOT axiosInstance) so we don't add the
           // Authorization header — the JWT filter would reject an expired token.
-          const newToken = await executeTokenRefresh(() =>
+          newToken = await executeTokenRefresh(() =>
             axios.post(
               `${axiosInstance.defaults.baseURL}/auth/refresh`,
               null,
               { withCredentials: true }
             ).then((r) => r.data?.token || null)
           );
-
-          if (newToken) {
-            setAccessToken(newToken);
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            onTokenRefreshed(newToken);
-            isRefreshing = false;
-            return axiosInstance(originalRequest);
-          }
         } catch {
-          onTokenRefreshFailed();
+          newToken = null;
+        } finally {
           isRefreshing = false;
         }
 
-        // Refresh failed — clear all session state
+        if (newToken) {
+          setAccessToken(newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          onTokenRefreshed(newToken);
+          return axiosInstance(originalRequest);
+        }
+
+        // Refresh failed — settle the queued requests, then clear all session state
+        onTokenRefreshFailed();
         clearAll();
         // Don't hard-redirect — let SessionExpiryGuard handle the expired state
         error.errorMessage = 'Session expired. Please login again.';
@@ -184,8 +220,9 @@ axiosInstance.interceptors.response.use(
     // Attach extracted message to error object
     error.errorMessage = errorMessage;
 
-    // Show error toast for non-401 errors
-    if (!error.response || error.response.status !== 401) {
+    // Show error toast for non-401 errors. A caller that expects the failure and explains it
+    // itself (e.g. "no exchange rate stored yet") passes `silent: true` in the request config.
+    if ((!error.response || error.response.status !== 401) && !originalRequest?.silent) {
       emitMessage('error', errorMessage);
     }
 

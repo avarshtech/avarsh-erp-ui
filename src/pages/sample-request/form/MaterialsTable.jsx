@@ -1,0 +1,68 @@
+import { useMemo } from 'react';
+import { Card, Table, Alert, Typography } from 'antd';
+import { substitutionBanner } from '../../../utils/sampleFabricRules';
+import { computeSampleQtyRequired, stockStatusFor } from '../../../utils/sampleBomMapper';
+import { buildMaterialsColumns } from './MaterialsColumns';
+
+const { Title, Text } = Typography;
+
+/**
+ * Section D — Materials Required, auto-populated from the BOM and split into
+ * Fabric / Trims & Accessories sub-sections (PRD v3 §8.2 D). The banner names
+ * the (user-defined) sample type; the substitution state drives the lock.
+ */
+const MaterialsTable = ({
+  materials, sr, sampleQty, sizes, typeName, colourName = null, isMaterialScope = false,
+  onColourChange, onMandatoryChange, readOnly = false,
+}) => {
+  // The server sends live availability but no status — the requirement it would
+  // be judged against is still being typed. Derive it on every render so the
+  // Stock column tracks the sample qty and sizes instead of freezing whatever
+  // they happened to be when the BOM was first loaded.
+  const enriched = useMemo(() => (materials || []).map((line) => ({
+    ...line,
+    stockStatus: stockStatusFor(
+      line.stockAvailable,
+      computeSampleQtyRequired(line, sampleQty, sizes, colourName),
+    ),
+  })), [materials, sampleQty, sizes, colourName]);
+
+  const columns = useMemo(() => buildMaterialsColumns({
+    sr, sampleQty, sizes, colourName, isMaterialScope, readOnly, onColourChange, onMandatoryChange,
+  }), [sr, sampleQty, sizes, colourName, isMaterialScope, readOnly, onColourChange, onMandatoryChange]);
+
+  const fabric = useMemo(() => enriched.filter((l) => l.section === 'FABRIC'), [enriched]);
+  const trims = useMemo(() => enriched.filter((l) => l.section !== 'FABRIC'), [enriched]);
+
+  return (
+    <Card size="small" style={{ marginBottom: 16 }} title={<Title level={5} style={{ margin: 0 }}>D · Materials Required — auto-populated from BOM</Title>}>
+      <Alert
+        style={{ marginBottom: 12 }}
+        type={sr?.colourSubstitutionAllowed ? 'warning' : 'info'}
+        showIcon
+        title={substitutionBanner(Boolean(sr?.colourSubstitutionAllowed), typeName || '—')}
+      />
+      <Text strong style={{ display: 'block', marginBottom: 8 }}>Fabric</Text>
+      <Table
+        rowKey="lineNo"
+        size="small"
+        columns={columns}
+        dataSource={fabric}
+        pagination={false}
+        scroll={{ x: 1400 }}
+        style={{ marginBottom: 16 }}
+      />
+      <Text strong style={{ display: 'block', marginBottom: 8 }}>Trims &amp; Accessories</Text>
+      <Table
+        rowKey="lineNo"
+        size="small"
+        columns={columns}
+        dataSource={trims}
+        pagination={false}
+        scroll={{ x: 1400 }}
+      />
+    </Card>
+  );
+};
+
+export default MaterialsTable;

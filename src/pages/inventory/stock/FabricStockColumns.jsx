@@ -23,13 +23,17 @@ const ageDays = (grnDate) => (grnDate ? dayjs().diff(dayjs(grnDate), 'day') : nu
 
 const getFabricStockColumns = () => [
   {
+    // Wide enough for a full variant code on one line — "KNI-SIN-002-1109-100C-180"
+    // is 25 characters, and a wrapped code is unreadable at a glance in a register.
+    // ellipsis rather than wrap for the rare code that still overruns.
     title: 'Item Code',
     dataIndex: 'itemCode',
     key: 'itemCode',
     fixed: 'left',
-    width: 180,
+    width: 260,
     align: 'center',
-    render: (code) => code,
+    ellipsis: true,
+    render: (code, r) => r.variantCode || '—',
   },
   {
     title: 'Fabric Description',
@@ -46,6 +50,24 @@ const getFabricStockColumns = () => [
     width: 140,
     align: 'center',
     render: (sc) => sc ? <Tag color={SUB_CATEGORY_COLORS[sc] || 'default'}>{sc}</Tag> : '-',
+  },
+  {
+    title: 'Composition',
+    dataIndex: 'composition',
+    key: 'composition',
+    width: 170,
+    align: 'center',
+    ellipsis: true,
+    render: (text) => text || '-',
+  },
+  {
+    title: 'Colour',
+    dataIndex: 'color',
+    key: 'color',
+    width: 120,
+    align: 'center',
+    ellipsis: true,
+    render: (text) => text || '-',
   },
   {
     title: 'Style',
