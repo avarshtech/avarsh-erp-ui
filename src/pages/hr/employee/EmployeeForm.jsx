@@ -12,6 +12,8 @@ import {
   getActiveDepartmentsByUnit, getActiveDesignationsByDepartment, getActiveShifts,
 } from '../../../services/master/hrMasterService';
 import { getActiveUnits } from '../../../services/master/unitService';
+import { getContractors } from '../../../services/hr/contractorService';
+import { isSuperuser } from '../../../utils/permissions';
 import { useBranch } from '../../../context/BranchContext';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import {
@@ -199,6 +201,15 @@ const EmployeeForm = () => {
   // calendar. Each level is now scoped to its parent.
   const watchedUnitId = Form.useWatch('unitId', form);
   const watchedDepartmentId = Form.useWatch('departmentId', form);
+  const watchedEmployeeType = Form.useWatch('employeeType', form);
+
+  // Administrator only: nobody else is told contractors exist, so the list is
+  // not even requested for them (the server would refuse it anyway).
+  const [canSeeContractors] = useState(isSuperuser);
+  const [contractors, setContractors] = useState([]);
+  useEffect(() => {
+    if (canSeeContractors) getContractors(true).then(setContractors).catch(() => setContractors([]));
+  }, [canSeeContractors]);
 
   useEffect(() => {
     getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
@@ -598,6 +609,19 @@ const EmployeeForm = () => {
           <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
+          {canSeeContractors && watchedEmployeeType === 'CONTRACT' && (
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="Contractor" name="contractorId" extra="Visible to the administrator only">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Direct contract (no contractor)"
+                  options={contractors.map((c) => ({ value: c.id, label: c.name }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
           <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: gradeLabel(g) }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Reporting Manager" name="reportingManagerId">

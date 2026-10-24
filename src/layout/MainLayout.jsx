@@ -539,24 +539,35 @@ const MainLayoutInner = () => {
       label: "HR & Payroll",
       moduleId: ["hr-masters", "hr-employees", "hr-attendance", "hr-leave", "hr-payroll", "hr-loans", "hr-bonus", "hr-statutory", "hr-fnf"],
       children: [
+        // Ordered the way the month runs, not the way the screens were built.
+        // Payroll used to sit above Loans, Salary Advances and Bonus - the three
+        // things it recovers and pays out - so the menu read backwards from the
+        // work: you were asked to run payroll before being shown what feeds it.
+        //
+        // Set up -> people -> attendance (capture, correct, report) -> leave ->
+        // what payroll needs -> payroll -> what payroll produces -> leavers.
         { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
         { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
+
         { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
-        // These screens existed with working routes but no navigation entry, so
-        // they were unreachable unless the URL was typed by hand.
         { key: "/hr/attendance/entry", label: "Mark Attendance", moduleId: "hr-attendance" },
         { key: "/hr/attendance/import", label: "Import Attendance", moduleId: "hr-attendance" },
         { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
         { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/strength", label: "Strength Report", moduleId: "hr-attendance" },
+
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
         { key: "/hr/leaves/balances", label: "Leave Balances", moduleId: "hr-leave" },
-        { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
+
         { key: "/hr/loans", label: "Loans", moduleId: "hr-loans" },
         { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
+        { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
+
         { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
         { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
         { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
+
         { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
       ],
@@ -713,6 +724,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/attendance/import')) return ['/hr/attendance/import'];
     if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
     if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
+    if (path.startsWith('/hr/attendance/strength')) return ['/hr/attendance/strength'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves/balances')) return ['/hr/leaves/balances'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];

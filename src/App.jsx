@@ -123,6 +123,7 @@ const AttendanceEntry = lazyRoute(() => import('./pages/hr/attendance/Attendance
 const AttendanceImport = lazyRoute(() => import('./pages/hr/attendance/AttendanceImport'));
 const MissPunchList = lazyRoute(() => import('./pages/hr/attendance/MissPunchList'));
 const GatePassList = lazyRoute(() => import('./pages/hr/attendance/GatePassList'));
+const StrengthReport = lazyRoute(() => import('./pages/hr/reports/StrengthReport'));
 const LeaveApplicationList = lazyRoute(() => import('./pages/hr/leave/LeaveApplicationList'));
 const LeaveBalanceView = lazyRoute(() => import('./pages/hr/leave/LeaveBalanceView'));
 // Payroll & Loans (lazy-loaded)
@@ -479,6 +480,7 @@ const ThemedApp = () => {
             <Route path="hr/attendance/import" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceImport /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/miss-punch" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><MissPunchList /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/gate-pass" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><GatePassList /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/strength" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><StrengthReport /></Suspense></PermissionRoute>} />
             {/* Leave */}
             <Route path="hr/leaves" element={<PermissionRoute module="hr-leave" operation="view"><Suspense fallback={<PageSkeleton />}><LeaveApplicationList /></Suspense></PermissionRoute>} />
             <Route path="hr/leaves/balances" element={<PermissionRoute module="hr-leave" operation="view"><Suspense fallback={<PageSkeleton />}><LeaveBalanceView /></Suspense></PermissionRoute>} />
