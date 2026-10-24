@@ -1,0 +1,174 @@
+/*
+ * Form 25B.
+ *
+ * Laid out as a printed form rather than as a web page: fixed borders, every cell
+ * drawn, both languages stacked in each label. It is handed to somebody on a factory
+ * floor, not scrolled.
+ *
+ * The print rules are the part that did not exist. SalarySlipView has always carried
+ * `salary-slip-print` and `no-print` classes, but no @media print block anywhere in
+ * the app defined them - so printing a payslip printed the sidebar, the header and the
+ * notification bell along with it.
+ */
+
+.slip-sheet {
+  max-width: 820px;
+  margin: 0 auto;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+  padding: 12px 14px 18px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+/* Tamil beneath its English, smaller and quieter, on every label. */
+.slip-en { display: block; }
+.slip-ta {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+.slip-head {
+  text-align: center;
+  border-bottom: 1px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.slip-company { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+.slip-title { margin-top: 4px; font-weight: 700; }
+.slip-title .slip-en { display: inline; }
+.slip-title .slip-ta { display: inline; margin-inline-start: 6px; }
+.slip-form-no { float: right; font-weight: 600; }
+.slip-period { margin-top: 4px; }
+.slip-period .slip-en,
+.slip-period .slip-ta { display: inline; }
+.slip-period .slip-ta { margin-inline-start: 4px; }
+
+/* Two columns of small facts, as the form has them. */
+.slip-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #000;
+  border-bottom: none;
+}
+.slip-fact {
+  display: flex;
+  gap: 8px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #000;
+}
+.slip-fact:nth-child(odd) { border-inline-end: 1px solid #000; }
+.slip-fact-label { flex: 0 0 42%; font-weight: 600; }
+.slip-fact-value { flex: 1; word-break: break-word; }
+.slip-of { opacity: 0.6; }
+
+.slip-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.slip-grid th,
+.slip-grid td {
+  border: 1px solid #000;
+  padding: 3px 6px;
+  vertical-align: top;
+}
+.slip-grid th {
+  font-weight: 700;
+  text-align: center;
+  background: #f2f2f2;
+}
+.slip-grid col,
+.slip-grid th:nth-child(1) { width: 24%; }
+.slip-grid th:nth-child(2),
+.slip-grid th:nth-child(3) { width: 15%; }
+.slip-grid th:nth-child(4) { width: 28%; }
+.slip-grid th:nth-child(5) { width: 18%; }
+
+.slip-particular { font-weight: 600; }
+.slip-figure { text-align: right; font-variant-numeric: tabular-nums; }
+.slip-total td { font-weight: 700; background: #f7f7f7; }
+
+.slip-summary {
+  margin-top: 10px;
+  border: 1px solid #000;
+}
+.slip-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #000;
+}
+.slip-summary > div:last-child { border-bottom: none; }
+.slip-summary strong { font-variant-numeric: tabular-nums; }
+.slip-summary .slip-en,
+.slip-summary .slip-ta { display: inline; }
+.slip-summary .slip-ta { margin-inline-start: 6px; }
+.slip-net { background: #f2f2f2; font-size: 13px; }
+
+.slip-employer {
+  margin-top: 10px;
+  border: 1px dashed #666;
+  padding: 6px 8px;
+}
+.slip-employer-title { font-weight: 700; margin-bottom: 4px; }
+.slip-employer .slip-en,
+.slip-employer .slip-ta { display: inline; }
+.slip-employer .slip-ta { margin-inline-start: 6px; }
+.slip-employer > div:not(.slip-employer-title) {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.slip-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 42px;
+  padding-top: 6px;
+}
+.slip-signatures > div {
+  border-top: 1px solid #000;
+  padding-top: 3px;
+  min-width: 190px;
+  text-align: center;
+  font-size: 11px;
+}
+
+/* Dark mode is for the screen. The sheet is a printed form and stays on paper. */
+[data-theme='dark'] .slip-sheet {
+  background: #fff;
+  color: #000;
+}
+
+@media print {
+  /* Everything but the slip. The classes existed; nothing ever defined them, so
+     printing a payslip printed the whole application around it. */
+  body * { visibility: hidden; }
+  .salary-slip-print,
+  .salary-slip-print * { visibility: visible; }
+  .salary-slip-print {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+  .no-print { display: none !important; }
+
+  .slip-sheet {
+    max-width: none;
+    border: 1px solid #000;
+    box-shadow: none;
+    font-size: 11px;
+  }
+  .slip-grid th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slip-total td,
+  .slip-net { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  @page { size: A4 portrait; margin: 10mm; }
+}
