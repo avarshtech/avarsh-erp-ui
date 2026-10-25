@@ -67,9 +67,13 @@ export const getFilesByEntity = async (entity, entityId) => {
  * @param {string} fileId - File UUID
  * @returns {Promise<Blob>}
  */
-export const downloadFileAsBlob = async (fileId) => {
+export const downloadFileAsBlob = async (fileId, { silent = false } = {}) => {
   const response = await axiosInstance.get(`${ENDPOINTS.DOWNLOAD}/${fileId}`, {
     responseType: 'blob',
+    // A caller that shows a placeholder when there is no file passes silent, so
+    // the interceptor does not toast an error the caller has already handled.
+    // A photo whose bytes are gone is not something to interrupt somebody over.
+    silent,
   });
   // Callers show these blobs or open them in a new window, in this app's origin (review U077).
   return inertBlob(response.data);

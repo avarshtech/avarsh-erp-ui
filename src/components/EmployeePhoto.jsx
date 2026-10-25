@@ -67,7 +67,10 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
       const photos = (Array.isArray(files) ? files : []).filter((f) => f.fileCategory === 'PHOTO');
       const latest = photos.at(-1) ?? null;
       setPhoto(latest);
-      show(latest ? await downloadFileAsBlob(latest.fileId) : null);
+      // silent: this catch already handles it. Without it the interceptor toasted
+      // first and the fallback ran afterwards, so a record whose photo file had
+      // gone showed "Server error occurred" over a page that was otherwise fine.
+      show(latest ? await downloadFileAsBlob(latest.fileId, { silent: true }) : null);
     } catch {
       // A missing photo is not an error worth a toast - the placeholder says it.
       setPhoto(null);
@@ -142,13 +145,18 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
 
   const box = { width: size, height: size };
 
-  // No photo and no right to add one: a plain silhouette, with no affordance
-  // suggesting otherwise.
+  // No photo and no right to add one: a silhouette that says so, with no
+  // affordance suggesting otherwise. Said in words as well as a shape - an icon
+  // alone reads as something still loading, or as something that failed.
   if (!src && !canEdit) {
     return (
       <div className="employee-photo employee-photo-empty" style={box}>
-        {busy ? <Spin indicator={<LoadingOutlined spin />} />
-          : <UserOutlined style={{ fontSize: size / 2.6 }} aria-hidden="true" />}
+        {busy ? <Spin indicator={<LoadingOutlined spin />} /> : (
+          <>
+            <UserOutlined style={{ fontSize: size / 3.2 }} aria-hidden="true" />
+            <span className="employee-photo-empty-label">No photo</span>
+          </>
+        )}
       </div>
     );
   }
