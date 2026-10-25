@@ -6,6 +6,7 @@ import MasterSplitView from '../../../components/MasterSplitView';
 import DateInput from '../../../components/DateInput';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { hasPermission } from '../../../utils/permissions';
+import './statutoryRateMaster.css';
 import {
   getAllStatutoryRates, createStatutoryRate, updateStatutoryRate, deleteStatutoryRate,
 } from '../../../services/hr/statutoryRateService';
@@ -82,6 +83,9 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Two columns, not four. The list lives in a third of the width when a figure is
+  // open, and four columns forced a horizontal scrollbar - so the value, the one
+  // thing somebody is looking for, was off the edge.
   const columns = [
     {
       title: 'Figure',
@@ -89,28 +93,30 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
       // The stored code is PF_WAGE_CEILING, which says nothing about what it does.
       render: (v, r) => (
         <>
-          <div>{v}</div>
-          <div style={{ fontSize: 11, opacity: 0.55 }}>{r.code}{r.stateCode ? ` · ${r.stateCode}` : ''}</div>
+          <div style={{ fontWeight: 500 }}>{v}</div>
+          <div style={{ fontSize: 11, opacity: 0.5 }}>
+            {r.code}{r.stateCode ? ` · ${r.stateCode}` : ''}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+            {r.effectiveFrom ? `From ${dayjs(r.effectiveFrom).format('DD-MMM-YYYY')}` : ''}
+            {r.effectiveTo ? ` to ${dayjs(r.effectiveTo).format('DD-MMM-YYYY')}` : ''}
+          </div>
         </>
       ),
     },
-    { title: 'Value', key: 'value', width: 130, align: 'right', render: (_, r) => showValue(r) },
     {
-      title: 'Applies from',
-      dataIndex: 'effectiveFrom',
-      width: 170,
-      render: (v, r) => (
+      title: 'Value',
+      key: 'value',
+      width: 120,
+      align: 'right',
+      render: (_, r) => (
         <>
-          {v ? dayjs(v).format('DD-MMM-YYYY') : '-'}
-          {r.current && <Tag color="green" style={{ marginInlineStart: 6 }}>In effect</Tag>}
+          <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{showValue(r)}</div>
+          {r.current
+            ? <Tag color="green" style={{ marginInlineEnd: 0, marginTop: 4 }}>In effect</Tag>
+            : <Tag style={{ marginInlineEnd: 0, marginTop: 4, opacity: 0.6 }}>Superseded</Tag>}
         </>
       ),
-    },
-    {
-      title: 'Until',
-      dataIndex: 'effectiveTo',
-      width: 130,
-      render: (v) => (v ? dayjs(v).format('DD-MMM-YYYY') : <span style={{ opacity: 0.45 }}>still applies</span>),
     },
   ];
 
@@ -209,15 +215,44 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
       layout="vertical"
       onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
       disabled={isReadOnly}
+      className="statutory-form"
     >
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        title="A figure is never overwritten"
-        description="Saving a new one closes the one before it the day before this starts. Months already
-          run keep the figure they were paid on, and reprinting an old payslip still shows it."
-      />
+      {/* Says which figure is open and how to leave, without scrolling. The select
+          below is disabled on an existing row, so it reads as a greyed-out box
+          rather than as a heading. */}
+      <div className="statutory-form-head">
+        <div>
+          <div className="statutory-form-title">{selected ? selected.label : 'New figure'}</div>
+          <div className="statutory-form-sub">
+            {selected ? selected.code : 'Pick a figure and say which month it starts applying'}
+          </div>
+        </div>
+        <Button type="text" icon={<CloseOutlined />} onClick={handleClose} aria-label="Close" />
+      </div>
+
+      <div className="statutory-form-body">
+      {/* Only when adding. On an existing row the rule has already been applied and
+          a paragraph of it above every field is in the way. */}
+      {!selected && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="A figure is never overwritten"
+          description="Saving a new one closes the one before it the day before this starts, so months
+            already run keep the figure they were paid on."
+        />
+      )}
+      {selected && (
+        <Alert
+          type={selected.current ? 'success' : 'warning'}
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={selected.current
+            ? 'This is the figure payroll is using now'
+            : 'This figure is not the one in use today'}
+        />
+      )}
 
       <Form.Item name="code" label="Figure" rules={[{ required: true, message: 'Pick the figure' }]}>
         {/* The code cannot move once saved: every payroll already run against this row
@@ -268,17 +303,26 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
         <Input placeholder="e.g. TN" maxLength={5} disabled={!!selected} style={{ textTransform: 'uppercase' }} />
       </Form.Item>
 
-      <Space>
-        <PermissionGuard module={MODULE_ID} operation={selected ? 'update' : 'add'}>
-          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSave}>
-            {selected ? 'Update' : 'Save'}
+      </div>
+
+      {/* Pinned. These used to sit at the natural end of a form taller than the
+          panel, which clipped rather than scrolled - so a figure could be opened
+          and then neither saved nor closed. */}
+      <div className="statutory-form-actions">
+        <Space>
+          <PermissionGuard module={MODULE_ID} operation={selected ? 'update' : 'add'}>
+            <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSave}>
+              {selected ? 'Save changes' : 'Save figure'}
+            </Button>
+          </PermissionGuard>
+          <Button icon={<CloseOutlined />} onClick={handleClose}>
+            {unsavedChanges ? 'Discard' : 'Close'}
           </Button>
-        </PermissionGuard>
+        </Space>
         {selected && canDelete && (
-          <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>Remove</Button>
+          <Button danger type="text" icon={<DeleteOutlined />} onClick={handleDelete}>Remove</Button>
         )}
-        <Button icon={<CloseOutlined />} onClick={handleClose}>Close</Button>
-      </Space>
+      </div>
     </Form>
   );
 

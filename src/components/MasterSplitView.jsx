@@ -152,7 +152,11 @@ const MasterSplitView = ({
           <Col span={16} style={{ height: '100%', animation: 'fadeIn 0.3s' }}>
             <Card
               style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-              styles={{ body: { flex: 1, minHeight: 0, overflow: 'hidden', padding: 0 } }}
+              // A form taller than the panel used to be clipped, not scrolled: its
+              // buttons were simply below the cut with no way to reach them, so a
+              // record could be opened and then neither saved nor closed. Any master
+              // with enough fields hits this; the statutory figures one always does.
+              styles={{ body: { flex: 1, minHeight: 0, overflow: 'auto', padding: 0 } }}
             >
               {renderForm()}
             </Card>
