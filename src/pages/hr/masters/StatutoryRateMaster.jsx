@@ -223,7 +223,7 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
       <div className="statutory-form-head">
         <div>
           <div className="statutory-form-title">{selected ? selected.label : 'New figure'}</div>
-          <div className="statutory-form-sub">
+          <div className={`statutory-form-sub${selected ? ' is-code' : ''}`}>
             {selected ? selected.code : 'Pick a figure and say which month it starts applying'}
           </div>
         </div>

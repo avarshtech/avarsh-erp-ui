@@ -22,9 +22,11 @@
   gap: 12px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-color, #f0f0f0);
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  /* A fixed band, not a sticky one. Sticking it inside a box whose content
+     overflows put it wherever that box ended, which was the middle of the
+     form - the bar sat on top of "Applies from". The body below scrolls
+     instead, between two bands that do not move. */
+  flex: 0 0 auto;
   background: var(--bg-container, #fff);
 }
 
@@ -38,12 +40,20 @@
   font-size: 12px;
   opacity: 0.6;
   margin-top: 2px;
+}
+
+/* Monospaced only where it is actually a code. The same class over the prose
+   shown when adding made a sentence look like an identifier. */
+.statutory-form-sub.is-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .statutory-form-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  /* The scroller. Nothing above or below it moves. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px 20px 8px;
 }
 
@@ -54,16 +64,12 @@
   gap: 12px;
   padding: 12px 20px;
   border-top: 1px solid var(--border-color, #f0f0f0);
-  /* Sticks to the bottom of the scrolling panel rather than to the end of the
-     form, so Save and Close are reachable without finding them first. */
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  flex: 0 0 auto;
   background: var(--bg-container, #fff);
 }
 
 /* The form sits inside a Card body that paints its own surface. Match it rather
-   than assuming white, or the sticky bars are the wrong colour in dark mode. */
+   than assuming white, or the two bands are the wrong colour in dark mode. */
 [data-theme='dark'] .statutory-form-head,
 [data-theme='dark'] .statutory-form-actions {
   background: #1e293b;
