@@ -5,7 +5,7 @@ import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getPayrollRunById, getPayrollRecords, markPayrollPaid,
-  processPayrollRun, approvePayrollRun, validatePayrollRun, cancelPayrollRun,
+  processPayrollRun, approvePayrollRun, validatePayrollRun, cancelPayrollRun, reopenPayrollRun,
 } from '../../../services/hr/payrollService';
 import { PAYMENT_MODES } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
@@ -190,6 +190,47 @@ const PayrollRunView = () => {
     });
   }, [id, message, modal, fetchData]);
 
+  // Approval commits the recoveries, which is why cancelling after it is refused -
+  // but that left an approved run as a dead end, and a month that could not be run
+  // again however wrong it turned out to be. Reopening gives the recoveries back and
+  // puts the run where it was before approval.
+  const handleReopen = useCallback(() => {
+    let reason = '';
+    modal.confirm({
+      title: 'Reopen this payroll run?',
+      width: 520,
+      content: (
+        <>
+          <p style={{ marginTop: 0 }}>
+            The loan and advance recoveries this run posted are given back, and it returns to
+            <strong> Processed</strong> — where it was before it was approved. Process it again to
+            work it out afresh, or cancel it to free the month.
+          </p>
+          <p style={{ opacity: 0.7 }}>
+            The salaries already calculated are kept until you process it again. Nobody is paid
+            twice: this run has not been marked paid.
+          </p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Why it is being reopened (optional)"
+            onChange={(e) => { reason = e.target.value; }}
+          />
+        </>
+      ),
+      okText: 'Reopen',
+      cancelText: 'Leave approved',
+      onOk: async () => {
+        try {
+          await reopenPayrollRun(id, reason.trim() || undefined);
+          message.success('Approval taken back — the run is processed again');
+          fetchData();
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
+
   const handleMarkPaid = useCallback(async () => {
     try {
       const values = await payForm.validateFields();
@@ -237,6 +278,9 @@ const PayrollRunView = () => {
                 <Button loading={advancing} onClick={handleProcess}>Re-process</Button>
                 <Button type="primary" onClick={handleApprove}>Approve</Button>
               </>
+            )}
+            {run?.status === 'APPROVED' && canCancel && (
+              <Button onClick={handleReopen}>Reopen</Button>
             )}
             {run?.status === 'APPROVED' && canPay && (
               <Button type="primary" onClick={() => setPayOpen(true)}>Mark as Paid</Button>

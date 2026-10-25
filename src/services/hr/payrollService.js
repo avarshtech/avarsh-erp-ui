@@ -96,3 +96,15 @@ export const cancelPayrollRun = async (runId, reason) => {
   });
   return response.data;
 };
+
+/**
+ * Takes back an approval so the run can be worked out again.
+ * The loan and advance recoveries it posted are given back.
+ * POST /api/v1/hr/payroll/{id}/reopen
+ */
+export const reopenPayrollRun = async (runId, reason) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${runId}/reopen`, null, {
+    params: { reason },
+  });
+  return response.data;
+};
