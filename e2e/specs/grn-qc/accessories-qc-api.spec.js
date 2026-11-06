@@ -326,9 +326,10 @@ test.describe('Accessories QC — Validation (API)', () => {
     // DB schema has inspection_date NOT NULL — server may reject or use default.
     // This test documents whether Trims QC draft is lenient on inspectionDate.
     if (status === 200 && data?.id) {
-      createdQcIds.push(data.id);
       const { data: fetched } = await api.get(`/qc/${data.id}`);
       expect(fetched.qcType).toBe('Accessories');
+      // A GRN line takes one QC: free it for the next draft test
+      await api.delete(`/qc/${data.id}`);
     } else {
       // DEFECT or expected: DB enforces NOT NULL on inspection_date even for drafts
       expect([400, 500].includes(status)).toBeTruthy();

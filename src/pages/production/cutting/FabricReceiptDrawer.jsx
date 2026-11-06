@@ -67,16 +67,25 @@ const FabricReceiptDrawer = ({ open, mode = 'create', record, cutPos, onClose, o
   useEffect(() => {
     if (!open || onExisting) return;
     if (!cutPoId) { setRolls([]); setFabrics([]); chooseFabric(undefined, []); return; }
+    // The drawer opens on a default Cut PO: when the user picks another, the default's fabrics and rolls
+    // stayed listed until the picked one's arrived (or arrived last and replaced them), so a quick pick saved
+    // another Cut PO's rolls and was refused. They clear at once, and a late answer is dropped.
+    setRolls([]);
+    setFabrics([]);
+    chooseFabric(undefined, []);
     setLoadingRolls(true);
+    let current = true;
     Promise.all([getPendingRolls(cutPoId), getCutPoFabrics(cutPoId)])
       .then(([pending, list]) => {
+        if (!current) return;
         setRolls(pending);
         setFabrics(list);
         const withRolls = list.filter((f) => f.pendingRolls > 0);
         chooseFabric(withRolls.length === 1 ? withRolls[0].itemCode : undefined, pending);
       })
-      .catch(() => message.error('Failed to load issued rolls'))
-      .finally(() => setLoadingRolls(false));
+      .catch(() => { if (current) message.error('Failed to load issued rolls'); })
+      .finally(() => { if (current) setLoadingRolls(false); });
+    return () => { current = false; };
   }, [open, onExisting, cutPoId, message, chooseFabric]);
 
   const visibleRolls = useMemo(() => {

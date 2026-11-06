@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect } from 'react';
 import { Card, Table, Empty, Tag, Space, Typography, Tooltip } from 'antd';
 import { ProfileOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { formatNumber } from '../../../utils/formatters';
+import { formatNumber, formatCount } from '../../../utils/formatters';
 import { matchesGrnCategory } from '../../../utils/inventoryConstants';
 
 const { Text } = Typography;
@@ -27,8 +27,10 @@ const POLineItemPicker = memo(function POLineItemPicker({
       { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 170, render: (v, r) => <span style={{ whiteSpace: 'nowrap' }}>{r.variantCode || '—'}</span> },
       { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
       { title: 'UOM', dataIndex: 'uom', align: 'center', width: 70 },
-      { title: 'PO Qty', dataIndex: 'orderedQty', align: 'center', width: 100, render: (v) => formatNumber(v, 1) },
-      { title: 'Received Qty', dataIndex: 'receivedQty', align: 'center', width: 120, render: (v) => formatNumber(v, 1) },
+      // Quantities to their own precision (up to three decimals): rounded to one, 342.72 m read 342.7, and a
+      // store keeper receiving the balance shown left 0.02 open, the PO Partially_Received for good
+      { title: 'PO Qty', dataIndex: 'orderedQty', align: 'center', width: 100, render: (v) => formatCount(v) },
+      { title: 'Received Qty', dataIndex: 'receivedQty', align: 'center', width: 120, render: (v) => formatCount(v) },
       {
         title: 'Balance',
         dataIndex: 'pendingQty',
@@ -42,7 +44,7 @@ const POLineItemPicker = memo(function POLineItemPicker({
               </Tag>
             );
           }
-          return <Text strong style={{ color: 'var(--primary-color)' }}>{formatNumber(v, 1)}</Text>;
+          return <Text strong style={{ color: 'var(--primary-color)' }}>{formatCount(v)}</Text>;
         },
       },
       { title: 'Rate', dataIndex: 'rate', align: 'center', width: 100, render: (v) => formatNumber(v, 2) },

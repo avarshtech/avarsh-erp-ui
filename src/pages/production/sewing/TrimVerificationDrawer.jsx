@@ -49,8 +49,10 @@ const TrimVerificationDrawer = ({ open, record, orders, onClose, onSaved }) => {
   useEffect(() => {
     if (!open || !card?.orderId || card.items) return;
     setBomLoading(true);
-    getBomItems(card.orderId)
-      .then((items) => setCard((prev) => ({
+    const orderId = card.orderId;
+    getBomItems(orderId)
+      // A late answer for the order the drawer opened on must not fill the card of the order picked since
+      .then((items) => setCard((prev) => (prev?.orderId !== orderId ? prev : {
         ...prev,
         items: items.map((b) => ({ ...b, status: null, remarks: '' })),
       })))

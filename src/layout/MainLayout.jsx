@@ -66,7 +66,7 @@ const withPreviewTag = (label) => (
 );
 import ErrorBoundary from "../components/ErrorBoundary";
 import { APP_VERSION, consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
-import { getPendingApprovals } from "../services/core/approvalFlowService";
+import { getPendingApprovals, APPROVALS_CHANGED } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
@@ -238,7 +238,7 @@ const MainLayoutInner = () => {
     });
   }, [notification]);
 
-  // ── Pending approvals badge (refreshes on navigation + every 2 minutes) ──
+  // ── Pending approvals badge (refreshes on navigation, after an approval action, and every 2 minutes) ──
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +248,8 @@ const MainLayoutInner = () => {
         .catch(() => {});
     refresh();
     const timer = setInterval(refresh, 120000);
-    return () => { cancelled = true; clearInterval(timer); };
+    window.addEventListener(APPROVALS_CHANGED, refresh);
+    return () => { cancelled = true; clearInterval(timer); window.removeEventListener(APPROVALS_CHANGED, refresh); };
   }, [location.pathname]);
 
   // ── WCO: Auto-hide header (desktop standalone only) ──

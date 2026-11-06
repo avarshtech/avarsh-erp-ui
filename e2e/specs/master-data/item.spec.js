@@ -531,7 +531,7 @@ test.describe.serial('Item — CRUD', () => {
       await expect(page.locator('.ant-message').getByText(/Item created successfully/i)).toBeVisible({ timeout: 8000 });
     });
 
-    test('Edit: via row action, Update gated until dirty, variant value round-trips', async ({ page }) => {
+    test('Edit: via row action, Update gated until dirty, HSN editable, variant value round-trips', async ({ page }) => {
       await searchItems(page, seedItem.searchKey);
       await page.locator('.ant-table-row').filter({ hasText: seedItem.itemCode }).locator('.anticon-edit').click();
 
@@ -542,9 +542,10 @@ test.describe.serial('Item — CRUD', () => {
       // seeded variant attribute value resolved back into the form
       await expect(modal.getByPlaceholder(`Enter ${attrName}`)).toHaveValue('SeedShade');
 
-      // HSN (like the classifier triple and UOMs) is LOCKED in edit mode by design —
-      // dirty the form through the fields that stay editable.
-      await expect(modal.locator('#hsnCode')).toBeDisabled();
+      // HSN stays editable after creation (the classifier triple and UOMs are locked).
+      // POs already raised keep the HSN on their own lines; only the item changes.
+      await expect(modal.locator('#hsnCode')).toBeEnabled();
+      await modal.locator('#hsnCode').fill('620520');
       await antInputNumberFill(page, '#defaultAllowance', 7.25);
       await modal.locator('#description').fill('Edited in regression');
       await expect(modal.getByRole('button', { name: /Update/i })).toBeEnabled();
@@ -554,6 +555,7 @@ test.describe.serial('Item — CRUD', () => {
         modal.getByRole('button', { name: /Update/i }).click(),
       ]);
       expect(resp.status()).toBeLessThan(300);
+      expect((await resp.json()).hsnCode).toBe('620520');
       await expect(page.locator('.ant-message').getByText(/Item updated successfully/i)).toBeVisible({ timeout: 8000 });
     });
 

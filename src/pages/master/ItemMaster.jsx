@@ -1881,7 +1881,7 @@ const ItemMaster = () => {
                   label="HSN Code"
                   rules={[{ required: true, message: 'HSN Code is required' }]}
                 >
-                  <Input placeholder="Enter HSN Code" disabled={isEditMode} />
+                  <Input placeholder="Enter HSN Code" />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={12}>

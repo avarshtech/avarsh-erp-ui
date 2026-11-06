@@ -174,8 +174,9 @@ const FabricIssueForm = () => {
 
   const uomMismatch = useMemo(() => {
     if (!selectedLine || !availableRolls.length) return false;
-    // by alias: the rolls say 'Kilogram' where the line may say 'KG'
-    return availableRolls.some((r) => !sameUom(r.uom, selectedLine.uom));
+    // by alias: the rolls say 'Kilogram' where the line may say 'KG'. A roll with no unit recorded
+    // (GRNs saved before the API copied the PO line's) is not a mismatch: it shows the line's unit.
+    return availableRolls.some((r) => r.uom && selectedLine.uom && !sameUom(r.uom, selectedLine.uom));
   }, [selectedLine, availableRolls]);
 
   const bomRequired = selectedLine?.bomRequired || 0;

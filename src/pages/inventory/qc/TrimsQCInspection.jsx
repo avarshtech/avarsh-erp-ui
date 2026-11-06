@@ -29,6 +29,7 @@ import { validateTrimsQC } from '../../../utils/qcValidation';
 import { QC_STATUS } from '../../../utils/inventoryConstants';
 import { formatNumber } from '../../../utils/formatters';
 import TrimsQCCriteriaTable from './TrimsQCCriteriaTable';
+import useInspectedLines, { lineOption } from './useInspectedLines';
 
 const { Text } = Typography;
 
@@ -198,12 +199,10 @@ const TrimsQCInspection = () => {
     return [];
   }, [selectedGRN]);
 
+  const inspectedLines = useInspectedLines('Accessories', selectedGRN?.id, isNew);
   const lineItemOptions = useMemo(
-    () => lineItemSource.map((li) => ({
-      label: `${li.variantCode || li.itemCode || '—'} — ${li.variantName || li.description || '—'}`,
-      value: li.poLineItemId || li.id,
-    })),
-    [lineItemSource],
+    () => lineItemSource.map((li) => lineOption(li, inspectedLines)),
+    [lineItemSource, inspectedLines],
   );
 
   const selectedLineItem = useMemo(

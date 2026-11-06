@@ -50,6 +50,7 @@ import {
 } from '../../services/po/purchaseOrderService';
 import { getAllTermsConditions } from '../../services/master/termsConditionsService';
 import { getSuppliers } from '../../services/master/supplierService';
+import { getAllUOMs } from '../../services/master/masterDataService';
 import { autocompleteItems, getItemsByIds } from '../../services/master/itemService';
 import { useStore } from '../../context/StoreContext';
 import { useBranch } from '../../context/BranchContext';
@@ -361,7 +362,14 @@ const POForm = () => {
   const [entityVersion, setEntityVersion] = useState(null);
 
   // Store context
-  const { uoms } = useStore();
+  const { uoms, setData } = useStore();
+
+  // A BOM line's unit is resolved against this list. Nothing on the way to this screen loads it on a fresh
+  // session, and every line raised from a BOM was saved without a unit (go-live run, 2026-10-21).
+  useEffect(() => {
+    if (uoms?.length) return;
+    getAllUOMs().then(({ data }) => setData('uoms', data)).catch(() => { /* the API falls back to the item's unit */ });
+  }, [uoms?.length, setData]);
 
   const isEditMode = !!id;
 

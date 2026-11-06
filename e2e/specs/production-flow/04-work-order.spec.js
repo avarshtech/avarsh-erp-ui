@@ -27,7 +27,7 @@ test.describe('Production flow — Work Order', () => {
     await chooseLabelled(authedPage, 'Approved Cutting PO', cuttingPo.cuttingPoNo);
     await pickToday(authedPage, 'Planned Start');
     await pickToday(authedPage, 'Planned End');
-    await selectOptionByText(authedPage, 'Unit Unit', 'Unit 1');
+    await selectOptionByText(authedPage, 'Unit', 'Unit 1');
     await pickToday(authedPage, 'Planned Delivery Date');
 
     await applyBulkRate(authedPage, 25);
