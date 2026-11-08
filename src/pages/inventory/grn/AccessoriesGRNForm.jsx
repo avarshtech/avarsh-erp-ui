@@ -278,7 +278,7 @@ const AccessoriesGRNForm = () => {
       return;
     }
     const payload = buildPayload();
-    const errors = validateTrimsGRN(payload, false, { po: selectedPO });
+    const errors = validateTrimsGRN(payload, false, { po: selectedPO, isMultiBranch });
     if (errors.length) { errors.slice(0, 3).forEach((e) => message.error(e)); return; }
     setSavingDraft(true);
     try {
@@ -296,7 +296,7 @@ const AccessoriesGRNForm = () => {
   const handleSubmit = async () => {
     if (savingDraft || submittingForm) return;
     const payload = buildPayload();
-    const errors = validateTrimsGRN(payload, true, { po: selectedPO });
+    const errors = validateTrimsGRN(payload, true, { po: selectedPO, isMultiBranch });
     if (errors.length) { errors.slice(0, 5).forEach((e) => message.error(e)); return; }
     setSubmittingForm(true);
     try {

@@ -130,6 +130,8 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
   const advisories = [];
   const live = doc.lines.filter((l) => Number(l.poQty) > 0);
   if (!doc.poDate || !doc.vendor || !doc.process) blocking.push('PO date, process and job worker are mandatory (VR-01).');
+  // Checked on submit, not re-raised to the approver, who cannot edit the terms (CppValidator agrees)
+  if (ctx.stage !== 'approve' && !String(doc.paymentTerms ?? '').trim()) blocking.push('Select payment terms.');
   deliveryIssues(doc, 'requiredDeliveryDate').forEach((issue) => blocking.push(`${issue} (VR-01).`));
   if (!live.length) blocking.push('At least one line needs a PO quantity above zero (VR-02).');
   if (doc.poDate && dayjs(doc.poDate).isAfter(today, 'day')) blocking.push('The PO date cannot be in the future (VR-05).');

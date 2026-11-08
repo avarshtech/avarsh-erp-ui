@@ -21,16 +21,18 @@ export function sizePresetGroups(presets) {
 }
 
 /**
- * The category each variant section searches: exactly "Fabric", and names containing
- * "local trim" / "imported trim" — falling back to a general "Trims" category for both.
- * CostingMasterMatcher on the server applies the same rule.
+ * The category each variant section searches: "Fabric" (else the first name containing
+ * "fabric", e.g. "Fabrics"), and names containing "local trim" / "imported trim" — falling
+ * back to a general trims category ("Trims" / "Trim", else any other name containing "trim")
+ * for both. CostingMasterMatcher on the server applies the same rule.
  */
 export function resolveCategorySlots(categories) {
   const names = (categories || []).map((c) => c.name || '');
-  const find = (test) => names.find((n) => test(n.toLowerCase())) || '';
-  const general = find((n) => n.includes('trim') && !n.includes('local') && !n.includes('imported'));
+  const find = (test) => names.find((n) => test(n.trim().toLowerCase())) || '';
+  const general = find((n) => n === 'trims' || n === 'trim')
+    || find((n) => n.includes('trim') && !n.includes('local') && !n.includes('imported'));
   return {
-    fabric: find((n) => n === 'fabric'),
+    fabric: find((n) => n === 'fabric') || find((n) => n.includes('fabric')),
     localTrim: find((n) => n.includes('local trim')) || general,
     importedTrim: find((n) => n.includes('imported trim')) || general,
   };

@@ -21,7 +21,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import { getCurrentUser } from '../services/auth/authService';
-import { getUserById, changePassword } from '../services/admin/userService';
+import { getMe, changeMyPassword } from '../services/auth/meService';
 import NotificationPreferences from '../components/NotificationPreferences';
 import { NEW_PASSWORD_RULES } from '../utils/passwordPolicy';
 
@@ -45,8 +45,19 @@ const Profile = () => {
     setLoading(true);
     try {
       if (currentUser?.id) {
-        const response = await getUserById(currentUser.id);
-        setUserData(response);
+        // /me, not /users/{id}: the latter is the Users admin screen's and needs its key.
+        // /me carries no username or active flag; the session has the one, and a signed-in
+        // user is active by definition.
+        const me = await getMe();
+        setUserData({
+          id: me.userId,
+          name: me.name,
+          email: me.email,
+          roleName: me.role,
+          roleId: me.roleId,
+          username: currentUser.username,
+          isActive: true,
+        });
       }
     } catch (error) {
       console.error('Failed to load user profile:', error);
@@ -61,7 +72,7 @@ const Profile = () => {
   const handleChangePassword = async (values) => {
     setSaving(true);
     try {
-      await changePassword(currentUser.id, {
+      await changeMyPassword({
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
       });
