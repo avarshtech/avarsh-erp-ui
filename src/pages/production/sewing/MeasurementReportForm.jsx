@@ -10,6 +10,7 @@ import useSewingMasters from '../../../hooks/useSewingMasters';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { uploadFile } from '../../../services/core/fileService';
+import { hasPermission } from '../../../utils/permissions';
 import { pointStatus, measurementResult } from '../../../utils/sewingCalc';
 import {
   getMeasurement, saveMeasurement, getOrders, getMeasurementOpeningPoints,
@@ -186,9 +187,12 @@ const MeasurementReportForm = () => {
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
         <Space>
-          <Button icon={<FileExcelOutlined />} disabled={!order} onClick={() => setChartOpen(true)}>
-            Upload Measurement Chart
-          </Button>
+          {/* The chart is a production master: uploading it writes there, as on the masters screen. */}
+          {(hasPermission('production-masters', 'add') || hasPermission('production-masters', 'update')) && (
+            <Button icon={<FileExcelOutlined />} disabled={!order} onClick={() => setChartOpen(true)}>
+              Upload Measurement Chart
+            </Button>
+          )}
           <ActionButton action="save" text="Save Report" loading={saving} onClick={handleSave} />
         </Space>
       </PageHeader>
