@@ -38,7 +38,25 @@ export class ApiClient {
 
     const data = await response.json();
     this.token = data.token;
+    this._credentials = { user, pass };
     return data;
+  }
+
+  /**
+   * Run a request; when the access token has expired (a worker can outlive its hour-long
+   * token in long runs), sign in again with the same credentials and retry once.
+   */
+  async #send(makeRequest) {
+    let response = await makeRequest();
+    if (response.status() === 401 && this._credentials) {
+      let body = '';
+      try { body = await response.text(); } catch { /* no body */ }
+      if (/EXPIRED/i.test(body)) {
+        await this.login(this._credentials.user, this._credentials.pass);
+        response = await makeRequest();
+      }
+    }
+    return response;
   }
 
   /**
@@ -66,38 +84,38 @@ export class ApiClient {
     const url = params
       ? `${API_BASE}${path}?${new URLSearchParams(params)}`
       : `${API_BASE}${path}`;
-    const response = await this.request.get(url, { headers: this.headers(extraHeaders) });
+    const response = await this.#send(() => this.request.get(url, { headers: this.headers(extraHeaders) }));
     return this.#result(response);
   }
 
   async post(path, data, extraHeaders) {
-    const response = await this.request.post(`${API_BASE}${path}`, {
+    const response = await this.#send(() => this.request.post(`${API_BASE}${path}`, {
       headers: this.headers(extraHeaders),
       data,
-    });
+    }));
     return this.#result(response);
   }
 
   async put(path, data, extraHeaders) {
-    const response = await this.request.put(`${API_BASE}${path}`, {
+    const response = await this.#send(() => this.request.put(`${API_BASE}${path}`, {
       headers: this.headers(extraHeaders),
       data,
-    });
+    }));
     return this.#result(response);
   }
 
   async patch(path, data, extraHeaders) {
-    const response = await this.request.patch(`${API_BASE}${path}`, {
+    const response = await this.#send(() => this.request.patch(`${API_BASE}${path}`, {
       headers: this.headers(extraHeaders),
       data,
-    });
+    }));
     return this.#result(response);
   }
 
   async delete(path, extraHeaders) {
-    const response = await this.request.delete(`${API_BASE}${path}`, {
+    const response = await this.#send(() => this.request.delete(`${API_BASE}${path}`, {
       headers: this.headers(extraHeaders),
-    });
+    }));
     return this.#result(response);
   }
 
