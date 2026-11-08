@@ -48,7 +48,7 @@ async function ensureManagerUser(api) {
 }
 
 async function createDraftPo(api) {
-  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
+  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences });
   const res = await api.post('/purchase-orders', po);
   expect(res.status).toBeLessThan(300);
   expect(res.data.status).toBe('Draft');

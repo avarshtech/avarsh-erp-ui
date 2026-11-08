@@ -63,6 +63,8 @@ import { formatNumber } from '../../utils/formatters';
 import { poLineAmount, poLineTax, poTotals } from '../../utils/poAmounts';
 import { getVariantStockAvailability } from '../../services/inventory/inventoryService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
+import GeneralPoOrderPicker from './components/GeneralPoOrderPicker';
+import { GENERAL_PO_ORDERS_REQUIRED, generalOrderReferences } from './components/generalPoOrders';
 import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/core/pantoneService';
@@ -565,7 +567,11 @@ const POForm = () => {
       // Restore PO type
       setPoType(data.poType || PO_TYPE.GENERAL);
 
-      if (data.orderReferences && data.orderReferences.length > 0) {
+      // A General PO names its order(s) in the header picker; a legacy one may name none, and must
+      // pick one before it is saved again
+      if ((data.poType || PO_TYPE.GENERAL) === PO_TYPE.GENERAL) {
+        form.setFieldsValue({ generalOrders: data.orderReferences || [] });
+      } else if (data.orderReferences && data.orderReferences.length > 0) {
         // Fetch BOM data for each order reference
         const bomPromises = data.orderReferences.map(async (ref) => {
           try {
@@ -847,6 +853,7 @@ const POForm = () => {
         onOk: () => {
           setPoType(newType);
           setBomOrders([]);
+          form.setFieldsValue({ generalOrders: [] });
           setLineItems([createEmptyLineItem()]);
           setIsDirty(true);
         },
@@ -854,9 +861,10 @@ const POForm = () => {
     } else {
       setPoType(newType);
       setBomOrders([]);
+      form.setFieldsValue({ generalOrders: [] });
       setLineItems([createEmptyLineItem()]);
     }
-  }, [lineItems]);
+  }, [lineItems, form]);
 
   // BOM Fetch handler
   const handleFetchBom = useCallback(async (orderNo) => {
@@ -1183,6 +1191,9 @@ const POForm = () => {
     });
 
     // BOM-PO type validations
+    if (poType === PO_TYPE.GENERAL && !(form.getFieldValue('generalOrders') || []).length) {
+      errors.push(GENERAL_PO_ORDERS_REQUIRED);
+    }
     if (poType === PO_TYPE.REGULAR && bomOrders.length === 0) {
       errors.push('Please load a BOM by entering an order number');
     }
@@ -1276,6 +1287,7 @@ const POForm = () => {
       { match: 'delivery date', field: 'deliveryDate' },
       { match: 'terms', field: 'termsConditionId' },
       { match: 'remarks', field: 'remarks' },
+      { match: 'general po is for', field: 'generalOrders' },
     ];
 
     for (const { match, field } of fieldMap) {
@@ -1321,7 +1333,9 @@ const POForm = () => {
     return {
       version: entityVersion,
       poType: poType,
-      orderReferences: poType !== PO_TYPE.GENERAL ? bomOrders.map(o => ({ orderId: o.orderId, orderNo: o.orderNo, bomId: o.bomId, styleId: o.styleId, styleName: o.styleName, season: o.season })) : null,
+      orderReferences: poType !== PO_TYPE.GENERAL
+        ? bomOrders.map(o => ({ orderId: o.orderId, orderNo: o.orderNo, bomId: o.bomId, styleId: o.styleId, styleName: o.styleName, season: o.season }))
+        : generalOrderReferences(values.generalOrders),
       supplierId: values.supplierId,
       supplierName: supplier?.name || '',
       poDate: values.poDate?.format('YYYY-MM-DD'),
@@ -1451,6 +1465,10 @@ const POForm = () => {
       for (const field of fieldsToCompare) {
         if (String(currentPayload[field] ?? '') !== String(snapshot[field] ?? '')) return true;
       }
+
+      // Compare the orders it names (a legacy General PO picks its order on resubmit)
+      const orderIds = (p) => (p.orderReferences || []).map((r) => String(r?.orderId ?? '')).sort().join(',');
+      if (orderIds(currentPayload) !== orderIds(snapshot)) return true;
 
       // Compare line items
       const currentLines = currentPayload.lineItems || [];
@@ -2192,6 +2210,24 @@ const POForm = () => {
                 </Col>
                 {isMultiBranch ? <Col xs={24} md={12}><BranchField label="Deliver To (Branch)" /></Col> : <BranchField />}
               </Row>
+              {poType === PO_TYPE.GENERAL && (
+                <Row gutter={24}>
+                  <Col xs={24}>
+                    <Form.Item
+                      name="generalOrders"
+                      label="Order(s)"
+                      required
+                      rules={[{
+                        validator: (_, refs) => (refs?.length
+                          ? Promise.resolve()
+                          : Promise.reject(new Error(GENERAL_PO_ORDERS_REQUIRED))),
+                      }]}
+                    >
+                      <GeneralPoOrderPicker disabled={submitting || savingDraft} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
               <Row gutter={24}>
                 <Col xs={24}>
                   <Form.Item name="remarks" label="Remarks">

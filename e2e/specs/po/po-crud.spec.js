@@ -11,6 +11,7 @@
  *   - Create (SGST+CGST supplier) → re-GET → assert header + line fields + the
  *     split tax values round-trip and match the formula (base*gst/200 each half)
  *   - Create (IGST supplier) → assert single igstValue path round-trips
+ *   - A General PO must name its order(s): saved with one it round-trips, without one → 400
  *   - Header taxAmount/grandTotal == Σ line tax / subtotal+tax
  *   - Activity log: GET + POST a comment
  *   - Update + Delete (Draft-only)
@@ -36,7 +37,7 @@ test.afterAll(async () => {
 });
 
 async function createPo(supplier, opts) {
-  const payload = buildGeneralPo(supplier, refs.item, refs.terms, opts);
+  const payload = buildGeneralPo(supplier, refs.item, refs.terms, { orderReferences: refs.orderReferences, ...opts });
   const res = await api.post('/purchase-orders', payload);
   if (res.data?.id) createdPos.push(res.data.id);
   return { res, payload };
@@ -65,6 +66,8 @@ test.describe('PO — API Search & Field Round-Trip', () => {
     expect(got.supplierId).toBe(refs.localSupplier.id);
     expect(got.supplierName).toBe(refs.localSupplier.name);
     expect(got.remarks).toBe('E2E PO');
+    // every PO names its order(s), General included
+    expect((got.orderReferences || []).map((r) => r.orderNo)).toContain(refs.order.orderNo);
     expect(Number(got.subtotal)).toBeCloseTo(payload.subtotal, 2);     // 1000
     expect(Number(got.grandTotal)).toBeCloseTo(payload.grandTotal, 2); // 1180
     // split-mode header tax fields
@@ -109,6 +112,15 @@ test.describe('PO — API Search & Field Round-Trip', () => {
     expect(Number(line.igst)).toBeCloseTo(12, 2);
     expect(Number(line.igstValue)).toBeCloseTo(igst, 2);
     expect(Number(line.totalAmount)).toBeCloseTo(base + igst, 2);
+  });
+
+  test('A General PO that names no order is refused (400)', async () => {
+    const payload = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences });
+    payload.orderReferences = null;
+    const res = await api.post('/purchase-orders', payload);
+    if (res.data?.id) createdPos.push(res.data.id);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.data)).toContain('must name the order(s) it is for');
   });
 
   test('Header tax equals Σ line tax and grandTotal = subtotal + tax (multi-line)', async () => {

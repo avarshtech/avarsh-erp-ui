@@ -46,8 +46,9 @@ test.beforeAll(async () => {
   order = ok(await api.post('/orders', buildOrderPayload(costing, refs)), 'create order');
 
   const poRefs = await loadPoRefs(api);
-  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, {});
-  draft.orderReferences = [{ orderId: order.id, orderNo: order.orderNo }];
+  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, {
+    orderReferences: [{ orderId: order.id, orderNo: order.orderNo }],
+  });
   po = ok(await api.post('/purchase-orders', draft), 'create po');
   // Submit, then approve each level of the flow: a save can no longer jump a PO straight to
   // Sent_To_Supplier. With no flow, the submit itself approves it.

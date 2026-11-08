@@ -42,7 +42,7 @@ test.afterAll(async () => {
 });
 
 async function newDraftPo() {
-  const res = await api.post('/purchase-orders', buildGeneralPo(refs.localSupplier, refs.item, refs.terms, {}));
+  const res = await api.post('/purchase-orders', buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences }));
   if (res.data?.id) createdPos.push(res.data.id);
   expect(res.data.status).toBe('Draft');
   return res.data;

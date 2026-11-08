@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function submitFreshPo() {
-  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
+  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences });
   const created = await api.post('/purchase-orders', po);
   const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
   await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });

@@ -4,7 +4,7 @@
  * What this tests (real browser DOM):
  *   - List loads with the key columns; Status filter fires a search with status=
  *   - New form renders; "Add Item" is gated until a supplier is selected
- *   - Create a General PO through the form: pick supplier → add an item line →
+ *   - Create a General PO through the form: pick supplier → pick its order(s) → add an item line →
  *     type Qty / Unit Price / GST% → the Order Summary Grand Total updates to the
  *     GST-inclusive total (proving the frontend tax wiring) → Save as Draft →
  *     POST /purchase-orders 200 → returns to the list
@@ -18,11 +18,13 @@ import { test, expect } from '@playwright/test';
 import { antSelect, antTableWaitForData } from '../../helpers/antd-helpers.js';
 import { ensureSessionActive, goToListPage, navigateWithAuth } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { loadPoOrder, pickGeneralPoOrder } from '../../helpers/po-seed.js';
 
 // Item search/autocomplete matches VARIANT identity only since the refactor (B-014),
 // and the seeds carry no variants — so the create test seeds one to search for.
 const PO_VARIANT_NAME = 'PO Cotton Variant';
 
+/** Seeds the variant the item search needs; returns the order the General PO will name. */
 async function ensurePoVariant() {
   const api = await createAuthenticatedClient();
   try {
@@ -33,6 +35,7 @@ async function ensurePoVariant() {
         variants: [...(item.variants || []), { variantName: PO_VARIANT_NAME, attributes: {}, isActive: true }],
       });
     }
+    return await loadPoOrder(api);
   } finally {
     await api.dispose();
   }
@@ -85,7 +88,7 @@ test.describe('PO — General PO form & create', () => {
   });
 
   test('Create a General PO via the form: tax computes live → Save as Draft → list', async ({ page }) => {
-    await ensurePoVariant();
+    const poOrder = await ensurePoVariant();
     await navigateWithAuth(page, '/purchase-orders/supplier-po/new');
     await page.locator('#supplierId').waitFor({ state: 'visible', timeout: 15000 });
 
@@ -102,6 +105,9 @@ test.describe('PO — General PO form & create', () => {
     await panel.locator('.ant-picker-header-next-btn').click(); // next month → guaranteed future
     await panel.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled) .ant-picker-cell-inner')
       .filter({ hasText: /^15$/ }).first().click();
+
+    // 1c) A General PO must name the order(s) it is for ("Order(s)", above Remarks).
+    await pickGeneralPoOrder(page, poOrder.orderNo);
 
     // 2) The General form already starts with one empty line — use it (no Add Item).
     await expect(page.getByRole('button', { name: /Add Item/i })).toBeEnabled();

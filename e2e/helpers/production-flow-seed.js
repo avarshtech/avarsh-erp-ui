@@ -46,8 +46,10 @@ export async function buildUpstreamChain(api, { stamp, fabricQty = 200 } = {}) {
   ok(await api.patch(`/production/pp-status/${order.id}`, { status: 'COMPLETED' }), 'complete PP sample');
 
   const poRefs = await loadPoRefs(api);
-  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, { qty: fabricQty, unitPrice: 120 });
-  draft.orderReferences = [{ orderId: order.id, orderNo: order.orderNo, styleName: order.styleNo }];
+  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, {
+    qty: fabricQty, unitPrice: 120,
+    orderReferences: [{ orderId: order.id, orderNo: order.orderNo, styleName: order.styleNo }],
+  });
   draft.remarks = `${FLOW_MARK} ${stamp}`;
   let po = ok(await api.post('/purchase-orders', draft), 'create supplier PO');
   const poNow = ok(await api.get(`/purchase-orders/${po.id}`), 'read supplier PO');

@@ -34,7 +34,7 @@ test.describe('Approval engine — guards', () => {
   });
 
   test('AF12a — PO: saving a decided status while PENDING is refused', async () => {
-    const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
+    const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences });
     const created = await api.post('/purchase-orders', po);
     const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
     await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });
@@ -116,7 +116,7 @@ test.describe('Approval engine — guards', () => {
     const notes = [];
 
     try {
-      const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
+      const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences });
       const created = await api.post('/purchase-orders', po);
       const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
       await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });
