@@ -98,22 +98,19 @@ export const saveSpotWash = async (payload) => {
 // ── Module 5: Checking (auto-creates alterations per BR 8.3) ────────────────
 export const listCheckings = async () => { await delay(); return clone(db.checkings); };
 export const getChecking = async (id) => { await delay(); return clone(db.checkings.find((c) => c.id === Number(id))); };
-export const saveChecking = async (payload) => {
+/** A saved checking sheet with pieces to alter becomes an alteration job (BR 8.3). */
+export const routeCheckingToAlteration = async (row) => {
   await delay();
-  const existing = payload.id && db.checkings.find((c) => c.id === payload.id);
-  if (existing) { Object.assign(existing, payload); return clone(existing); }
-  const row = { id: nextId(db.checkings), checkNo: docNo('FCK', db.checkings), status: 'COMPLETED', ...payload };
-  db.checkings.push(row);
-  if (row.alterQty > 0) {
-    db.alterations.push({
-      id: nextId(db.alterations), alterNo: docNo('ALT', db.alterations),
-      orderId: row.orderId, color: row.color, size: row.size || '—', date: row.date,
-      alterPcs: row.alterQty, defectCode: row.defects?.[0]?.code || 'M-01', source: 'FINISHING',
-      doneById: null, recheckResult: 'PENDING', cycles: 1,
-      remarks: `Auto-created from ${row.checkNo}`, status: 'IN_PROGRESS',
-    });
-  }
-  return clone(row);
+  if (!row || !(row.alterQty > 0)) return null;
+  const alt = {
+    id: nextId(db.alterations), alterNo: docNo('ALT', db.alterations),
+    orderId: row.orderId, color: row.color, size: row.size || '—', date: row.date,
+    alterPcs: row.alterQty, defectCode: row.defects?.[0]?.code || 'M-01', source: 'FINISHING',
+    doneById: null, recheckResult: 'PENDING', cycles: 1,
+    remarks: `Auto-created from ${row.checkNo}`, status: 'IN_PROGRESS',
+  };
+  db.alterations.push(alt);
+  return clone(alt);
 };
 
 // ── Module 7: Measurement ───────────────────────────────────────────────────

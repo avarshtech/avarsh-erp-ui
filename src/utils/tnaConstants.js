@@ -6,6 +6,9 @@ import dayjs from 'dayjs';
 import { DATE_FORMAT, DATE_TIME_FORMAT } from './uiConstants';
 import { getCurrentUser } from './permissions';
 
+/** The scheduling, revision and delay rules every plan records (FR-12.1); mirrors TnaScheduler.RULE_VERSION. */
+export const RULE_VERSION = 'TNA-R1';
+
 // ── Activity status (§10, FR-7.1) ───────────────────────────────────────────
 export const ACTIVITY_STATUS = {
   NOT_STARTED: { color: 'default', label: 'Not started' },
@@ -71,9 +74,8 @@ export const ATTRIBUTION = {
 
 // ── Where each activity's completion event comes from (§6) ──────────────────
 export const SOURCE_STATUS = {
-  LIVE: { color: 'green', label: 'Live', hint: 'The source record exists in the ERP today' },
-  PROPOSED: { color: 'purple', label: 'Proposed', hint: 'Source-screen enhancement approved for Round 2; simulated in the mock' },
-  MISSING: { color: 'orange', label: 'Awaiting source', hint: 'No source event yet — never reopened for manual entry (FR-6.7)' },
+  LIVE: { color: 'green', label: 'From source', hint: 'Completed by its source record in the ERP' },
+  MANUAL: { color: 'purple', label: 'Manual', hint: 'No source record exists — recorded on the plan with remarks' },
 };
 
 export const DURATION_SOURCE = {
@@ -81,6 +83,9 @@ export const DURATION_SOURCE = {
   PRODUCT_TYPE: 'Product-type master',
   BUYER_PRODUCT_TYPE: 'Buyer + product-type master',
 };
+
+/** The milestones recorded on the plan because no source record exists (decision 2026-11-09). */
+export const MANUAL_MILESTONES = ['A09', 'A12', 'A16'];
 
 // ── Exceptions and data quality (§11.7, FR-10.5) ────────────────────────────
 export const SEVERITY = {
@@ -121,6 +126,7 @@ export const CHANGE_TYPE = {
   COMMITMENT_REVISION: { color: 'purple', label: 'Commitment revision' },
   PARTIAL_PROGRESS: { color: 'cyan', label: 'Partial progress' },
   ACKNOWLEDGEMENT: { color: 'magenta', label: 'Acknowledgement' },
+  MANUAL_ENTRY: { color: 'purple', label: 'Manual milestone' },
 };
 
 export const DELAY_BASIS = [
@@ -131,7 +137,7 @@ export const DELAY_BASIS = [
 /** Owning source modules — My Activities filter and the Masters "source screen" column. */
 export const SOURCE_MODULES = [
   'Order Entry', 'BOM', 'Purchase', 'Sampling', 'Stores', 'QC', 'Cutting', 'Cut Panel', 'Sewing',
-  'Garment Process', 'Finishing', 'Packing', 'Production', 'Orders',
+  'Garment Process', 'Finishing', 'Packing', 'Export Docs', 'Time & Action',
 ];
 
 /** Source-module screens a T&A row deep-links to (FR-8.6). */
@@ -139,7 +145,8 @@ export const SOURCE_ROUTES = {
   'Order Entry': '/orders/list', Orders: '/orders/list', BOM: '/bom/list', Purchase: '/purchase-orders/list',
   Sampling: '/sample-requests/list', Stores: '/inventory/grn/list', QC: '/inventory/qc', Cutting: '/production/cutting',
   'Cut Panel': '/bom/cut-panel/list', Sewing: '/production/sewing', 'Garment Process': '/bom/garment-process/list',
-  Packing: '/production/packing/list', Production: '/production/cutting',
+  Packing: '/production/packing/list', Production: '/production/cutting', Finishing: '/production/finishing',
+  'Export Docs': '/export-docs/shipments/list',
 };
 
 /** Width of the activity-name column on the timeline (WF-03). */

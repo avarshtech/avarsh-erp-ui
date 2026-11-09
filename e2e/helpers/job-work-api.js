@@ -75,7 +75,7 @@ export async function cutPanelPo(api, cpr, { vendor = VENDOR.printers, rate = 5,
   }));
   const po = ok(await api.post('/cut-panel-pos', {
     poDate: day(0), processName: process, vendorId: await vendorId(api, vendor), requiredDeliveryDate: day(10),
-    returnTo: 'CUTTING', returnUnitId: 1, instructions: 'Print to the approved strike-off', otherCharges: 0,
+    returnTo: 'CUTTING', returnUnitId: 1, instructions: 'Print to the approved strike-off', otherCharges: 0, paymentTerms: 'Open Account 30 Days',
     lastLineNo: lines.length, lines,
   }), 'create Cut Panel PO');
   return draft ? po : ok(await api.post(`/cut-panel-pos/${po.id}/submit`, { version: po.version }), 'submit Cut Panel PO');
@@ -90,7 +90,8 @@ export async function garmentProcessPo(api, gpr, { vendor = VENDOR.wash, rate = 
   }));
   const po = ok(await api.post('/garment-process-pos', {
     poDate: day(0), vendorId: await vendorId(api, vendor), requiredDate: day(20), returnTo: 'FINISHING', returnUnitId: 1,
-    expectedReturnDate: day(15), instructions: 'Enzyme wash, soft hand feel', otherCharges: 0, lastLineNo: lines.length, lines,
+    expectedReturnDate: day(15), instructions: 'Enzyme wash, soft hand feel', otherCharges: 0,
+    paymentTerms: 'Open Account 30 Days', lastLineNo: lines.length, lines,
   }), 'create Garment Process PO');
   return draft ? po : ok(await api.post(`/garment-process-pos/${po.id}/submit`, { version: po.version }), 'submit Garment Process PO');
 }

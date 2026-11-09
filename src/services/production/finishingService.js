@@ -4,6 +4,7 @@
  * the delegate without touching screens.
  */
 import * as mockApi from './finishingMockApi';
+import { saveChecking as saveCheckingApi } from './finishingCheckingApi';
 
 export const USE_MOCK_FINISHING_DATA = true;
 
@@ -19,9 +20,14 @@ export const rowTotal = mockApi.rowTotal;
 export const listSpotWash = (...a) => mockApi.listSpotWash(...a);
 export const saveSpotWash = (...a) => mockApi.saveSpotWash(...a);
 
-export const listCheckings = (...a) => mockApi.listCheckings(...a);
-export const getChecking = (...a) => mockApi.getChecking(...a);
-export const saveChecking = (...a) => mockApi.saveChecking(...a);
+// Checking sheets are on the real API; Alterations are still the mock, so a new sheet with
+// pieces to alter is routed there from here.
+export { listCheckings, getChecking } from './finishingCheckingApi';
+export const saveChecking = async (payload) => {
+  const saved = await saveCheckingApi(payload);
+  if (!payload?.id && saved?.alterQty > 0) await mockApi.routeCheckingToAlteration(saved);
+  return saved;
+};
 export const aqlSample = mockApi.aqlSample;
 export const dhuPct = mockApi.dhuPct;
 

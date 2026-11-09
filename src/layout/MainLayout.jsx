@@ -562,7 +562,7 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/assets",
+      key: "assets-menu",
       icon: <ToolOutlined />,
       label: "Assets",
       moduleId: ["assets", "asset-dashboard", "asset-reports", "asset-setup", "asset-transfers", "asset-disposals", "asset-verification"],

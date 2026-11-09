@@ -1,62 +1,45 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert, App, Button, Card, Checkbox, Col, DatePicker, Input, Row, Space, Table,
+  Alert, App, Card, Checkbox, Col, Row, Table,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getCalendar, saveCalendar } from '../../../services/tna/tnaService';
+import { getCalendar, saveSettings } from '../../../services/tna/tnaService';
 import { hasPermission } from '../../../utils/permissions';
 import { fmtDate } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
-import DeleteConfirm from '../../../components/buttons/DeleteConfirm';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((label, value) => ({ value, label }));
 
-/** FR-3.5 / A-02 — the factory working calendar: weekly off and declared holidays. */
+const COLUMNS = [
+  { title: 'Date', dataIndex: 'date', width: 120, render: fmtDate },
+  { title: 'Day', dataIndex: 'date', key: 'dow', width: 110, render: (d) => dayjs(d).format('dddd') },
+  { title: 'Holiday', dataIndex: 'name' },
+];
+
+/** FR-3.5 / A-02 — the working calendar: weekly off here, holidays from HR's holiday master (DEP-09). */
 const CalendarTab = () => {
   const { message } = App.useApp();
   const [cal, setCal] = useState(null);
-  const [draft, setDraft] = useState({ date: null, name: '' });
   const canEdit = hasPermission('tna-masters', 'update');
 
-  useEffect(() => { getCalendar().then(setCal).catch((e) => message.error(e.message)); }, [message]);
+  useEffect(() => { getCalendar().then(setCal).catch(() => message.error('Failed to load the working calendar')); }, [message]);
 
-  const persist = async (next, note) => {
+  const saveWeeklyOff = async (weeklyOff) => {
+    if (!weeklyOff.length) { message.warning('Keep at least one weekly off day'); return; }
     try {
-      setCal(await saveCalendar(next));
-      message.success(`${note} — applies to plans generated from now on`);
-    } catch (e) { message.error(e.message); }
-  };
-
-  const addHoliday = () => {
-    if (!draft.date || !draft.name.trim()) { message.warning('Enter a date and a name'); return; }
-    const date = draft.date.format('YYYY-MM-DD');
-    if (cal.holidays.some((h) => h.date === date)) { message.warning('That date is already declared'); return; }
-    persist({ ...cal, holidays: [...cal.holidays, { date, name: draft.name.trim() }].sort((a, b) => (a.date < b.date ? -1 : 1)) }, 'Holiday declared');
-    setDraft({ date: null, name: '' });
+      await saveSettings({ weeklyOff });
+      setCal((c) => ({ ...c, weeklyOff }));
+      message.success('Weekly off updated — plans are re-scheduled on it from their next sync');
+    } catch (e) { message.error(e?.response?.data?.message || 'Failed to save the weekly off'); }
   };
 
   if (!cal) return null;
-  const columns = [
-    { title: 'Date', dataIndex: 'date', width: 120, render: fmtDate },
-    { title: 'Day', dataIndex: 'date', key: 'dow', width: 110, render: (d) => dayjs(d).format('dddd') },
-    { title: 'Holiday', dataIndex: 'name' },
-    ...(hasPermission('tna-masters', 'delete') ? [{
-      title: '', key: 'x', width: 90,
-      render: (_, h) => (
-        <DeleteConfirm recordLabel={`${h.name} (${fmtDate(h.date)})`} onConfirm={() => persist({ ...cal, holidays: cal.holidays.filter((x) => x.date !== h.date) }, 'Holiday removed')}>
-          <Button size="small" danger>Remove</Button>
-        </DeleteConfirm>
-      ),
-    }] : []),
-  ];
-
   return (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={8}>
         <Card size="small" title="Working week">
           <div style={{ marginBottom: 8, fontSize: 13 }}>Weekly off</div>
-          <Checkbox.Group disabled={!canEdit} options={WEEKDAYS} value={cal.weeklyOff} onChange={(v) => persist({ ...cal, weeklyOff: v }, 'Weekly off updated')} />
+          <Checkbox.Group disabled={!canEdit} options={WEEKDAYS} value={cal.weeklyOff} onChange={saveWeeklyOff} />
           <Alert
             type="info"
             style={{ marginTop: 12 }}
@@ -66,16 +49,9 @@ const CalendarTab = () => {
       </Col>
       <Col xs={24} xl={16}>
         <Card size="small" title={`${cal.name} — ${cal.holidays.length} days declared`}>
-          {canEdit && (
-            <Space wrap style={{ marginBottom: 10 }}>
-              <DatePicker name="holidayDate" format={DATE_FORMAT} value={draft.date} onChange={(d) => setDraft((x) => ({ ...x, date: d }))} />
-              <Input name="holidayName" placeholder="Holiday name" style={{ width: 220 }} value={draft.name} onChange={(e) => setDraft((x) => ({ ...x, name: e.target.value }))} maxLength={60} />
-              <Button icon={<PlusOutlined />} onClick={addHoliday}>Declare holiday</Button>
-            </Space>
-          )}
-          <Table rowKey="date" size="small" bordered pagination={false} dataSource={cal.holidays} columns={columns} scroll={{ y: 360 }} />
+          <Table rowKey={(h) => `${h.date}-${h.name}`} size="small" bordered pagination={false} dataSource={cal.holidays} columns={COLUMNS} scroll={{ y: 360 }} />
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-            The holiday list is owned by HR / Administration (DEP-09). The 2026 list reproduces the CR worked example: 26-Aug, 02-Oct, 20-Oct and 21-Oct fall inside its plan period.
+            Holidays are maintained once, in <Link to="/hr/masters">HR › Masters › Holidays</Link>; Time &amp; Action schedules on the active ones.
           </div>
         </Card>
       </Col>

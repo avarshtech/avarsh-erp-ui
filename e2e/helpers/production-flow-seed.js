@@ -28,10 +28,11 @@ export const day = (n = 0) => {
 
 /**
  * Costing → order → BOM → PO → GRN → QC → stock. `fabricQty` is what the supplier PO buys and the GRN
- * receives, split over two rolls. Returns { order, bom, po, grn, qc, item, rolls }.
+ * receives, split over two rolls; `buyerId` picks the buyer (the seed's default when omitted), which is
+ * what decides the order's Time & Action template. Returns { order, bom, po, grn, qc, item, rolls }.
  */
-export async function buildUpstreamChain(api, { stamp, fabricQty = 200 } = {}) {
-  const costing = await seedApprovedCosting(api);
+export async function buildUpstreamChain(api, { stamp, fabricQty = 200, buyerId } = {}) {
+  const costing = await seedApprovedCosting(api, buyerId ? { buyerId } : {});
   const orderRefs = await loadOrderRefs(api, costing.buyerId);
   const created = ok(await api.post('/orders', buildOrderPayload(costing, orderRefs, { remarks: `${FLOW_MARK} ${stamp}` })), 'create order');
   ok(await api.put(`/orders/${created.id}/status`, { status: 'CONFIRMED', version: created.version }), 'confirm order');

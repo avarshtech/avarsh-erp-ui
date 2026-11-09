@@ -34,7 +34,7 @@ const ActivityFacts = memo(function ActivityFacts({ detail }) {
     ['Variance vs baseline', <DeltaTag key="v" value={a.baselineVariance} unit="WD" />],
     a.revisedVariance != null && ['Variance vs target at completion', <DeltaTag key="r" value={a.revisedVariance} unit="WD" />],
     ['Float', <span key="f"><span style={{ color: a.floatDays <= 0 ? 'var(--error-color)' : undefined, fontWeight: 600 }}>{signedDays(a.floatDays, 'WD')}</span> vs latest · <span style={{ color: a.floatDaysOriginal <= 0 ? 'var(--error-color)' : undefined }}>{signedDays(a.floatDaysOriginal, 'WD')}</span> vs original</span>],
-    ['Duration', `${a.duration} ${a.dayType === 'CD' ? 'calendar' : 'working'} days · ${DURATION_SOURCE[a.durationSource]}`],
+    ['Duration', `${a.duration} ${a.dayType === 'CD' ? 'calendar' : 'working'} days · ${DURATION_SOURCE[a.durationSource] || a.durationSource}`],
   ]);
   const evidence = section('Completion evidence', [
     ['Source screen', <span key="s">{a.sourceScreen} <Tag color={SOURCE_STATUS[a.sourceStatus].color} style={{ marginLeft: 6 }}>{SOURCE_STATUS[a.sourceStatus].label}</Tag></span>],
@@ -43,6 +43,7 @@ const ActivityFacts = memo(function ActivityFacts({ detail }) {
     a.awaitingSource && ['Awaiting source enhancement', a.missingNote],
     ['Source record', <SourceLink key="r" module={ev?.sourceModule || a.sourceModule} record={ev?.sourceRecord || a.sourceRecord} />],
     ev && ['Posted by', ev.postedBy],
+    ev?.note && [a.isManual ? 'Remarks' : 'Note', fmtText(ev.note)],
     a.requiredQty != null && ['Accepted / required', `${qty(a.achievedQty || 0, a.uom)} of ${qty(a.requiredQty, a.uom)} (${a.progressPct || (a.actualDate ? 100 : 0)}%)`],
     a.partials?.length > 1 && ['Earlier partial postings', a.partials.slice(0, -1).map((p) => `${p.ref} · ${qty(p.qty, a.uom)} · ${fmtDate(p.at)} — threshold not met`).join('; ')],
     a.outcome === 'REJECTED' && ['Outcome', <Tag key="o" color="red">Rejected — a new cycle was opened</Tag>],

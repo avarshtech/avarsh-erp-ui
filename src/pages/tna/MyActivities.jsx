@@ -7,7 +7,7 @@ import PageHeader from '../../components/PageHeader';
 import { listMyActivities, getMeta } from '../../services/tna/tnaService';
 import { SOURCE_MODULES, fmtDate, signedDays } from '../../utils/tnaConstants';
 import TnaStatusTag from './components/TnaStatusTag';
-import MockDataNote from './components/MockDataNote';
+import AsOfNote from './components/AsOfNote';
 
 const { Text } = Typography;
 const mono = { fontFamily: 'var(--font-mono, monospace)' };
@@ -56,7 +56,7 @@ const MyActivities = () => {
       <PageHeader
         title="My activities"
         subtitle="Open activities owned by your source module, across every live order — overdue first"
-        extra={<MockDataNote asOf={meta?.asOf} />}
+        extra={<AsOfNote asOf={meta?.asOf} />}
       />
       <Card size="small" styles={{ body: { paddingTop: 12 } }}>
         <Select
