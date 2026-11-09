@@ -2,7 +2,8 @@
  * T&A 03 — the newest production-flow order's plan, end to end (run after production-flow/08): every
  * milestone the ERP has a record for was completed by that record on its date; the three with no record
  * (pattern release, First Bulk Piece, PP meeting) are recorded on the plan page; Finishing › Checking
- * completes finishing output and the final AQL; a closed shipment dispatches the order and closes the plan.
+ * completes finishing output and the final AQL; what is packed ships in two parts, each capped at what is left,
+ * and the order — packed only in part by the flow — is not dispatched until it ships in full.
  */
 import { test, expect } from '../../fixtures.js';
 import {
@@ -126,34 +127,58 @@ test.describe.serial('T&A — one order from confirmation to dispatch', () => {
     expect(consoleGuard).toEqual([]);
   });
 
-  test('a closed shipment dispatches every line and closes the plan', async ({ api }) => {
+  test('what is packed ships in two parts; the order is not dispatched until it has shipped in full', async ({ api }) => {
     const { data: buyers } = await api.get('/buyers');
     const buyer = (Array.isArray(buyers) ? buyers : buyers.content).find((b) => b.id === order.buyerId);
     const portId = async (code) => (await api.get('/ports', { search: code, kinds: 'SEA' })).data.find((p) => p.code === code).id;
+    // production-flow/08 leaves its entry reopened for editing: packing is finished before anything ships
+    const { data: entries } = await api.get('/packing/entries', { orderId: order.id, page: 0, size: 50 });
+    for (const e of (entries.content || []).filter((x) => x.status === 'OPEN')) {
+      ok(await api.post(`/packing/entries/${e.id}/complete`, { version: e.version }), 'complete packing');
+    }
     const options = ok(await api.get('/export-docs/shipments/order-options', { buyerId: buyer.id }), 'order options');
     const option = options.find((o) => o.orderId === order.id);
     expect(option, 'the packed order is offered to a shipment').toBeTruthy();
-    const shipment = ok(await api.post('/export-docs/shipments', {
+    // Each buyer PO's packed pieces, split: about half on the first shipment, the rest on the second
+    const split = (packed, part) => Object.fromEntries(Object.entries(packed).map(([colour, sizes]) => [colour,
+      Object.fromEntries(Object.entries(sizes).map(([size, n]) => [size, part === 1 ? Math.ceil(n / 2) : Math.floor(n / 2)])
+        .filter(([, n]) => n > 0))]));
+    const shipmentBody = async (pos, n) => ({
       buyerId: buyer.id, notifyParty: { kind: 'LOCATION', locationId: buyer.shippingLocations[0].id },
-      orderIds: [order.id],
-      // Every buyer PO of the order goes on this shipment, as the screen ticks them
-      orderPos: [{ orderId: order.id, pos: option.pos.map((p) => ({ buyerPoNo: p.buyerPoNo, destination: p.destination })) }],
+      orderIds: [order.id], orderPos: [{ orderId: order.id, pos }],
       mode: 'SEA', incoterm: 'FOB', preCarriageBy: 'ROAD', placeOfReceipt: 'Tiruppur',
-      vesselFlightNo: 'MSC TNA E2E', portOfLoadingId: await portId('INMAA1'), portOfDischargeId: await portId('NLRTM'),
+      vesselFlightNo: `MSC TNA E2E ${n}`, portOfLoadingId: await portId('INMAA1'), portOfDischargeId: await portId('NLRTM'),
       finalDestination: 'Rotterdam, Netherlands', countryOfFinalDestination: 'Netherlands',
-      etd: today(), eta: today(), forwarder: 'Kuehne + Nagel', containerNos: ['TNAU1234567'],
-    }), 'create shipment');
-    expect(ok(await api.post(`/export-docs/shipments/${shipment.id}/close`), 'close shipment').status).toBe('CLOSED');
+      etd: today(), eta: today(), forwarder: 'Kuehne + Nagel', containerNos: [`TNAU123456${n}`],
+    });
+    const ship = async (part) => ok(await api.post('/export-docs/shipments', await shipmentBody(option.pos.map((p) => ({
+      buyerPoNo: p.buyerPoNo, destination: p.destination, colorQty: split(p.packed, part) })), part)), `shipment ${part}`);
 
-    const done = await planOf(api, order.id);
-    expect(act(done, 'A24').actualDate, 'dispatch from the closed shipment').toBe(today());
-    expect(act(done, 'A24').sourceRecord).toContain(shipment.shipmentNo);
-    expect(done.header.lines.every((l) => l.actualDispatch === today())).toBe(true);
-    expect(done.header.status).toBe('CLOSED');
-    expect(done.header.actualDispatch).toBe(today());
-    expect(done.header.latest.actualDelay, 'shipped before the commitment').toBeLessThanOrEqual(0);
+    const first = await ship(1);
+    expect(first.orders[0].pos[0].shipQty).toBeGreaterThan(0);
+    expect(ok(await api.post(`/export-docs/shipments/${first.id}/close`), 'close 1').status).toBe('CLOSED');
+    const second = await ship(2);
+    expect(ok(await api.post(`/export-docs/shipments/${second.id}/close`), 'close 2').status).toBe('CLOSED');
+    const packedTotal = option.pos.reduce((t, p) => t + Object.values(p.packed).flatMap(Object.values).reduce((a, n) => a + n, 0), 0);
+    expect(first.orders[0].pos.concat(second.orders[0].pos).reduce((t, p) => t + p.shipQty, 0), 'everything packed shipped once').toBe(packedTotal);
 
+    // Nothing packed is left, so a third shipment cannot send a single piece more of the same POs
+    const [firstColour] = Object.keys(option.pos[0].packed);
+    const [firstSize] = Object.keys(option.pos[0].packed[firstColour]);
+    const third = await api.post('/export-docs/shipments', await shipmentBody([{ buyerPoNo: option.pos[0].buyerPoNo,
+      destination: option.pos[0].destination, colorQty: { [firstColour]: { [firstSize]: 1 } } }], 9));
+    expect(third.status).toBe(422);
+    expect(third.data.message).toMatch(/is more than the 0 packed and not yet shipped/);
+
+    // The flow packs part of the order: below 95% of each line, the lines are not dispatched and the plan stays open
+    const plan = await planOf(api, order.id);
+    expect(act(plan, 'A24').actualDate, 'not dispatched: the order is not shipped in full').toBeNull();
+    expect(plan.header.lines.every((l) => !l.actualDispatch)).toBe(true);
+    expect(plan.header.status).toBe('ACTIVE');
+    expect(ok(await api.get(`/orders/${order.id}`), 'order').status).not.toBe('COMPLETED');
+
+    // Analytics counts dispatched orders only; it answers whether or not this one has gone
     const analytics = ok(await api.get('/tna/analytics', { months: 6 }), 'analytics');
-    expect(analytics.kpis.orders).toBeGreaterThanOrEqual(1);
+    expect(analytics.kpis).toBeTruthy();
   });
 });

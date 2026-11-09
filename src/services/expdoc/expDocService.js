@@ -127,7 +127,7 @@ export const deleteShipment = async (shipment) => {
   mirrorRemove(shipment.id);
 };
 /** The consignee's orders for the Orders picker: every status but cancelled, at the working branch. */
-export const listConsigneeOrders = (buyerId, search) => shipmentApi.listApiOrderOptions(buyerId, search);
+export const listConsigneeOrders = (buyerId, search, shipmentId) => shipmentApi.listApiOrderOptions(buyerId, search, 50, shipmentId);
 
 // ── Carton packing entry ── the Packing screens use the real API
 //    (services/production/packingService.js). Packing lists bind those real entries

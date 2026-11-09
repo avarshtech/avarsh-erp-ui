@@ -2,7 +2,7 @@
 //   npx vitest run src/pages/expdoc/shipments/shipmentPos.test.js
 import { describe, test, expect } from 'vitest';
 import {
-  poKey, poRefOf, poLabel, poChoicesOf, savedTicksOf, orderPosPayload,
+  poKey, poRefOf, poLabel, poChoicesOf, savedTicksOf, orderPosPayload, balanceOf, startQtyOf, totalOf,
 } from './shipmentPos.js';
 import { toApi } from '../../../services/expdoc/shipmentAdapter.js';
 
@@ -67,5 +67,35 @@ describe('a buyer PO on a shipment', () => {
     // A form value (the per-order ticks object) never travels as is
     expect(toApi({ orderIds: [5], orderPos: { 5: ['x'] } }).orderPos).toBeNull();
     expect(toApi({ orderIds: [5] }).orderPos).toBeNull();
+  });
+});
+
+describe('the pieces a buyer PO sends (2026-11-09)', () => {
+  const packedPo = { ...PO_101, packed: { Navy: { S: 10, M: 10 } }, shippedElsewhere: { Navy: { S: 4, M: 10 } } };
+
+  test('the balance is packed less other shipments, sizes with nothing left omitted', () => {
+    expect(balanceOf(packedPo)).toEqual({ Navy: { S: 6 } });
+    expect(totalOf(balanceOf(packedPo))).toBe(6);
+  });
+
+  test('a PO starts with what the shipment saved, else its balance; unknown packing starts with nothing', () => {
+    expect(startQtyOf(packedPo)).toEqual({ Navy: { S: 6 } });
+    expect(startQtyOf({ ...packedPo, colorQty: { Navy: { S: 2 } } })).toEqual({ Navy: { S: 2 } });
+    expect(startQtyOf(PO_102)).toBeNull();
+  });
+
+  test("an offered PO carries what the shipment saved of it", () => {
+    const [choice] = poChoicesOf([packedPo], [{ ...PO_101, colorQty: { Navy: { S: 3 } }, shipQty: 3 }]);
+    expect(choice.packed).toEqual(packedPo.packed);
+    expect(choice.colorQty).toEqual({ Navy: { S: 3 } });
+  });
+
+  test("the save sends the grid's pieces with each PO, and nothing when the grid was never shown", () => {
+    const payload = orderPosPayload([5], { 5: [poKey(PO_101), poKey(PO_102)] }, () => [], () => true,
+      { 5: { [poKey(PO_101)]: { Navy: { S: 6 } } } });
+    expect(payload).toEqual([{ orderId: 5, pos: [
+      { buyerPoNo: 'ZR-PO-101', destination: 'Arteixo DC', colorQty: { Navy: { S: 6 } } },
+      { buyerPoNo: 'ZR-PO-102', destination: 'Arteixo DC' },
+    ] }]);
   });
 });

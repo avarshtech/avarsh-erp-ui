@@ -42,6 +42,11 @@ export const closeApiShipment = async (id) =>
 export const reopenApiShipment = async (id) =>
   fromApi(await call(axiosInstance.post(`${BASE}/${id}/reopen`, null, QUIET)));
 
-/** The consignee's orders a shipment may carry: every status but cancelled, at the working branch. */
-export const listApiOrderOptions = (buyerId, search, size = 50) =>
-  call(axiosInstance.get(`${BASE}/order-options`, { params: { buyerId, ...(search ? { search } : {}), size } }));
+/**
+ * The consignee's orders a shipment may carry: every status but cancelled, at the working branch. Each buyer PO
+ * says what is packed and what other shipments take — `shipmentId`, the shipment being edited, not counting.
+ */
+export const listApiOrderOptions = (buyerId, search, size = 50, shipmentId = null) =>
+  call(axiosInstance.get(`${BASE}/order-options`, {
+    params: { buyerId, ...(search ? { search } : {}), size, ...(shipmentId ? { shipmentId } : {}) },
+  }));

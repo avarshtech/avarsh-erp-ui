@@ -30,8 +30,17 @@ let api;
 /** Every shipment a spec makes: removed at the end, or a long-lived stack collects them run after run. */
 const created = [];
 
+let zaraOrderId;
+
 test.beforeAll(async () => {
   api = await createAuthenticatedClient();
+  // A shipment sends what packing completed (2026-11-09): ORD/0002's two POs are packed for the form test
+  zaraOrderId = await orderIdOf(api, 'ORD/0002');
+  await purgeMarked(api, zaraOrderId);
+  await createEntry(api, { orderId: zaraOrderId, groups: [
+    range({ cartonFrom: 1, cartonTo: 2, buyerPoNo: 'ZR-PO-2025-101', destination: 'Arteixo DC', colorName: 'White' }),
+    range({ cartonFrom: 3, cartonTo: 4, buyerPoNo: 'ZR-PO-2025-102', destination: 'Arteixo DC', colorName: 'White' }),
+  ] });
 });
 
 test.afterAll(async () => {
@@ -41,6 +50,7 @@ test.afterAll(async () => {
     const open = data.status === 'CLOSED' ? (await api.post(`${API}/${id}/reopen`)).data : data;
     await api.delete(`${API}/${id}?version=${open.version}`);
   }
+  if (zaraOrderId) await purgeMarked(api, zaraOrderId);
   await api?.dispose();
 });
 

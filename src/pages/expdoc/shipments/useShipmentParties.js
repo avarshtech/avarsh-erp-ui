@@ -5,7 +5,7 @@ import {
   needsConsigneeAddress, consigneeAddressOptions, consigneeLocationOf, consigneeOf, notifyOf, rematchLocationId,
 } from './shipmentParties';
 import useConsigneeOrders from './useConsigneeOrders';
-import { poChoicesOf, poKey, orderPosPayload } from './shipmentPos';
+import { poChoicesOf, poKey, orderPosPayload, startQtyOf } from './shipmentPos';
 
 /**
  * The consignee side of the shipment form (rules in shipmentParties): the buyer the
@@ -27,7 +27,7 @@ const useShipmentParties = (form, buyers, record) => {
   // (`buyerId` is undefined for the first render after the form mounts.)
   const isSavedConsignee = Boolean(record) && (buyerId == null || buyerId === record.buyerId);
   const savedOrders = isSavedConsignee ? record.orders : null;
-  const orders = useConsigneeOrders(buyerId ?? null, savedOrders);
+  const orders = useConsigneeOrders(buyerId ?? null, savedOrders, record?.id ?? null);
   const notifyOptions = useMemo(() => {
     if (buyer) return notifyOptionsOf(buyer);
     // Until the buyer master answers, the saved notify party reads by name, not as its code.
@@ -65,6 +65,19 @@ const useShipmentParties = (form, buyers, record) => {
       form.setFieldValue(['orderPos', String(o.orderId)], o.choices.map(poKey));
     });
   }, [poOrders, form]);
+
+  // Each PO starts with the pieces the shipment saved, else its balance, once its packing is known
+  const ticks = Form.useWatch('orderPos', form);
+  useEffect(() => {
+    poOrders.forEach((o) => {
+      const ticked = ticks?.[String(o.orderId)] || [];
+      o.choices.filter((p) => ticked.includes(poKey(p))).forEach((p) => {
+        const path = ['shipQty', String(o.orderId), poKey(p)];
+        const start = startQtyOf(p);
+        if (start && form.getFieldValue(path) === undefined) form.setFieldValue(path, start);
+      });
+    });
+  }, [poOrders, ticks, form]);
 
   // Once the buyer master answers: a saved location whose id Buyer Master has renewed is
   // matched again by its label; a choice the master no longer offers at all (a retired
@@ -107,7 +120,7 @@ const useShipmentParties = (form, buyers, record) => {
     // The server needs it only when the bank is notified and the buyer has several locations.
     consigneeLocationId: values.notifyValue === NOTIFY_BANK ? values.consigneeLocationId ?? null : null,
     orderIds: values.orderIds || [],
-    orderPos: orderPosPayload(values.orderIds || [], values.orderPos, choicesOf, knownOf),
+    orderPos: orderPosPayload(values.orderIds || [], values.orderPos, choicesOf, knownOf, values.shipQty),
   }), [choicesOf, knownOf]);
 
   return {
