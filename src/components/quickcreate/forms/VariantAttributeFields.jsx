@@ -1,4 +1,8 @@
 import { Col, Divider, Form, Input, Row, Select } from 'antd';
+import PantoneColorInput from '../../PantoneColorInput';
+
+/** A colour attribute picks a Pantone shade, as in Item Master. */
+const isColour = (attr) => /colou?r/i.test(attr.attributeName || '');
 
 /**
  * The variant: its name and one value per attribute of the item type (every attribute is
@@ -26,7 +30,9 @@ export default function VariantAttributeFields({ attributes, isNewType, allAttri
             <Col span={12} key={attr.id}>
               <Form.Item name={`attr_${attr.id}`} label={attr.attributeName}
                 rules={[{ required: true, whitespace: true, message: `${attr.attributeName} is required` }]}>
-                <Input placeholder={attr.attributeName} maxLength={100} />
+                {isColour(attr)
+                  ? <PantoneColorInput placeholder={`Enter ${attr.attributeName} code or name`} />
+                  : <Input placeholder={attr.attributeName} maxLength={100} />}
               </Form.Item>
             </Col>
           ))}

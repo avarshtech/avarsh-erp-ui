@@ -11,7 +11,17 @@ import {
   resolveCategorySlots, sizePresetGroups, toBuyerOptions, toCostMasterOptions, toSupplierOptions, toVendorOptions, unwrapList,
 } from '../model/masterOptions';
 
-const loadManufacturing = () => getActiveProcesses('Manufacturing');
+// Section D prices every process the garment goes through: the making processes, the cut-panel
+// processes (printing, embroidery …) and the garment processes (washing, dyeing …), each once.
+const MANUFACTURING_CATEGORIES = ['Manufacturing', 'Cut Panel', 'Garment'];
+const loadManufacturing = () => Promise.all(MANUFACTURING_CATEGORIES.map((c) => getActiveProcesses(c).catch(() => [])))
+  .then((lists) => {
+    const seen = new Set();
+    const all = lists.flatMap((l) => unwrapList(l)).filter((p) => !seen.has(p.id) && seen.add(p.id));
+    // A name two categories share ("Other") reads with its category, so the pick is unambiguous
+    const count = all.reduce((m, p) => m.set(p.processName, (m.get(p.processName) || 0) + 1), new Map());
+    return all.map((p) => (count.get(p.processName) > 1 ? { ...p, processName: `${p.processName} (${p.category})` } : p));
+  });
 
 /** Every master list the sheet's pickers read, with an `add` for each quick-create. */
 export default function useSheetMasters() {
