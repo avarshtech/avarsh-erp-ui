@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { App, Modal, Table, Tag, Typography, Space, Empty, Spin, Alert } from 'antd';
 import { ImportOutlined } from '@ant-design/icons';
 import { getBomsByStyleId } from '../../services/costing/costingService';
+import { bomLineUomFields } from './sheet/model/rowFactory';
 
 const { Text } = Typography;
 
@@ -40,7 +41,8 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
         variantName: line.variantName || '',
         description: line.variantName || line.itemName || '',
         consumption: line.consumptionPerGarment || 0,
-        uom: line.uom || '',
+        // Consumption in the BOM's unit, priced per its purchase unit: the factor travels with it
+        ...bomLineUomFields(line),
         sizes: '',
         comments: line.remarks || '',
       };

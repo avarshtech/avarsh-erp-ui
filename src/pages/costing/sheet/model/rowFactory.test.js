@@ -2,7 +2,7 @@
 // they behave today (2026-10-12).
 //   npx vitest run src/pages/costing/sheet/model/rowFactory.test.js
 import { describe, test, expect } from 'vitest';
-import { blankRow, hydrateRows, masterRecordPatch, nextKey, recalcRow, variantPatch, variantUomFields } from './rowFactory';
+import { blankRow, bomLineUomFields, hydrateRows, masterRecordPatch, nextKey, recalcRow, variantPatch, variantUomFields } from './rowFactory';
 
 describe('recalcRow: the one place a row\'s amount is derived', () => {
   test('fabric net cost, local trim price and imported trim price (USD)', () => {
@@ -55,6 +55,18 @@ describe('what a pick writes onto a row', () => {
     expect(variantUomFields({ uomId: 1, uomSymbol: 'PCS' }))
       .toEqual({ uom: 'PCS', uomId: 1, primaryUom: 'PCS', primaryUomId: 1, secondaryUomId: null, uomConversionFactor: null });
     expect(variantUomFields({ uomId: 1, uomSymbol: 'PCS', secondaryUomId: 1, uomConversionFactor: 12 }).uomConversionFactor).toBeNull();
+  });
+
+  test('a BOM line consumed in CM and bought in MTR imports with its factor, so cost converts (C-11)', () => {
+    const fields = bomLineUomFields({ uom: 'CM', purchaseUom: 'MTR', uomConversionFactor: '100' });
+    expect(fields).toEqual({ uom: 'CM', primaryUom: 'MTR', uomConversionFactor: 100 });
+    const row = hydrateRows('fabric', [{ key: 'f1', consumption: 140, fabricPrice: 100, ...fields }])[0];
+    expect(row.netCost).toBeCloseTo(140, 2);
+  });
+
+  test('a BOM line in one unit, or the same unit spelt two ways, imports with no factor', () => {
+    expect(bomLineUomFields({ uom: 'PCS', uomConversionFactor: 1 }).uomConversionFactor).toBeNull();
+    expect(bomLineUomFields({ uom: 'KG', purchaseUom: 'Kilogram', uomConversionFactor: 1000 }).uomConversionFactor).toBeNull();
   });
 
   test('a fabric pick names the fabric and reads knit or woven off its sub-category', () => {

@@ -1,5 +1,5 @@
 import { calcFabricNetCost, calcTrimPrice } from '../../../../utils/costingConstants';
-import { conversionApplies } from '../../../../utils/uomConversions';
+import { conversionApplies, sameUom } from '../../../../utils/uomConversions';
 import { SECTION_CONFIG } from './sectionConfig';
 
 // Row keys come from a counter, never Date.now(): two rows added in the same millisecond
@@ -55,6 +55,21 @@ export const variantUomFields = (variant) => {
     primaryUomId: variant?.uomId ?? null,
     secondaryUomId: variant?.secondaryUomId ?? null,
     uomConversionFactor: factorApplies ? Number(variant.uomConversionFactor) : null,
+  };
+};
+
+/**
+ * The UOM fields a row imported from a BOM line inherits. The BOM line names units, not ids:
+ * consumption in `uom`, the rate's unit in `purchaseUom`, and the factor between them — kept
+ * only when the two units really differ, as for a picked variant (C-11).
+ */
+export const bomLineUomFields = (line) => {
+  const purchaseUom = line?.purchaseUom || line?.uom || '';
+  const factorApplies = !sameUom(line?.uom, purchaseUom) && Number(line?.uomConversionFactor) > 0;
+  return {
+    uom: line?.uom || '',
+    primaryUom: purchaseUom,
+    uomConversionFactor: factorApplies ? Number(line.uomConversionFactor) : null,
   };
 };
 
