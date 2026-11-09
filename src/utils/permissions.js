@@ -309,7 +309,7 @@ export const SCREENS = [
   { id: 'production-finishing', name: 'Production — Finishing', section: 'production', kind: 'screen',
     path: '/production/finishing',
     routes: ['/production/finishing', '/production/finishing/checking/new', '/production/finishing/checking/:id'],
-    ops: STANDARD_OPERATIONS, preview: true },
+    ops: STANDARD_OPERATIONS },
   { id: 'production-packing', name: 'Production — Packing', section: 'production', kind: 'screen',
     path: '/production/packing/list',
     routes: ['/production/packing/list', '/production/packing/new', '/production/packing/edit/:id'],

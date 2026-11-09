@@ -1,56 +1,27 @@
 /**
- * Finishing module API surface. Mock-only during the design phase; signatures
- * mirror the future real endpoints (/api/v1/finishing/…) so integration swaps
- * the delegate without touching screens.
+ * Finishing module API surface. Every register is on the real API (/api/v1/finishing/…); this
+ * module keeps the one import path the screens use.
  */
-import * as mockApi from './finishingMockApi';
-import { saveChecking as saveCheckingApi } from './finishingCheckingApi';
+export const USE_MOCK_FINISHING_DATA = false;
 
-export const USE_MOCK_FINISHING_DATA = true;
+export { rowTotal, aqlSample, dhuPct } from './finishingCalc';
 
-export const getEmployees = (...a) => mockApi.getEmployees(...a);
+export {
+  getEmployees,
+  listReceivings, saveReceiving,
+  getHourlySheet, saveHourlySheet,
+  listSpotWash, saveSpotWash,
+  listAlterations, saveAlterationBatch, saveAlteration,
+  listMetalDetection, saveMetalDetection, listNeedleLog,
+  listShadeGroups, saveShadeGroup,
+  getFinishingDashboard,
+} from './finishingFloorApi';
 
-export const listReceivings = (...a) => mockApi.listReceivings(...a);
-export const saveReceiving = (...a) => mockApi.saveReceiving(...a);
+// Checking sheets. A sheet with pieces to alter raises its alteration job on the server.
+export { listCheckings, getChecking, saveChecking } from './finishingCheckingApi';
 
-export const getHourlySheet = (...a) => mockApi.getHourlySheet(...a);
-export const saveHourlySheet = (...a) => mockApi.saveHourlySheet(...a);
-export const rowTotal = mockApi.rowTotal;
-
-export const listSpotWash = (...a) => mockApi.listSpotWash(...a);
-export const saveSpotWash = (...a) => mockApi.saveSpotWash(...a);
-
-// Checking sheets are on the real API; Alterations are still the mock, so a new sheet with
-// pieces to alter is routed there from here.
-export { listCheckings, getChecking } from './finishingCheckingApi';
-export const saveChecking = async (payload) => {
-  const saved = await saveCheckingApi(payload);
-  if (!payload?.id && saved?.alterQty > 0) await mockApi.routeCheckingToAlteration(saved);
-  return saved;
-};
-export const aqlSample = mockApi.aqlSample;
-export const dhuPct = mockApi.dhuPct;
-
-export const listFinishingMeasurements = (...a) => mockApi.listFinishingMeasurements(...a);
-export const getFinishingMeasurement = (...a) => mockApi.getFinishingMeasurement(...a);
-export const saveFinishingMeasurement = (...a) => mockApi.saveFinishingMeasurement(...a);
-
-export const listAlterations = (...a) => mockApi.listAlterations(...a);
-export const saveAlterationBatch = (...a) => mockApi.saveAlterationBatch(...a);
-export const saveAlteration = (...a) => mockApi.saveAlteration(...a);
-
-export const listMetalDetection = (...a) => mockApi.listMetalDetection(...a);
-export const saveMetalDetection = (...a) => mockApi.saveMetalDetection(...a);
-export const listNeedleLog = (...a) => mockApi.listNeedleLog(...a);
-
-export const listShadeGroups = (...a) => mockApi.listShadeGroups(...a);
-export const saveShadeGroup = (...a) => mockApi.saveShadeGroup(...a);
-
-export const getFinishingDashboard = (...a) => mockApi.getFinishingDashboard(...a);
-
-// Finishing carries its own measurement chart while it is still mock-backed;
-// the real chart lives in mst_measurement_specs and lands here when Finishing
-// is cut over to the backend.
+// Finishing carries its own measurement chart; the real chart lives in mst_measurement_specs
+// and is not wired to Finishing yet.
 export { specPoints, fullMeasurementChart } from './finishingMockData';
 
 // Cross-module and real. Orders come from the API rather than the finishing

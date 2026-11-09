@@ -5,6 +5,8 @@ import { newest, twinGet } from './twinHttp';
 export const fetchProcessIssues = () => twinGet('/finishing/process-issues', { page: 0, size: 100 })
   .then((page) => page?.content || []);
 
+export const fetchFinishingDashboard = () => twinGet('/finishing/dashboard');
+
 export const fetchPackingEntries = (since) => twinGet('/packing/entries', { page: 0, size: 100, dateFrom: since })
   .then((page) => ({ ...page, content: (page?.content || []).map(decorateEntry) }));
 
