@@ -1,8 +1,8 @@
 /**
  * The REAL Carton Packing entries (Production, /api/v1/packing/entries), mirrored in
- * memory for the packing lists that still run on the mock — the same arrangement as
- * the shipments (expDocShipmentMirror). loadDb() lays them over `db.packingEntries`
- * and saveDb() strips them, so no entry is ever kept in the browser.
+ * memory for the packing-list rules that read them synchronously — the same arrangement
+ * as the shipments (expDocShipmentMirror). loadDb() lays them over `db.packingEntries`
+ * and saveDb() ignores them, so no entry is ever kept in the browser.
  *
  * - Read per ORDER: a packing list takes the entries of its shipment's orders.
  * - Fresh for 30 s per order; concurrent syncs share one request. A failed read keeps

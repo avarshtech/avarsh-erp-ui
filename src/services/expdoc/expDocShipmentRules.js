@@ -2,8 +2,8 @@
  * When a shipment closes, decided from the documents raised against it. Pure, so the
  * unit spec runs it in Node; expDocShipmentBridge applies the answer through the API.
  *
- * Until packing lists and invoices move to the API, "the documents" are the ones in
- * this browser.
+ * "The documents" are the packing lists and invoices the document store loaded from the
+ * API (expDocStore); every user who can raise one reads them all.
  */
 import { PL_STATUS, SHIPMENT_STATUS } from '../../utils/expDocConstants.js';
 

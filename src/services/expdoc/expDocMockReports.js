@@ -9,7 +9,7 @@
  * counts have no ceiling. It expands ONLY the requested page rather than materialising
  * a shipment and slicing it, so the cost of page 900 is the same as page 1.
  */
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { delay, clone, pageOf, matchesText, colourKey } from './expDocMockCommon';
 import { PL_STATUS, DOC_TYPE, TEMPLATE_STATUS } from '../../utils/expDocConstants';
 import {

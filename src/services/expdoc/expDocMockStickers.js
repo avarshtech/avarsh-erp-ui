@@ -7,15 +7,15 @@
  *
  * Print history is stored as RANGES, never one row per carton. A shipment's carton
  * count follows the buyer's order quantity, so a per-carton map would grow without
- * bound and would be the first thing to blow the browser's storage budget. Per-carton
+ * bound and would be the first thing to bloat every document load. Per-carton
  * history ("who printed carton 57, when, how many times") is derived on read by
  * intersecting ranges — PRD §20 asks for the answer, not for that storage shape.
  *
  * The template a run prints with lives in the API. expDocService resolves it and hands
  * its layout in (`options.layout`, the choices as `options.layoutOptions`), so this
- * mock never calls the API; a run records the revision it printed with, not a copy.
+ * module never calls the API; a run records the revision it printed with, not a copy.
  */
-import { loadDb, saveDb, nextStickerRunNo } from './expDocMockStore';
+import { loadDb, saveDb, nextStickerRunNo, newDocId } from './expDocStore';
 import {
   delay, clone, fail, pageOf, pushAudit, nowStamp, currentUserName,
 } from './expDocMockCommon';
@@ -470,9 +470,8 @@ export const generateStickerRun = async (plId, options = {}) => {
   }
 
   const layoutBindings = printedPaths(layout);
-  // One entry per ROW. A per-carton map is O(cartons) in localStorage — the exact
-  // storage shape this module refuses everywhere else, and enough to blow the
-  // ~5 MB quota on a large shipment, taking the whole mock store with it.
+  // One entry per ROW. A per-carton map is O(cartons) in the stored run — the exact
+  // storage shape this module refuses everywhere else, and every user loads every run.
   const rowHashes = {};
   // And the numbers each row printed under: a later renumbering is then a reprint (V-14)
   const rowRanges = {};
@@ -484,7 +483,7 @@ export const generateStickerRun = async (plId, options = {}) => {
     rowRanges[rowId] = { from: row.cartonFrom, to: row.cartonTo };
   });
 
-  const id = Math.max(0, ...(db.stickerRuns || []).map((r) => r.id)) + 1;
+  const id = newDocId();
   const run = {
     id,
     runNo: nextStickerRunNo(db),

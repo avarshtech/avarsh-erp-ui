@@ -25,7 +25,7 @@ import { getAllSizePresets } from '../../../services/master/sizePresetService';
 import {
   getPackingEntry, createPackingEntry, updatePackingEntry, setPackingEntryStatus,
 } from '../../../services/production/packingService';
-import { afterPackingEntrySaved, packingListsOfEntries } from '../../../services/expdoc/expDocService';
+import { afterPackingEntrySaved, packingListsOfEntries, loadExportDocuments } from '../../../services/expdoc/expDocService';
 import { resolveOrderSizes, orderPosOf } from '../../../utils/orderSizes';
 import CartonGroupEditor from './CartonGroupEditor';
 import PackAsPlan from './PackAsPlan';
@@ -224,8 +224,17 @@ const CartonPackingForm = () => {
   const missingPo = orderPos.length > 1 && groups.some((g) => !g.buyerPoNo
     // The same PO to two destinations: the range must say which
     || (!g.destination && orderPos.filter((p) => p.buyerPoNo === g.buyerPoNo).length > 1));
-  // The packing lists in this browser holding this entry (Export Docs still keeps them here)
-  const onLists = useMemo(() => (record?.id ? packingListsOfEntries([record.id])[record.id] || [] : []), [record]);
+  // The packing lists holding this entry, once the export documents have loaded
+  const [docsLoaded, setDocsLoaded] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadExportDocuments().then(() => { if (alive) setDocsLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+  const onLists = useMemo(
+    () => (docsLoaded && record?.id ? packingListsOfEntries([record.id])[record.id] || [] : []),
+    [record, docsLoaded],
+  );
 
   const handleGroupsChange = useCallback((next) => {
     setGroups(next);

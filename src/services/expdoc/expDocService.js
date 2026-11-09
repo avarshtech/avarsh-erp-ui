@@ -1,19 +1,19 @@
 /**
  * Export Documentation API surface — the ONLY file screens import.
  *
- * On the real API: shipments (/api/v1/export-docs/shipments) and the buyer templates
+ * Everything is the API's: shipments (/api/v1/export-docs/shipments), the buyer templates
  * for packing lists, invoices and carton stickers (/api/v1/export-docs/templates, via
- * expDocTemplateStore). Everything else is still the mock, and every mock function
- * keeps the signature the future real endpoints will take, so integration swaps the
- * delegate without touching a screen. The section comments record the endpoint each
- * group maps to.
+ * expDocTemplateStore), and the packing lists, invoices, sticker runs, audit trail and
+ * masters (/api/v1/export-docs/documents, via expDocStore). The documents' rules still run
+ * here, in the expDocMock*.js modules, against the documents the store loaded; the section
+ * comments record the endpoint each group would map to if those rules move to the server.
  *
- * The mock documents read the API's shipments from an in-memory mirror, synced before
- * each call that reads one (withShipments), and close or reopen a shipment as they
- * are released, cancelled or revised (thenSyncShipment).
- *
- * Flipping USE_MOCK_EXPDOC_DATA to false before a backend exists throws a loud,
- * named error rather than silently returning undefined.
+ * - A call that reads documents syncs the store first (withDocuments, fresh within 30 s).
+ * - A call that changes them is a document action (docWrite): the store reloads, the rules
+ *   run, and every change is saved in one batch, or none is.
+ * - The documents read the API's shipments from an in-memory mirror, synced before each
+ *   call that reads one (withShipments), and close or reopen a shipment once their change
+ *   is saved (thenSyncShipment).
  */
 import { USE_MOCK_EXPDOC_DATA } from './expDocEnv';
 import * as mockMasters from './expDocMockMasters';
@@ -22,6 +22,7 @@ import * as shipmentApi from './shipmentApi';
 import { optionOf } from './shipmentAdapter';
 import { syncShipmentMirror, mirrorPut, mirrorRemove } from './expDocShipmentMirror';
 import { syncShipmentStatus, assertShipmentDeletable } from './expDocShipmentBridge';
+import { syncDocuments, runWrite } from './expDocStore';
 import { buyerCodeOf } from './expDocMockData';
 import {
   syncPackingMirror, putPackingEntry, removePackingEntry as forgetPackingEntry, canReadPacking as packingReadable,
@@ -41,7 +42,7 @@ import { resolveStickerTemplate } from './expDocStickerTemplates';
 import { INCOTERMS, SHIPMENT_STATUS } from '../../utils/expDocConstants';
 
 const notReady = () => {
-  throw new Error('Export Documentation backend not implemented yet — mock phase');
+  throw new Error('Export Documentation documents are switched off (USE_MOCK_EXPDOC_DATA)');
 };
 const guard = (impl) => (USE_MOCK_EXPDOC_DATA ? impl : new Proxy({}, { get: () => notReady }));
 
@@ -53,8 +54,21 @@ const reports = guard(mockReports);
 const notifications = guard(mockNotifications);
 const dashboard = guard(mockDashboard);
 
+/** A call that reads documents reads the API's: the store is synced first, fresh within 30 s. */
+const withDocuments = (fn) => async (...a) => {
+  await syncDocuments();
+  return fn(...a);
+};
+
 /**
- * A mock call that reads shipments reads the API's: the mirror is synced first, fresh
+ * A document action: the documents are reloaded (so numbers and versions are the latest),
+ * `fn` runs, and everything it changed is saved as one batch. Outermost but for
+ * thenSyncShipment, which must see the change saved.
+ */
+const docWrite = (fn) => (...a) => runWrite(() => fn(...a));
+
+/**
+ * A call that reads shipments reads the API's: the mirror is synced first, fresh
  * within 30 s and holding every shipment this browser's documents name, plus any the
  * call itself names (`idsOf`).
  */
@@ -78,7 +92,7 @@ const shipmentOrderIds = (shipmentId) => (mockShipments.shipmentOrders(shipmentI
 
 /**
  * A document action that can close or reopen its shipment, which then follows its
- * documents. `before` names the shipment when the result cannot (a delete).
+ * documents once they are saved. `before` names the shipment when the result cannot (a delete).
  */
 const thenSyncShipment = (fn, before = () => null) => async (...a) => {
   const shipmentId = before(...a);
@@ -91,24 +105,26 @@ const thenSyncShipment = (fn, before = () => null) => async (...a) => {
 // Incoterms are a fixed list (utils/expDocConstants.js); ports come from the port catalogue
 // (services/master/portService.js).
 export const listIncoterms = async () => INCOTERMS;
-export const listHsCodes = (...a) => masters.listHsCodes(...a);
+export const listHsCodes = withDocuments((...a) => masters.listHsCodes(...a));
 export const getHsDefault = (...a) => masters.getHsDefault(...a);
 export const getBuyerCommercial = (...a) => masters.getBuyerCommercial(...a);
 export const getTolerancePercent = (...a) => masters.getTolerancePercent(...a);
 export const getExporterProfileExtra = (...a) => masters.getExporterProfileExtra(...a);
 export const getTenantConfig = (...a) => masters.getTenantConfig(...a);
-export const getFxRate = (...a) => masters.getFxRate(...a);
+export const getFxRate = withDocuments((...a) => masters.getFxRate(...a));
 
 // ── Shipments ── REAL API /export-docs/shipments
-// Every record carries this browser's document counts, and every write lands in the
-// mirror at once, so the next document raised sees it.
+// Every record carries its document counts, and every write lands in the mirror at
+// once, so the next document raised sees it.
 export const searchShipments = async (params = {}) => {
-  const page = await shipmentApi.searchApiShipments(params);
+  const [page] = await Promise.all([shipmentApi.searchApiShipments(params), syncDocuments()]);
   return { ...page, content: mockShipments.withLocalDocumentsAll(page.content) };
 };
 /** `silent` for a document's printed header, which shows a dash for a shipment it cannot read. */
-export const getShipment = async (id, { silent = false } = {}) =>
-  mockShipments.withLocalDocuments(await shipmentApi.getApiShipment(id, { silent }));
+export const getShipment = async (id, { silent = false } = {}) => {
+  const [shipment] = await Promise.all([shipmentApi.getApiShipment(id, { silent }), syncDocuments()]);
+  return mockShipments.withLocalDocuments(shipment);
+};
 /** The pickers' shipments: the OPEN ones for a new document, every one for a report filter. */
 export const listShipmentOptions = async ({ includeClosed = false } = {}) => {
   const page = await shipmentApi.searchApiShipments({
@@ -120,8 +136,9 @@ export const createShipment = async (shipment) =>
   mockShipments.withLocalDocuments(mirrorPut(await shipmentApi.createApiShipment(shipment)));
 export const updateShipment = async (id, shipment) =>
   mockShipments.withLocalDocuments(mirrorPut(await shipmentApi.updateApiShipment(id, shipment)));
-/** Takes the record (id, version, shipmentNo). Refused while this browser holds documents for it. */
+/** Takes the record (id, version, shipmentNo). Refused while documents name it; the API refuses too. */
 export const deleteShipment = async (shipment) => {
+  await syncDocuments({ force: true });
   assertShipmentDeletable(shipment);
   await shipmentApi.deleteApiShipment(shipment.id, shipment.version);
   mirrorRemove(shipment.id);
@@ -134,9 +151,11 @@ export const listConsigneeOrders = (buyerId, search, shipmentId) => shipmentApi.
 //    through expDocPackingMirror; these let the Carton Packing screens see the lists.
 /** Whether this user can read Carton Packing, without which a packing list shows no cartons. */
 export const canReadPacking = () => packingReadable();
-/** entry id -> the live packing lists in this browser holding it. */
+/** Loads the export documents (fresh within 30 s), for a screen that then reads them synchronously. */
+export const loadExportDocuments = () => syncDocuments();
+/** entry id -> the live packing lists holding it, of the documents loaded (loadExportDocuments). */
 export const packingListsOfEntries = (entryIds) => packingLists.listsOfEntries(entryIds);
-/** A Carton Packing save, seen at once by the packing lists in this browser. */
+/** A Carton Packing save, seen at once by the packing lists. */
 export const afterPackingEntrySaved = (entry) => putPackingEntry(entry);
 export const afterPackingEntryDeleted = (entry) => forgetPackingEntry(entry);
 
@@ -144,105 +163,109 @@ export const afterPackingEntryDeleted = (entry) => forgetPackingEntry(entry);
 //    POST /{id}/status · /{id}/refresh · /{id}/acknowledge · /{id}/revise
 const plShipment = (id) => mockShipments.shipmentOfDocument('packingLists', id);
 const listOrders = (id) => packingLists.ordersOfList(id);
-export const searchPackingLists = withShipments(
-  withPacking((...a) => packingLists.searchPackingLists(...a), () => packingLists.ordersOfAllLists()),
-);
-export const getPackingList = withShipments(withPacking((...a) => packingLists.getPackingList(...a), listOrders));
+/** A packing-list read: the documents, then the shipments, then the cartons of `ordersOf`. */
+const plRead = (fn, ordersOf = listOrders) => withDocuments(withShipments(withPacking(fn, ordersOf)));
+/** A packing-list action: saved as one batch, then the shipment follows its documents. */
+const plWrite = (fn) => thenSyncShipment(docWrite(withShipments(withPacking(fn, listOrders))));
+export const searchPackingLists = plRead((...a) => packingLists.searchPackingLists(...a), () => packingLists.ordersOfAllLists());
+export const getPackingList = plRead((...a) => packingLists.getPackingList(...a));
 /**
  * `templateId` is the template the user chose; the document keeps a snapshot of it. The
  * shipment's orders are read from the orders API (sizes, garment, quantities per PO).
+ * Numbered here (PKL/…), on the documents just reloaded.
  */
-export const createPackingList = withShipments(withPacking(thenSyncShipment(async (payload) => packingLists.createPackingList({
+export const createPackingList = thenSyncShipment(docWrite(withShipments(withPacking(async (payload) => packingLists.createPackingList({
   ...payload,
   templateSnapshot: await loadTemplateSnapshot(payload.templateId),
   orderMeta: await orderMetaFor(shipmentOrderIds(payload.shipmentId)),
-})), (payload) => shipmentOrderIds(payload?.shipmentId)), (payload) => [payload?.shipmentId]);
-export const updatePackingList = withShipments(withPacking((...a) => packingLists.updatePackingList(...a), listOrders));
+}), (payload) => shipmentOrderIds(payload?.shipmentId)), (payload) => [payload?.shipmentId])));
+export const updatePackingList = plWrite((...a) => packingLists.updatePackingList(...a));
 /** Reads the cartons again now, and the orders, so new packing and corrections arrive. */
-export const refreshFromPacking = withShipments(async (id) => {
+export const refreshFromPacking = docWrite(withShipments(async (id) => {
   const orders = listOrders(id);
   await syncPackingMirror(orders, { force: true });
   return packingLists.refreshFromPacking(id, { orderMeta: await orderMetaFor(orders) });
-});
-export const acknowledgeWarning = withShipments(withPacking((...a) => packingLists.acknowledgeWarning(...a), listOrders));
-export const changePlStatus = withShipments(
-  withPacking(thenSyncShipment((...a) => packingLists.changeStatus(...a)), listOrders),
-);
+}));
+export const acknowledgeWarning = plWrite((...a) => packingLists.acknowledgeWarning(...a));
+export const changePlStatus = plWrite((...a) => packingLists.changeStatus(...a));
 /** Block actions on a draft: take units (entry x PO) on, take one off, move a block, drop an orphan. */
-export const bindPackingEntries = withShipments(withPacking((...a) => packingLists.bindPackingEntries(...a), listOrders));
-export const removePackingEntry = withShipments(withPacking((...a) => packingLists.removePackingEntry(...a), listOrders));
-export const moveBlock = withShipments(withPacking((...a) => packingLists.moveBlock(...a), listOrders));
-export const dropBlock = withShipments(withPacking((...a) => packingLists.dropBlock(...a), listOrders));
+export const bindPackingEntries = plWrite((...a) => packingLists.bindPackingEntries(...a));
+export const removePackingEntry = plWrite((...a) => packingLists.removePackingEntry(...a));
+export const moveBlock = plWrite((...a) => packingLists.moveBlock(...a));
+export const dropBlock = plWrite((...a) => packingLists.dropBlock(...a));
 /** The buyer's plan of one order on a draft, and a planned range marked (or no longer) Not shipping. */
-export const savePlPlan = withShipments(withPacking((...a) => packingLists.savePlPlan(...a), listOrders));
-export const markPlanNotShipping = withShipments(withPacking((...a) => packingLists.markPlanNotShipping(...a), listOrders));
-/** For Carton Packing: the draft lists in this browser that plan cartons of this order still to pack. */
-export const listOpenPlansForOrder = withShipments(withPacking(
-  (...a) => packingLists.openPlansForOrder(...a), (orderId) => [orderId],
-));
-export const revisePackingList = withShipments(thenSyncShipment((...a) => packingLists.revisePackingList(...a)));
-export const markPackingListExported = withShipments(
-  thenSyncShipment((...a) => packingLists.markPackingListExported(...a)),
+export const savePlPlan = plWrite((...a) => packingLists.savePlPlan(...a));
+export const markPlanNotShipping = plWrite((...a) => packingLists.markPlanNotShipping(...a));
+/** For Carton Packing: the draft lists that plan cartons of this order still to pack. */
+export const listOpenPlansForOrder = plRead((...a) => packingLists.openPlansForOrder(...a), (orderId) => [orderId]);
+export const revisePackingList = thenSyncShipment(docWrite(withShipments((...a) => packingLists.revisePackingList(...a))));
+export const markPackingListExported = thenSyncShipment(
+  docWrite(withShipments((...a) => packingLists.markPackingListExported(...a))),
 );
 /** Move a draft to a newer revision of its template, or (with a reason) to another template. */
-export const changePlTemplate = withShipments(async (id, templateId, reason) =>
-  packingLists.changePlTemplate(id, await loadTemplateSnapshot(templateId), { reason }));
-export const comparePackingLists = withShipments((...a) => packingLists.comparePackingLists(...a));
-export const deletePackingList = withShipments(
-  thenSyncShipment((...a) => packingLists.deletePackingList(...a), plShipment),
+export const changePlTemplate = docWrite(withShipments(async (id, templateId, reason) =>
+  packingLists.changePlTemplate(id, await loadTemplateSnapshot(templateId), { reason })));
+export const comparePackingLists = withDocuments(withShipments((...a) => packingLists.comparePackingLists(...a)));
+export const deletePackingList = thenSyncShipment(
+  docWrite(withShipments((...a) => packingLists.deletePackingList(...a))), plShipment,
 );
 /** What a new packing list of a shipment could take, order by order and PO by PO. */
-export const listBindableForShipment = withShipments(withPacking(async (shipmentId) => packingLists.listBindableForShipment(
+export const listBindableForShipment = withDocuments(withShipments(withPacking(async (shipmentId) => packingLists.listBindableForShipment(
   shipmentId, await orderMetaFor(shipmentOrderIds(shipmentId)),
-), shipmentOrderIds), (shipmentId) => [shipmentId]);
+), shipmentOrderIds), (shipmentId) => [shipmentId]));
 
 // ── Carton stickers ── GET /packing-lists/{id}/stickers/context · /preview ·
 //    /check · POST /sticker-runs · GET /sticker-runs · /cartons/{no}/history
 //    The sticker template is an API template: it is chosen here for the run's
-//    `templateId` and handed to the mock as `layout` with the choices (`layoutOptions`).
+//    `templateId` and handed to the rules as `layout` with the choices (`layoutOptions`).
 const withStickerTemplate = async (plId, options = {}) => ({
   ...options,
   ...(await resolveStickerTemplate(stickers.stickerTemplateRequest(plId), options.templateId)),
 });
-export const getStickerContext = withShipments(async (plId, options) =>
-  stickers.getStickerContext(plId, await withStickerTemplate(plId, options)));
-export const previewCartons = withShipments((...a) => stickers.previewCartons(...a));
-export const checkStickerGeneration = withShipments(async (plId, options) =>
-  stickers.checkStickerGeneration(plId, await withStickerTemplate(plId, options)));
-export const generateStickerRun = withShipments(async (plId, options) =>
-  stickers.generateStickerRun(plId, await withStickerTemplate(plId, options)));
-export const searchStickerRuns = withShipments((...a) => stickers.searchStickerRuns(...a));
-export const cartonPrintHistory = withShipments((...a) => stickers.cartonPrintHistory(...a));
+export const getStickerContext = withDocuments(withShipments(async (plId, options) =>
+  stickers.getStickerContext(plId, await withStickerTemplate(plId, options))));
+export const previewCartons = withDocuments(withShipments((...a) => stickers.previewCartons(...a)));
+export const checkStickerGeneration = withDocuments(withShipments(async (plId, options) =>
+  stickers.checkStickerGeneration(plId, await withStickerTemplate(plId, options))));
+/** Numbered here (STK/…), on the documents just reloaded. */
+export const generateStickerRun = docWrite(withShipments(async (plId, options) =>
+  stickers.generateStickerRun(plId, await withStickerTemplate(plId, options))));
+export const searchStickerRuns = withDocuments(withShipments((...a) => stickers.searchStickerRuns(...a)));
+export const cartonPrintHistory = withDocuments(withShipments((...a) => stickers.cartonPrintHistory(...a)));
 
 // ── Export invoices ── /export-docs/invoices
 const invoiceShipment = (id) => mockShipments.shipmentOfDocument('invoices', id);
-export const searchInvoices = withShipments((...a) => invoices.searchInvoices(...a));
-export const getInvoice = withShipments((...a) => invoices.getInvoice(...a));
-export const listInvoiceablePls = withShipments((...a) => invoices.listInvoiceablePls(...a));
-export const createInvoice = withShipments(thenSyncShipment(async (payload) => invoices.createInvoice({
+/** An invoice action that can close or reopen its shipment: saved as one batch, then the shipment follows. */
+const invoiceWrite = (fn, before) => thenSyncShipment(docWrite(withShipments(fn)), before);
+export const searchInvoices = withDocuments(withShipments((...a) => invoices.searchInvoices(...a)));
+export const getInvoice = withDocuments(withShipments((...a) => invoices.getInvoice(...a)));
+export const listInvoiceablePls = withDocuments(withShipments((...a) => invoices.listInvoiceablePls(...a)));
+export const createInvoice = invoiceWrite(async (payload) => invoices.createInvoice({
   ...payload, templateSnapshot: await loadTemplateSnapshot(payload.templateId),
-})));
-export const changeInvoiceTemplate = withShipments(async (id, templateId, reason) =>
-  invoices.changeInvoiceTemplate(id, await loadTemplateSnapshot(templateId), { reason }));
-export const updateInvoice = withShipments((...a) => invoices.updateInvoice(...a));
-export const regenerateInvoiceLines = withShipments((...a) => invoices.regenerateLines(...a));
-export const acknowledgeInvoiceWarning = withShipments((...a) => invoices.acknowledgeInvoiceWarning(...a));
-export const changeInvoiceStatus = withShipments(thenSyncShipment((...a) => invoices.changeInvoiceStatus(...a)));
-export const reviseInvoice = withShipments(thenSyncShipment((...a) => invoices.reviseInvoice(...a)));
-export const markInvoiceExported = withShipments(thenSyncShipment((...a) => invoices.markInvoiceExported(...a)));
-export const deleteInvoice = withShipments(thenSyncShipment((...a) => invoices.deleteInvoice(...a), invoiceShipment));
+}));
+export const changeInvoiceTemplate = docWrite(withShipments(async (id, templateId, reason) =>
+  invoices.changeInvoiceTemplate(id, await loadTemplateSnapshot(templateId), { reason })));
+export const updateInvoice = docWrite(withShipments((...a) => invoices.updateInvoice(...a)));
+export const regenerateInvoiceLines = docWrite(withShipments((...a) => invoices.regenerateLines(...a)));
+export const acknowledgeInvoiceWarning = docWrite(withShipments((...a) => invoices.acknowledgeInvoiceWarning(...a)));
+/** Finalising numbers the invoice (EXP/…) on the documents just reloaded, so the series stays gapless. */
+export const changeInvoiceStatus = invoiceWrite((...a) => invoices.changeInvoiceStatus(...a));
+export const reviseInvoice = invoiceWrite((...a) => invoices.reviseInvoice(...a));
+export const markInvoiceExported = invoiceWrite((...a) => invoices.markInvoiceExported(...a));
+export const deleteInvoice = invoiceWrite((...a) => invoices.deleteInvoice(...a), invoiceShipment);
 
 // ── Buyer document templates ── REAL API /export-docs/templates (packing list,
-//    invoice and carton sticker). Writes take the template object.
-export const listAllTemplates = (...a) => templateStore.listAllTemplates(...a);
-export const getTemplate = (...a) => templateStore.getTemplate(...a);
-export const createTemplate = (...a) => templateStore.createTemplate(...a);
-export const saveUploadedTemplates = (...a) => templateStore.saveUploadedTemplates(...a);
-export const cloneTemplate = (...a) => templateStore.cloneTemplate(...a);
-export const newTemplateVersion = (...a) => templateStore.newTemplateVersion(...a);
-export const updateTemplate = (...a) => templateStore.updateTemplate(...a);
-export const publishTemplate = (...a) => templateStore.publishTemplate(...a);
-export const retireTemplate = (...a) => templateStore.retireTemplate(...a);
+//    invoice and carton sticker). Writes take the template object. A template shows how
+//    many documents use it, so the documents are synced first.
+export const listAllTemplates = withDocuments((...a) => templateStore.listAllTemplates(...a));
+export const getTemplate = withDocuments((...a) => templateStore.getTemplate(...a));
+export const createTemplate = withDocuments((...a) => templateStore.createTemplate(...a));
+export const saveUploadedTemplates = withDocuments((...a) => templateStore.saveUploadedTemplates(...a));
+export const cloneTemplate = withDocuments((...a) => templateStore.cloneTemplate(...a));
+export const newTemplateVersion = withDocuments((...a) => templateStore.newTemplateVersion(...a));
+export const updateTemplate = withDocuments((...a) => templateStore.updateTemplate(...a));
+export const publishTemplate = withDocuments((...a) => templateStore.publishTemplate(...a));
+export const retireTemplate = withDocuments((...a) => templateStore.retireTemplate(...a));
 export const deleteTemplate = (...a) => templateStore.deleteTemplate(...a);
 export const compareTemplates = (...a) => templateStore.compareTemplates(...a);
 export const getTemplateSample = withShipments((...a) => templateStore.getTemplateSample(...a));
@@ -253,26 +276,26 @@ export {
 } from './exportTemplateAiApi';
 
 // ── Reports and audit ── /export-docs/reports, /export-docs/audit
-export const packingStatusReport = withShipments((...a) => reports.packingStatusReport(...a));
-export const shipmentRegisterReport = withShipments((...a) => reports.shipmentRegisterReport(...a));
-export const invoiceRegisterReport = withShipments((...a) => reports.invoiceRegisterReport(...a));
-export const varianceReport = withShipments((...a) => reports.varianceReport(...a));
-export const cartonMasterReport = withShipments((...a) => reports.cartonMasterReport(...a));
-export const templateCoverageReport = async (params = {}) => reports.templateCoverageReport({
+export const packingStatusReport = withDocuments(withShipments((...a) => reports.packingStatusReport(...a)));
+export const shipmentRegisterReport = withDocuments(withShipments((...a) => reports.shipmentRegisterReport(...a)));
+export const invoiceRegisterReport = withDocuments(withShipments((...a) => reports.invoiceRegisterReport(...a)));
+export const varianceReport = withDocuments(withShipments((...a) => reports.varianceReport(...a)));
+export const cartonMasterReport = withDocuments(withShipments((...a) => reports.cartonMasterReport(...a)));
+export const templateCoverageReport = withDocuments(async (params = {}) => reports.templateCoverageReport({
   ...params, apiTemplates: await templateStore.apiTemplateSummaries(),
-});
-export const productivityReport = withShipments((...a) => reports.productivityReport(...a));
-export const searchAudit = (...a) => reports.searchAudit(...a);
+}));
+export const productivityReport = withDocuments(withShipments((...a) => reports.productivityReport(...a)));
+export const searchAudit = withDocuments((...a) => reports.searchAudit(...a));
 
 // ── Dashboard (§11.1 "Receives back") ── GET /export-docs/dashboard
-export const getExpDocDashboard = withShipments(withPacking(
+export const getExpDocDashboard = withDocuments(withShipments(withPacking(
   (...a) => dashboard.getExpDocDashboard(...a), () => mockShipments.openShipmentOrderIds(),
-));
+)));
 
 // ── Document set (§18) ── GET /export-docs/shipments/{id}/documents
-export const getShipmentDocumentSet = withShipments(
+export const getShipmentDocumentSet = withDocuments(withShipments(
   (...a) => mockShipments.getShipmentDocumentSet(...a), (shipmentId) => [shipmentId],
-);
+));
 
 /*
  * Notifications (§23) — GET/PATCH/DELETE /notifications, filtered by module.
@@ -282,8 +305,8 @@ export const getShipmentDocumentSet = withShipments(
  * with the API's rows, so the cutover is deleting this block, not rewriting a screen.
  * Listing them raises the ETD reminders, which read the shipments.
  */
-export const listExpDocNotifications = withShipments((...a) => notifications.listNotifications(...a));
-export const expDocUnreadCount = withShipments((...a) => notifications.unreadCount(...a));
+export const listExpDocNotifications = withDocuments(withShipments((...a) => notifications.listNotifications(...a)));
+export const expDocUnreadCount = withDocuments(withShipments((...a) => notifications.unreadCount(...a)));
 export const markExpDocNotificationRead = (...a) => notifications.markRead(...a);
 export const markExpDocNotificationUnread = (...a) => notifications.markUnread(...a);
 export const markAllExpDocNotificationsRead = (...a) => notifications.markAllRead(...a);

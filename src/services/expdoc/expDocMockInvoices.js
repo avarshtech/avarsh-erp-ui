@@ -1,5 +1,5 @@
 /**
- * Export invoice — mock service (PRD §8, §16, §17).
+ * Export invoice — the document's rules (PRD §8, §16, §17); expDocStore keeps it on the API.
  *
  * The invoice is a projection of one or more FINAL packing lists. It stores its
  * own header, lines, charges and tax block, but never its own quantities of record:
@@ -13,7 +13,7 @@
  * absent — in which case the line carries null and V-12 reports it, rather than the
  * document printing a confident blank.
  */
-import { loadDb, saveDb, nextInvoiceNo } from './expDocMockStore';
+import { loadDb, saveDb, nextInvoiceNo, newDocId } from './expDocStore';
 import {
   delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp,
   todayStr, currentUserName, colourKey, fieldDiff, describeChanges,
@@ -46,6 +46,12 @@ const LIVE_INVOICE_STATUSES = [
 
 /** Packing lists an invoice may be raised from (§8.1: final, or already shipped). */
 const INVOICEABLE_PL_STATUSES = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
+
+/** A draft's provisional number, DRAFT-0001 on: one past the highest any invoice carries. */
+const nextProvisionalNo = (db) => {
+  const used = (db.invoices || []).map((i) => Number(/^DRAFT-(\d+)$/.exec(i.provisionalNo || '')?.[1]) || 0);
+  return `DRAFT-${String(Math.max(0, ...used) + 1).padStart(4, '0')}`;
+};
 
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 
@@ -395,12 +401,12 @@ export const createInvoice = async (payload = {}) => {
   const fx = await getFxRate(todayStr(), commercial.currency || 'USD', 'INR');
   const extra = getExporterProfileExtra();
 
-  const id = Math.max(0, ...(db.invoices || []).map((i) => i.id)) + 1;
+  const id = newDocId();
   const record = {
     id,
     // BR-02: no number until it is finalised, so the issued series stays gapless.
     invoiceNo: null,
-    provisionalNo: `DRAFT-${String(id).padStart(4, '0')}`,
+    provisionalNo: nextProvisionalNo(db),
     revision: 0,
     supersedesInvoiceId: null,
     supersededByInvoiceId: null,
@@ -854,7 +860,7 @@ export const reviseInvoice = async (id, reason) => {
 
   const cfg = { ...DEFAULT_TENANT_CONFIG, ...(db.masters?.tenantConfig || {}) };
   const revision = (row.revision || 0) + 1;
-  const newId = Math.max(0, ...db.invoices.map((i) => i.id)) + 1;
+  const newId = newDocId();
 
   const base = clone(row);
   const next = {

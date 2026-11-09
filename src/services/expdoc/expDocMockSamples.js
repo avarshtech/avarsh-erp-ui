@@ -1,7 +1,7 @@
 /**
- * Live preview of a template with sample data (§10.3), from the export-docs mock store.
+ * Live preview of a template with sample data (§10.3), from the sample cartons expDocStore holds.
  */
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { delay, clone, todayStr } from './expDocMockCommon';
 import { decorate as decorateShipment } from './expDocMockShipments';
 import { entryStyle } from './expDocMockStickers';

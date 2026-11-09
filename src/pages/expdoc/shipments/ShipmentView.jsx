@@ -110,8 +110,8 @@ const ShipmentView = ({ open, shipmentId, onClose, onEdit, canUpdate }) => {
           </DetailCard>
 
           <DetailCard title="Usage" style={{ marginTop: 16 }}>
-            <DetailCard.Field label="Packing lists (this browser)" value={fresh.packingListCount ?? 0} />
-            <DetailCard.Field label="Invoices (this browser)" value={fresh.invoiceCount ?? 0} />
+            <DetailCard.Field label="Packing lists" value={fresh.packingListCount ?? 0} />
+            <DetailCard.Field label="Invoices" value={fresh.invoiceCount ?? 0} />
             <DetailCard.Field label="Branch" value={fresh.branchName} />
             <DetailCard.Field label="Created" value={when(fresh.createdAt, fresh.createdBy)} />
             <DetailCard.Field label="Last saved" value={when(fresh.updatedAt, fresh.updatedBy)} />

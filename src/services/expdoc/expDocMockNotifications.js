@@ -3,8 +3,9 @@
  *
  * The ERP has a real notification service (`services/core/notificationService.js`)
  * backed by `sys_notifications` and a `NotificationPermissionMapping` on the server.
- * This module has no server, so its events live in the mock store and the
- * NotificationCenter merges them with whatever the API returns. The SHAPE is the
+ * Its topics are not registered there yet, so these events stay in the browser that
+ * raised them (expDocStore keeps them in localStorage, apart from the documents, which
+ * are the API's) and the NotificationCenter merges them with whatever the API returns. The SHAPE is the
  * API's shape — `{id, type, title, body, actionUrl, isRead, createdAt}` — so the
  * cutover is deleting this file and registering the topics on the backend.
  *
@@ -12,7 +13,7 @@
  * server filters by permission; a single-user demo has nobody to filter to, and
  * quietly hiding events would make the feature look broken rather than unimplemented.
  */
-import { loadDb, saveDb } from './expDocMockStore';
+import { loadDb, saveDb } from './expDocStore';
 import { delay, clone, nowStamp, currentUserName, pageOf } from './expDocMockCommon';
 import { EXPDOC_PREFIX, SERIES_WARN_AT, seriesHeadroom, LAST_DOC_NUMBER } from './expDocDocNumbers';
 

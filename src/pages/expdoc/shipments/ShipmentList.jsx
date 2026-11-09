@@ -88,7 +88,7 @@ const ShipmentList = () => {
         message.success(`${record.shipmentNo} deleted`);
         fetchData();
       } catch (e) {
-        // An API error was shown by the interceptor; a refusal for this browser's documents was not
+        // An API error was shown by the interceptor; the quick check on the documents loaded was not
         if (!e?.isAxiosError) message.error(e?.message || 'Failed to delete shipment');
       }
     },

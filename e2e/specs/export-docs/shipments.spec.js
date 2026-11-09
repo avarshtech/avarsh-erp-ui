@@ -8,14 +8,16 @@
  * notifying the bank asks which location prints under the consignee; H&M has no bank and
  * notifies a location. Orders: ORD/0002 is Zara's, ORD/0001 (a draft) is H&M's.
  *
- * A shipment closes when every packing list and invoice on it is released. Those are still a
- * browser mock with no demo cartons for these buyers, so the close itself is driven through
- * the API here (its rule is unit-tested in src/services/expdoc/shipmentBridge.test.js), and the spec
- * checks what the screen does with a closed shipment. Every shipment a spec makes is its own,
- * so the specs can run again on the same stack.
+ * A shipment closes when every packing list and invoice on it is released. Their rules run in
+ * the browser (the API keeps the documents, /export-docs/documents), so the close is driven
+ * through the service the screens call (its rule is unit-tested in
+ * src/services/expdoc/shipmentBridge.test.js), and the spec checks what the screen does with a
+ * closed shipment. Every shipment a spec makes is its own, and its documents are deleted with
+ * it, so the specs can run again on the same stack.
  */
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { deleteShipmentDocuments } from '../../helpers/export-documents-api.js';
 import {
   createEntry, deleteEntry, orderIdOf, purgeMarked, range,
 } from '../../helpers/packing-api.js';
@@ -44,6 +46,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  // A shipment with packing lists cannot be deleted
+  await deleteShipmentDocuments(api, created);
   for (const id of created) {
     const { status, data } = await api.get(`${API}/${id}`);
     if (status !== 200) continue;
@@ -274,7 +278,7 @@ test.describe('Shipments', { tag: '@dev-server' }, () => {
     const entry = await createEntry(api, { orderId, groups: [range({ cartonFrom: 1, cartonTo: 10 })] });
     await goTo(page, LIST);
 
-    // Packing lists are still the browser mock: driven through the same service the screens call
+    // Packing lists are driven through the same service the screens call
     const raised = await page.evaluate(async ({ shipmentId, entryId }) => {
       const svc = await import('/src/services/expdoc/expDocService.js');
       const { orders } = await svc.listBindableForShipment(shipmentId);

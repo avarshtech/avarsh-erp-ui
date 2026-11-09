@@ -11,7 +11,7 @@
  *                  alone, so a downstream invoice or sticker run is not falsely
  *                  invalidated. This is what keeps V-13/V-14 usable rather than noisy.
  */
-import { loadDb, saveDb, nextPackingListNo } from './expDocMockStore';
+import { loadDb, saveDb, nextPackingListNo, newDocId } from './expDocStore';
 import {
   delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp,
   todayStr, currentUserName, colourKey, fieldDiff, describeChanges,
@@ -323,7 +323,7 @@ export const createPackingList = async (payload) => {
 
   const numbering = Object.values(NUMBERING).includes(payload.numbering)
     ? payload.numbering : buyersRule(db, shipment.buyerId, shipment.buyerName);
-  const id = Math.max(0, ...db.packingLists.map((p) => p.id)) + 1;
+  const id = newDocId();
   const record = {
     id,
     // Allocated at CREATE: packing lists are referenced while still drafts, and a
@@ -861,7 +861,7 @@ export const revisePackingList = async (id, reason) => {
     fail('VALIDATION', 'A revision needs a reason of at least 10 characters.');
   }
 
-  const newId = Math.max(0, ...db.packingLists.map((p) => p.id)) + 1;
+  const newId = newDocId();
   const revision = {
     ...clone(pl),
     id: newId,
@@ -996,7 +996,7 @@ export const markPlanNotShipping = async (id, orderId, planRowId, reason, versio
 };
 
 /**
- * The draft packing lists in this browser whose buyer's plan still has cartons of this
+ * The draft packing lists whose buyer's plan still has cartons of this
  * order to pack, for Carton Packing's "Pack as per packing list".
  */
 export const openPlansForOrder = async (orderId) => {
@@ -1026,11 +1026,11 @@ export const ordersOfList = (id) => {
   return [...new Set([...(shipment?.orders || []).map((o) => o.orderId), ...(pl.sourceRefs || []).map((r) => r.orderId)])];
 };
 
-/** The orders of every packing list in this browser: the register flags lists behind their cartons. */
+/** The orders of every packing list: the register flags lists behind their cartons. */
 export const ordersOfAllLists = () => [...new Set((loadDb().packingLists || []).flatMap((p) => (p.sourceRefs || []).map((r) => r.orderId)))];
 
 /**
- * The live packing lists in this browser that hold each of these Carton Packing entries,
+ * The live packing lists that hold each of these Carton Packing entries,
  * for the Carton Packing screens: entry id -> [{ plId, plNo, status, buyerPoNo }].
  */
 export const listsOfEntries = (entryIds = []) => {

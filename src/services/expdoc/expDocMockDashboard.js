@@ -2,13 +2,13 @@
  * Export Documentation dashboard aggregates (future GET /export-docs/dashboard).
  *
  * The two questions the PRD's §11.1 return arrow asks — "which shipments are ready
- * to document?" and "what is waiting on me?" — computed live from the mock store
+ * to document?" and "what is waiting on me?" — computed live from the document store
  * rather than stored, because both answers change with every carton edit.
  *
  * Range-shaped like everything else in the module: shipment readiness counts
  * DOCUMENTS, never cartons, so a 40,000-carton shipment costs the same as a 40.
  */
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { entriesOfShipment } from './expDocMockShipments';
 import { delay, todayStr } from './expDocMockCommon';
 import { PL_STATUS, INVOICE_STATUS } from '../../utils/expDocConstants';

@@ -4,6 +4,7 @@
 //     npx playwright test e2e/specs/export-docs/packing-list-blocks.spec.js --project=export-docs
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { deleteShipmentDocuments } from '../../helpers/export-documents-api.js';
 import {
   createEntry, deleteEntry, orderIdOf, purgeMarked, range,
 } from '../../helpers/packing-api.js';
@@ -30,6 +31,8 @@ test.beforeEach(async () => { await purgeMarked(api, orderId); });
 
 test.afterAll(async () => {
   await purgeMarked(api, orderId);
+  // A shipment with packing lists cannot be deleted
+  await deleteShipmentDocuments(api, shipments);
   for (const id of shipments) {
     const { status, data } = await api.get(`${API}/${id}`);
     if (status !== 200) continue;
@@ -105,7 +108,7 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     await expect(page.getByText(`PO ${PO2} · ${DEST}`).first()).toBeVisible({ timeout: 20000 });
     await expect(page.getByText('own 11–15').first()).toBeVisible();
 
-    // Carton Packing names the lists the entry's cartons sit on (this browser holds them)
+    // Carton Packing names the lists the entry's cartons sit on
     await goTo(page, `/production/packing/edit/${entry.id}`);
     await expect(page.getByText(`${pl1.plNo} · PO ${PO1}`)).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(`${pl2.plNo} · PO ${PO2}`)).toBeVisible();

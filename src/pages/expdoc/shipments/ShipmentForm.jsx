@@ -66,7 +66,7 @@ const ShipmentForm = () => {
   const canUpdate = hasPermission(EXPDOC_MODULE.SHIPMENTS, isEdit || record ? 'update' : 'add');
   const isClosed = record?.status === SHIPMENT_STATUS.CLOSED;
   const canEdit = canUpdate && !isClosed;
-  // Documents raised against the shipment name its consignee; this browser's are all there are, for now.
+  // Documents raised against the shipment name its consignee, so it is fixed once there are any
   const consigneeLocked = Boolean(record) && (record.packingListCount || 0) + (record.invoiceCount || 0) > 0;
 
   // Buyers come from the real master, cached in StoreContext like everywhere else.

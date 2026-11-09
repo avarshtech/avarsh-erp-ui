@@ -7,7 +7,7 @@
  * utils/expDocConstants.js. The one exception is the FX rate for TODAY, which has a
  * real endpoint.
  */
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { delay, clone, todayStr } from './expDocMockCommon';
 import { DEFAULT_BUYER_COMMERCIAL } from './expDocMockData';
 import { getTodaysRate } from '../costing/costingService';
