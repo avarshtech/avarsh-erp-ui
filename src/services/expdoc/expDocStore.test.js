@@ -125,6 +125,18 @@ describe('a document action', () => {
     expect(loadDb().packingLists.find((p) => p.id === 1).version).toBe(5);
   });
 
+  test('a document whose body lacks its own key is left alone, never deleted', async () => {
+    api.list.mockResolvedValue([pl(1, 'PKL/26-27/1001', 4), { key: 'stray', kind: 'AUDIT', version: 0, body: { x: 1 } }, settings]);
+    await runWrite(async () => {
+      const db = loadDb();
+      db.packingLists[0].status = 'FINAL';
+      saveDb(db);
+    });
+    const [{ upserts, deletes }] = api.save.mock.calls[0];
+    expect(upserts.map((u) => u.key)).toEqual(['1']);
+    expect(deletes).toEqual([]);
+  });
+
   test('nothing changed: nothing is sent', async () => {
     await runWrite(async () => loadDb().packingLists[0]);
     expect(api.save).not.toHaveBeenCalled();

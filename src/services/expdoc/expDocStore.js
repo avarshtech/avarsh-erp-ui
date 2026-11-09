@@ -125,6 +125,9 @@ const adopt = (list) => {
       return;
     }
     const body = bodyOf(doc);
+    // A record is tracked by its id; one whose body does not carry its own key was not written by
+    // these screens and is left alone, or every save would try to delete it
+    if (String(body?.id) !== doc.key) return;
     remember(doc, body);
     if (byKind[doc.kind]) next[byKind[doc.kind]].push(clone(body));
   });
