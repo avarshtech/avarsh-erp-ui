@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import { useBranch } from '../../context/BranchContext';
 import OrderBranchAllocation from './OrderBranchAllocation';
+import OrderCancelImpact from './OrderCancelImpact';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import { changeOrderStatus } from '../../services/orders/orderService';
@@ -80,6 +81,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
   // Cancel request state
   const [showCancelInput, setShowCancelInput] = useState(false);
+  const [cancellable, setCancellable] = useState(true);
   const [cancelReason, setCancelReason] = useState('');
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -660,6 +662,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   Minimum 50 characters required ({50 - cancelReason.length} more needed)
                 </Text>
               )}
+              <OrderCancelImpact orderId={orderData.id} onCancellable={setCancellable} />
               <Space>
                 <ActionButton
                   action="save"
@@ -667,7 +670,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   size="small"
                   danger
                   loading={actionLoading}
-                  disabled={cancelReason.trim().length < 50}
+                  disabled={cancelReason.trim().length < 50 || !cancellable}
                   onClick={async () => {
                     await handleRequestCancel();
                     setShowCancelInput(false);
