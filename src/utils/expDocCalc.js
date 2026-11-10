@@ -330,8 +330,15 @@ export const orderVsPacked = (orderBreakdown, rows, options = {}) => {
   const out = [];
   const seen = new Set();
 
+  // Packed is summed per style, colour and size, so the ordered lines are too: an order shipping two
+  // buyer POs of the same colour has one ordered line per PO, and each alone would read as a large excess
+  const ordered = new Map();
   orderBreakdown.forEach((line) => {
     const k = key(line.styleNo, line.colorName, line.size);
+    const prev = ordered.get(k);
+    ordered.set(k, prev ? { ...prev, orderQty: int(prev.orderQty) + int(line.orderQty) } : line);
+  });
+  ordered.forEach((line, k) => {
     seen.add(k);
     out.push(buildVarianceRow(line, packed.get(k)?.qty || 0, tolerancePercent));
   });
