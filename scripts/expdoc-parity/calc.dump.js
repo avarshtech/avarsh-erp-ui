@@ -18,12 +18,13 @@ const {
   expandCartons, expandCartonRange, expandCartonNos, readPath,
 } = calc;
 
-// The server hashes with SHA-256 (later phase), so the browser's FNV-1a staleness tokens are not ported
+// The hashing helpers are ported too (ContentHashes: the server keeps the browser's FNV-1a), but their
+// cases live in hashes.dump.js (expDocHashes.json), so this dump leaves them out
 const NOT_PORTED = {
-  canonical: 'sorted-key JSON for the FNV hash; the server hashes its own way',
-  fnv1a: 'browser staleness token; the server uses SHA-256',
-  contentHashOfRows: 'FNV-1a over canonical rows; replaced by a server hash',
-  cartonHash: 'FNV-1a over sticker bindings; replaced by a server hash',
+  canonical: 'covered by hashes.dump.js (ContentHashesParityTest)',
+  fnv1a: 'covered by hashes.dump.js (ContentHashesParityTest)',
+  contentHashOfRows: 'covered by hashes.dump.js (ContentHashesParityTest)',
+  cartonHash: 'covered by hashes.dump.js (ContentHashesParityTest)',
 };
 
 const SEP = String.fromCharCode(0x241f); // the PO key separator, as expDocPoKeys.js has it

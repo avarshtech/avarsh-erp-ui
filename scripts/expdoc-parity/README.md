@@ -29,6 +29,8 @@ Regenerate them whenever a ported module changes, and commit both repos together
 | `localeCompareNumeric.dump.js` | `jsLocaleCompareNumeric.json` | `JsCollationParityTest` |
 | `invoiceCalc.dump.js` | `expDocInvoiceCalc.json` | `InvoiceCalcParityTest` |
 | `invoiceTerms.dump.js` | `expDocInvoiceTerms.json` | `InvoiceTermsParityTest` |
+| `hashes.dump.js` | `expDocHashes.json` | `ContentHashesParityTest` |
+| `validation.dump.js` | `expDocValidation.json` | `ValidationParityTest` |
 
 Writing cases:
 
