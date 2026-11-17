@@ -4,7 +4,7 @@ import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
 import { DOC_TYPE } from '../../../utils/expDocConstants';
 import {
-  listShipmentOptions, listBindableForShipment, createPackingList, getBuyerCommercial,
+  listShipmentOptions, listBindableForShipment, createPackingList,
 } from '../../../services/expdoc/expDocService';
 import TemplatePickerField from '../shared/TemplatePickerField';
 import { unitRowsOf, unplacedText } from './plUnitRows';
@@ -67,13 +67,12 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
   const handleCreate = useCallback(async () => {
     setCreating(true);
     try {
-      const commercial = getBuyerCommercial({ buyerCode: shipment?.buyerCode });
       const pl = await createPackingList({
         shipmentId,
         templateId,
         buyerId: shipment?.buyerId ?? null,
         buyerCode: shipment?.buyerCode ?? null,
-        buyerName: commercial.buyerName ?? shipment?.buyerName ?? null,
+        buyerName: shipment?.buyerName ?? null,
         units: chosen.map((r) => ({ packingEntryId: r.packingEntryId, poKey: r.poKey })),
       });
       message.success(`${pl.plNo} created`);

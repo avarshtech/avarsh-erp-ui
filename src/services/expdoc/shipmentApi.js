@@ -23,6 +23,10 @@ export const searchApiShipments = async (params = {}, { silent = false, timeout 
 export const getApiShipment = async (id, { silent = false } = {}) =>
   fromApi(await call(axiosInstance.get(`${BASE}/${id}`, { silent })));
 
+/** Each carried order's currency, payment terms and style HS code, which the export invoice takes. */
+export const getApiOrderTerms = (id, { silent = false } = {}) =>
+  call(axiosInstance.get(`${BASE}/${id}/order-terms`, { silent }));
+
 export const createApiShipment = async (shipment) => fromApi(await call(axiosInstance.post(BASE, toApi(shipment))));
 
 export const updateApiShipment = async (id, shipment) =>

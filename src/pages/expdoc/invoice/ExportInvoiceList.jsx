@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { App, Card, Col, Row, Table } from 'antd';
-import { FileTextOutlined, SendOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { App, Button, Card, Col, Row, Table } from 'antd';
+import { FileTextOutlined, SendOutlined, CheckCircleOutlined, WarningOutlined, DollarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -13,6 +13,7 @@ import { EXPDOC_MODULE, INVOICE_STATUS, INVOICE_STATUS_LABELS } from '../../../u
 import { searchInvoices, deleteInvoice } from '../../../services/expdoc/expDocService';
 import { buildInvoiceColumns } from './InvoiceListColumns';
 import InvoiceCreateModal from './InvoiceCreateModal';
+import CustomsRatesDrawer from './CustomsRatesDrawer';
 
 const STATUS_OPTIONS = Object.values(INVOICE_STATUS)
   .map((s) => ({ value: s, label: INVOICE_STATUS_LABELS[s] }));
@@ -28,6 +29,7 @@ const ExportInvoiceList = () => {
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState();
   const [createOpen, setCreateOpen] = useState(false);
+  const [ratesOpen, setRatesOpen] = useState(false);
 
   const canAdd = hasPermission(EXPDOC_MODULE.INVOICE, 'add');
   const canDelete = hasPermission(EXPDOC_MODULE.INVOICE, 'delete');
@@ -102,7 +104,9 @@ const ExportInvoiceList = () => {
         subtitle="Commercial invoices raised from final packing lists — quantities, weights and marks flow across untouched"
         onAdd={canAdd ? () => setCreateOpen(true) : undefined}
         addLabel="New Invoice"
+        extra={<Button icon={<DollarOutlined />} onClick={() => setRatesOpen(true)}>Customs rates</Button>}
       />
+      <CustomsRatesDrawer open={ratesOpen} onClose={() => setRatesOpen(false)} />
 
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><StatCard title="Drafts (this page)" value={kpis.drafts} icon={<FileTextOutlined />} color="var(--info-color)" /></Col>

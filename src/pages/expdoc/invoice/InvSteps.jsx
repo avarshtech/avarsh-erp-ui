@@ -7,6 +7,7 @@ import { FormSelect } from '../../../components/form';
 import { integerInputProps, numericInputProps } from '../../../utils/inputHelpers';
 import { LINE_GRAIN, LINE_GRAIN_LABELS } from '../../../utils/expDocConstants';
 import { amountInWords } from '../../../utils/amountInWords';
+import { invoiceFxStatus } from '../../../utils/expDocInvoiceTerms';
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -394,6 +395,7 @@ export const InvStepFinancials = ({ inv, patch, locked, onOverrideFx }) => {
     charges: { ...charges, [key]: { ...(charges[key] || {}), ...changes } },
   });
   const igstOn = inv.template?.igst?.enabled !== false;
+  const fx = invoiceFxStatus(inv);
 
   return (
     <Row gutter={[16, 16]}>
@@ -402,26 +404,20 @@ export const InvStepFinancials = ({ inv, patch, locked, onOverrideFx }) => {
           <Space orientation="vertical" size={12} style={{ width: '100%' }}>
             <Descriptions size="small" column={1} bordered>
               <Descriptions.Item label="Currency">
-                <ReadCell value={inv.currency} source="the buyer's commercial profile" />
+                <ReadCell value={inv.currency} source="the orders" />
               </Descriptions.Item>
               <Descriptions.Item label="Exchange rate">
                 <Space size={6} wrap>
                   <Text strong>{money(inv.fxRate, 4)}</Text>
-                  <Tooltip title={inv.fxSource === 'MANUAL'
-                    ? `Overridden: ${inv.fxOverrideReason || 'no reason recorded'}`
-                    : (inv.fxSource === 'MASTER_LIVE'
-                      ? 'Fetched live for today.'
-                      : 'From the rate master. The live rate service is unavailable, so the stored rate is used.')}
-                  >
-                    <Tag color={inv.fxSource === 'MANUAL' ? 'purple' : 'blue'}>
-                      {inv.fxSource === 'MANUAL' ? 'manual' : (inv.fxSource === 'MASTER_LIVE' ? 'live rate' : 'rate master')}
-                    </Tag>
+                  <Tooltip title={fx.tooltip}>
+                    <Tag color={fx.color}>{fx.tag}</Tag>
                   </Tooltip>
                   {!locked && <a onClick={onOverrideFx}>Override</a>}
                 </Space>
               </Descriptions.Item>
               <Descriptions.Item label="Rate date">{inv.fxDate || '—'}</Descriptions.Item>
             </Descriptions>
+            {!locked && fx.warning && <Alert type="warning" showIcon title={fx.warning} />}
           </Space>
         </Card>
       </Col>
@@ -475,6 +471,13 @@ export const InvStepFinancials = ({ inv, patch, locked, onOverrideFx }) => {
                 </Row>
               );
             })}
+            {!locked && inv.discountCarriedFrom && (
+              <Alert
+                type="info"
+                showIcon
+                title={`Discount carried from ${inv.discountCarriedFrom}, this buyer's last invoice. Remove it if it does not apply to this one.`}
+              />
+            )}
           </Space>
         </Card>
       </Col>

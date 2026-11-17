@@ -18,7 +18,10 @@ import {
   delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp,
   todayStr, currentUserName, colourKey, fieldDiff, describeChanges,
 } from './expDocMockCommon';
-import { getBuyerCommercial, getHsDefault, getFxRate, getExporterProfileExtra } from './expDocMockMasters';
+import { getFxRate, fxFieldsOf, getExporterProfileExtra } from './expDocMockMasters';
+import {
+  ordersOfPls, resolveInvoiceTerms, termsByOrder, hsCodeOfOrder, latestOfBuyer,
+} from '../../utils/expDocInvoiceTerms';
 import { decoratePl } from './expDocMockPackingLists';
 import { decorate as decorateShipment } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
@@ -74,7 +77,6 @@ const rowsWithOrder = (db, pls) => {
       // Carried so the line builder can name the garment without re-joining.
       __garmentName: row.garmentName ?? entry?.garmentName ?? null,
       __composition: row.compositionText ?? entry?.compositionText ?? null,
-      __category: entry?.garmentCategory ?? null,
       __plId: pl.id,
       __plNo: pl.plNo,
     };
@@ -100,8 +102,11 @@ const mergedSizes = (pls) => [...new Set(pls.flatMap((pl) => pl.sizes || []))];
  *
  * Kept separate from create/update because §8.3 lets the grain change and V-13 asks
  * for a regenerate — both of which are exactly this, run again.
+ *
+ * `byOrder` (termsByOrder of the shipment's order terms) gives each line its style's HS
+ * code; a style without one leaves the line blank for staff, never a category guess.
  */
-const generateLines = (db, pls, template) => {
+const generateLines = (db, pls, template, byOrder = new Map()) => {
   const rows = rowsWithOrder(db, pls);
   const breakdown = mergedBreakdown(pls);
   const rate = makeRateResolver(breakdown, { matchColour: colourKey });
@@ -118,7 +123,7 @@ const generateLines = (db, pls, template) => {
     rateFor: rate.rateOnly,
     garmentNameFor: (g) => sourceRow(g).__garmentName ?? null,
     compositionFor: (g) => sourceRow(g).__composition ?? null,
-    hsCodeFor: (g) => getHsDefault(sourceRow(g).__category)?.code ?? null,
+    hsCodeFor: (g) => hsCodeOfOrder(byOrder, sourceRow(g).orderId),
   });
 
   // The order's own price is kept alongside the (editable) invoice rate so V-11 has
@@ -146,7 +151,7 @@ const generateLines = (db, pls, template) => {
  * annexe's grain, never by re-entering anything. Computed here rather than in the
  * renderer because the renderer has no packing-list rows to group.
  */
-const generateAnnexes = (db, pls, template) =>
+const generateAnnexes = (db, pls, template, byOrder) =>
   (template?.annexeSheets || []).map((sheet) => ({
     key: sheet.key,
     title: sheet.title || sheet.key,
@@ -154,7 +159,7 @@ const generateAnnexes = (db, pls, template) =>
     lines: generateLines(db, pls, {
       ...template,
       invoiceLineGrain: { ...(template.invoiceLineGrain || {}), ...(sheet.grain || {}), groupBy: undefined },
-    }),
+    }, byOrder),
   }));
 
 // ─── Decoration ─────────────────────────────────────────────────────────────────
@@ -216,9 +221,10 @@ export const decorateInvoice = (inv, db, options = {}) => {
     ? null
     : igstBlock(out.totals.netTotal, out.fxRate, out.igstRatePct);
 
-  const commercial = getBuyerCommercial({ buyerCode: out.buyerCode, buyerName: out.buyerName });
-  out.tolerancePercent = Number(commercial.tolerancePercent) || 0;
-  out.allowMultiInvoicePerPl = Boolean(commercial.allowMultiInvoicePerPl);
+  // The tolerance is set on the packing list (owner, 2026-11-17). Several invoices per packing
+  // list stays off: nothing yet splits a list's quantities between invoices.
+  out.tolerancePercent = Number(pls[0]?.tolerancePercent) || 0;
+  out.allowMultiInvoicePerPl = false;
 
   // V-13 compares the hash the invoice was built on with the packing list's now.
   out.staleRefs = (out.packingListRefs || []).filter((ref) => {
@@ -329,14 +335,13 @@ export const listInvoiceablePls = async (params = {}) => {
     .filter((pl) => (!params.shipmentId || pl.shipmentId === Number(params.shipmentId)))
     .filter((pl) => (!params.buyerCode || pl.buyerCode === params.buyerCode))
     .map((pl) => {
-      const commercial = getBuyerCommercial(pl);
       const existing = (db.invoices || []).filter((inv) => LIVE_INVOICE_STATUSES.includes(inv.status)
         && (inv.packingListRefs || []).some((r) => r.plId === pl.id));
       const decorated = decoratePl(pl, db);
       let reason = null;
       if (!INVOICEABLE_PL_STATUSES.includes(pl.status)) {
         reason = `Only a final packing list can be invoiced (this one is ${pl.status.toLowerCase()}).`;
-      } else if (existing.length && !commercial.allowMultiInvoicePerPl) {
+      } else if (existing.length) {
         reason = `Already on ${existing.map((e) => e.invoiceNo || 'a draft invoice').join(', ')}.`;
       }
       return {
@@ -384,7 +389,10 @@ export const createInvoice = async (payload = {}) => {
   if (buyerCodes.length > 1) fail('CONFLICT', 'All packing lists on one invoice must belong to the same buyer.');
 
   const first = pls[0];
-  const commercial = getBuyerCommercial(first);
+  // Currency and payment terms are the orders' (owner, 2026-11-17); the facade read them for the shipment
+  const terms = resolveInvoiceTerms(ordersOfPls(pls), payload.orderTerms);
+  if (terms.error) fail('VALIDATION', terms.error);
+  const byOrder = termsByOrder(payload.orderTerms);
   const shipmentRaw = (db.shipments || []).find((s) => s.id === first.shipmentId) || null;
   // The invoice copies the shipment's parties: one that cannot be read now (deleted, offline) is a refusal
   if (first.shipmentId != null && !shipmentRaw) {
@@ -398,8 +406,18 @@ export const createInvoice = async (payload = {}) => {
   if (chosen && chosen.docType !== DOC_TYPE.INVOICE) fail('VALIDATION', 'That template is not an invoice layout.');
   const template = chosen || systemTemplateFor(DOC_TYPE.INVOICE);
 
-  const fx = await getFxRate(todayStr(), commercial.currency || 'USD', 'INR');
+  const invoiceDate = payload.invoiceDate || todayStr();
+  // The CBIC customs export rate in force on the invoice date; none keyed in leaves it blank
+  const fx = await getFxRate(invoiceDate, terms.currency);
   const extra = getExporterProfileExtra();
+  // A standing discount (Prénatal's 3%) is the buyer's last invoice's, shown as carried so a
+  // one-off is not repeated unnoticed
+  const lastOfBuyer = latestOfBuyer(db.invoices || [], { buyerId: first.buyerId, buyerName: first.buyerName });
+  const lastDiscount = lastOfBuyer?.charges?.discount;
+  // A percentage carries anywhere; a flat amount only into an invoice in the same currency
+  const carried = Number(lastDiscount?.value) > 0
+    && ((lastDiscount.mode || 'PERCENT') === 'PERCENT' || lastOfBuyer.currency === terms.currency)
+    ? lastDiscount : null;
 
   const id = newDocId();
   const record = {
@@ -411,7 +429,7 @@ export const createInvoice = async (payload = {}) => {
     supersedesInvoiceId: null,
     supersededByInvoiceId: null,
     status: INVOICE_STATUS.DRAFT,
-    invoiceDate: payload.invoiceDate || todayStr(),
+    invoiceDate,
 
     buyerId: first.buyerId ?? null,
     buyerCode: first.buyerCode,
@@ -445,35 +463,33 @@ export const createInvoice = async (payload = {}) => {
     buyerOrderDate: null,
     consignee: shipment?.consignee ?? null,
     notify: shipment?.notify ?? null,
-    incoterm: shipment?.incoterm || commercial.incoterm || null,
+    incoterm: shipment?.incoterm || null,
     // The named place is the port's name ("FOB Chennai"), not the printed name and code
     incotermPlace: shipment?.portOfLoadingName || shipment?.portOfLoading || null,
-    paymentTerms: commercial.paymentTerms || null,
+    paymentTerms: terms.paymentTerms,
     countryOfOrigin: 'INDIA',
     countryOfFinalDestination: shipment?.countryOfFinalDestination ?? null,
 
-    currency: commercial.currency || 'USD',
-    fxRate: fx.rate || null,
-    fxSource: fx.rate ? (fx.live ? 'MASTER_LIVE' : 'MASTER') : null,
-    fxDate: fx.date || todayStr(),
+    currency: terms.currency,
+    ...fxFieldsOf(fx),
     fxOverrideReason: null,
     igstRatePct: template?.igst?.defaultRatePct ?? 5,
 
     charges: {
       discount: {
         enabled: template?.charges?.discount?.enabled ?? true,
-        mode: 'PERCENT',
-        // Prénatal's standing 3% is a buyer term, not something a user should recall.
-        value: Number(commercial.discountPercent) || 0,
+        mode: carried?.mode || 'PERCENT',
+        value: carried ? Number(carried.value) : 0,
       },
       freight: { enabled: template?.charges?.freight?.enabled ?? true, value: 0 },
       insurance: { enabled: template?.charges?.insurance?.enabled ?? true, value: 0 },
       other: { enabled: template?.charges?.other?.enabled ?? true, value: 0 },
     },
     totalsOverride: {},
+    discountCarriedFrom: carried ? (lastOfBuyer.invoiceNo || lastOfBuyer.provisionalNo) : null,
 
-    lines: generateLines(db, pls, template),
-    annexes: generateAnnexes(db, pls, template),
+    lines: generateLines(db, pls, template, byOrder),
+    annexes: generateAnnexes(db, pls, template, byOrder),
     acknowledgements: [],
     finalSnapshot: null,
 
@@ -515,6 +531,14 @@ export const updateInvoice = async (id, payload = {}) => {
   EDITABLE_FIELDS.forEach((k) => {
     if (payload[k] !== undefined) row[k] = clone(payload[k]);
   });
+  // A new invoice date takes the customs rate in force on it, unless someone set the rate by hand
+  if (row.invoiceDate !== before.invoiceDate && row.fxSource !== 'MANUAL') {
+    Object.assign(row, fxFieldsOf(await getFxRate(row.invoiceDate, row.currency)));
+  }
+  // The carried discount is the user's own once they change it
+  if (JSON.stringify(row.charges?.discount) !== JSON.stringify(before.charges?.discount)) row.discountCarriedFrom = null;
+  // HS codes typed on the lines reach the annexe sheets of the same styles
+  if (payload.lines !== undefined) row.annexes = fillAnnexHsCodes(row.annexes, row.lines);
 
   /*
    * §20: every edit is audited with its field-level before/after, and the master-data
@@ -582,13 +606,53 @@ const carryRateOverrides = (previous, lines) => {
     : l));
 };
 
+/** An HS code staff typed on a line whose style has none is kept when the same line comes back. */
+const carryTypedHsCodes = (previous, lines) => {
+  const byKey = new Map((previous || []).filter((l) => l.hsCode).map((l) => [l.key, l.hsCode]));
+  return lines.map((l) => (!l.hsCode && byKey.has(l.key) ? { ...l, hsCode: byKey.get(l.key) } : l));
+};
+
+/**
+ * An annexe is the same goods at another grain, so a line it leaves without an HS code takes the
+ * one the main lines give its style (typed by staff, where the style has none).
+ */
+const fillAnnexHsCodes = (annexes, lines) => {
+  const byStyle = new Map();
+  (lines || []).forEach((l) => {
+    const key = String(l.styleNo ?? '').toLowerCase();
+    if (l.hsCode && !byStyle.has(key)) byStyle.set(key, l.hsCode);
+  });
+  // A code taken from the main lines follows them when staff correct it there
+  return (annexes || []).map((a) => ({
+    ...a,
+    lines: (a.lines || []).map((l) => {
+      if (l.hsCode && !l.hsCodeFromLines) return l;
+      const code = byStyle.get(String(l.styleNo ?? '').toLowerCase()) ?? null;
+      return { ...l, hsCode: code, hsCodeFromLines: Boolean(code) };
+    }),
+  }));
+};
+
+/**
+ * The shipment's order terms for a rebuild. A draft whose orders are now in another currency is
+ * refused: its rates and charges are in the old one, so it is made again rather than relabelled.
+ */
+const termsForRebuild = (row, pls, orderTerms) => {
+  if (!orderTerms) return new Map();
+  const terms = resolveInvoiceTerms(ordersOfPls(pls), orderTerms);
+  if (!terms.error && row.currency && terms.currency !== String(row.currency).toUpperCase()) {
+    fail('CONFLICT', `This draft was made in ${row.currency}, but its orders are now in ${terms.currency}. Delete this draft and create the invoice again.`);
+  }
+  return termsByOrder(orderTerms);
+};
+
 /**
  * Change the template ONE draft invoice renders with — a newer revision of its own
  * template (logged, no reason), or a different template (permissioned, with a reason).
  * The lines are generated at the template's grain, so they are rebuilt; rates the user
  * set are kept, and a grain override made under the old template is dropped with it.
  */
-export const changeInvoiceTemplate = async (id, snapshot, { reason } = {}) => {
+export const changeInvoiceTemplate = async (id, snapshot, { reason, orderTerms } = {}) => {
   await delay();
   const db = loadDb();
   const row = (db.invoices || []).find((i) => i.id === Number(id));
@@ -622,12 +686,13 @@ export const changeInvoiceTemplate = async (id, snapshot, { reason } = {}) => {
   row.templateIsFallback = Boolean(snapshot.isSystem);
 
   const pls = boundPls(db, row);
+  const byOrder = termsForRebuild(row, pls, orderTerms);
   const effective = row.grainOverride?.mode
     ? { ...snapshot, invoiceLineGrain: { ...(snapshot.invoiceLineGrain || {}), mode: row.grainOverride.mode } }
     : snapshot;
   const previous = row.lines || [];
-  row.lines = carryRateOverrides(previous, generateLines(db, pls, effective));
-  row.annexes = generateAnnexes(db, pls, effective);
+  row.lines = carryTypedHsCodes(previous, carryRateOverrides(previous, generateLines(db, pls, effective, byOrder)));
+  row.annexes = fillAnnexHsCodes(generateAnnexes(db, pls, effective, byOrder), row.lines);
   row.version += 1;
   row.updatedAt = nowStamp();
   row.updatedBy = currentUserName();
@@ -650,6 +715,7 @@ export const regenerateLines = async (id, options = {}) => {
   if (row.status !== INVOICE_STATUS.DRAFT) fail('CONFLICT', 'Only a draft invoice can be regenerated.');
 
   const pls = boundPls(db, row);
+  const byOrder = termsForRebuild(row, pls, options.orderTerms);
   const template = templateOf(row);
   /*
    * Changing the grain is a template-override-level act (§8.3); the caller gates it.
@@ -669,8 +735,8 @@ export const regenerateLines = async (id, options = {}) => {
   }
 
   const previous = row.lines || [];
-  row.lines = generateLines(db, pls, effective);
-  row.annexes = generateAnnexes(db, pls, effective);
+  row.lines = carryTypedHsCodes(previous, generateLines(db, pls, effective, byOrder));
+  row.annexes = fillAnnexHsCodes(generateAnnexes(db, pls, effective, byOrder), row.lines);
 
   if (options.keepRateOverrides !== false) row.lines = carryRateOverrides(previous, row.lines);
 

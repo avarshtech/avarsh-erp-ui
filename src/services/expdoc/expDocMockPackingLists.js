@@ -16,7 +16,6 @@ import {
   delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp,
   todayStr, currentUserName, colourKey, fieldDiff, describeChanges,
 } from './expDocMockCommon';
-import { getBuyerCommercial } from './expDocMockMasters';
 import { decorate as decorateShipment } from './expDocMockShipments';
 import {
   assemble, blocksOf, breakdownFor, groupsByOrder,
@@ -29,8 +28,9 @@ import { applyPlan, markNotShipping } from './expDocPlPlan';
 import { subtractRanges } from '../../utils/expDocPlanMatch';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
-  PL_STATUS, PL_TRANSITIONS, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
+  PL_STATUS, PL_TRANSITIONS, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE, DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
+import { latestOfBuyer } from '../../utils/expDocInvoiceTerms';
 import {
   sectionTotals, grandTotals, weightPerPiece, orderVsPacked, contentHashOfRows,
   formatRanges, packedQuantities,
@@ -128,6 +128,8 @@ export const PL_EDITABLE_FIELDS = [
   'plDate', 'descriptionOfGoods', 'marksAndNos', 'containerNo', 'sealNo', 'remarks',
   // How the cartons are numbered (owner, 2026-10-09): the rule, and where a continuing series starts
   'numbering', 'firstCartonNo',
+  // The buyer's shipping tolerance, kept on the list itself (owner, 2026-11-17)
+  'tolerancePercent',
 ];
 
 /** The fields that renumber the cartons when they change. */
@@ -140,9 +142,7 @@ export const decoratePl = (pl, db, options = {}) => {
   const out = clone(pl);
   const rows = allRows(out);
   const template = templateFor(out);
-  const tolerancePercent = out.tolerancePercent
-    ?? getBuyerCommercial({ buyerCode: out.buyerCode, buyerName: out.buyerName }).tolerancePercent
-    ?? 0;
+  const tolerancePercent = out.tolerancePercent ?? DEFAULT_TENANT_CONFIG.defaultTolerancePercent;
 
   out.sections = (out.sections || []).map((s) => ({ ...s, totals: sectionTotals(s.rows) }));
   out.totals = grandTotals(out.sections);
@@ -323,6 +323,10 @@ export const createPackingList = async (payload) => {
 
   const numbering = Object.values(NUMBERING).includes(payload.numbering)
     ? payload.numbering : buyersRule(db, shipment.buyerId, shipment.buyerName);
+  // The tolerance starts as the buyer's last list's, shown as carried (owner, 2026-11-17)
+  const lastOfBuyer = latestOfBuyer(db.packingLists || [], { buyerId: shipment.buyerId, buyerName: shipment.buyerName });
+  const carriedTolerance = payload.tolerancePercent == null && Number(lastOfBuyer?.tolerancePercent) > 0
+    ? Number(lastOfBuyer.tolerancePercent) : null;
   const id = newDocId();
   const record = {
     id,
@@ -362,7 +366,8 @@ export const createPackingList = async (payload) => {
     sourceRefs: refs,
     sections: [],
     orderBreakdown: clone(payload.orderBreakdown || []),
-    tolerancePercent: payload.tolerancePercent ?? null,
+    tolerancePercent: payload.tolerancePercent ?? carriedTolerance,
+    toleranceCarriedFrom: carriedTolerance != null ? lastOfBuyer.plNo : null,
     acknowledgements: [],
     finalSnapshot: null,
     finalisedBy: null,
@@ -426,6 +431,9 @@ export const updatePackingList = async (id, payload) => {
   });
   if (!Object.values(NUMBERING).includes(pl.numbering)) pl.numbering = before.numbering || DEFAULT_NUMBERING;
   pl.firstCartonNo = Math.max(1, Number(pl.firstCartonNo) || 1);
+  if (pl.tolerancePercent != null) pl.tolerancePercent = Math.min(100, Math.max(0, Number(pl.tolerancePercent) || 0));
+  // The carried tolerance is this list's own once someone changes it
+  if (pl.tolerancePercent !== before.tolerancePercent) pl.toleranceCarriedFrom = null;
   const changes = fieldDiff(before, pl, PL_EDITABLE_FIELDS);
   if (!changes.length) return decoratePl(pl, db);
   if (changes.some((c) => NUMBERING_FIELDS.includes(c.field))) reassemble(pl, db);

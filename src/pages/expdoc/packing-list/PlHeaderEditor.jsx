@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button, Form, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { FormSection, FormInput, FormDatePicker } from '../../../components/form';
+import { FormSection, FormInput, FormDatePicker, FormInputNumber } from '../../../components/form';
 import { ClassifiedLabel } from '../shared/FieldClassBadge';
 import { FIELD_CLASS } from '../../../utils/expDocConstants';
 
@@ -28,6 +28,7 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
     containerNo: pl.containerNo || undefined,
     sealNo: pl.sealNo || undefined,
     remarks: pl.remarks || undefined,
+    tolerancePercent: pl.tolerancePercent ?? 0,
   }), [pl]);
 
   // Keyed on the document, not its version: an action elsewhere on the list (adding packing,
@@ -83,6 +84,14 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
         </Form.Item>
         <Form.Item name="remarks" label="Remarks">
           <FormInput placeholder="Optional note printed under the totals" />
+        </Form.Item>
+        <Form.Item
+          name="tolerancePercent"
+          label="Shipping tolerance %"
+          tooltip="How far packed quantities may differ from the order before the list warns (short or excess)."
+          extra={pl.toleranceCarriedFrom ? `From ${pl.toleranceCarriedFrom}, this buyer's last packing list` : undefined}
+        >
+          <FormInputNumber min={0} max={100} precision={2} />
         </Form.Item>
       </FormSection>
 

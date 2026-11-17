@@ -385,6 +385,7 @@ const PackingListWorkspace = () => {
             <DetailCard.Field label="Consignee" value={pl.resolved?.consignee?.name} />
             <DetailCard.Field label="Container no." value={pl.resolved?.containerNo} />
             <DetailCard.Field label="Seal no." value={pl.resolved?.sealNo} />
+            <DetailCard.Field label="Shipping tolerance" value={`${pl.tolerancePercent ?? 0}%`} />
             <DetailCard.Field label="Remarks" value={pl.remarks} span={16} />
           </DetailCard>
         )

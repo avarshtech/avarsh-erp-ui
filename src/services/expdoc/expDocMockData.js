@@ -50,10 +50,10 @@ const SEED_HS_CODES = [
  * buyer master supplies ids we cannot know at seed time. Lookup falls back to a
  * neutral default so an unseeded buyer still produces a usable document.
  *
- * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms and
- * tolerance do not exist on mst_buyers today. The consignee and notify party are
- * NOT here — a shipment takes them from the real buyer master (the buyer, its
- * shipping locations and its bank).
+ * Only the demo buyer codes are still read (buyerCodeOf, the reports' buyer list). An
+ * invoice's currency and payment terms come from the orders, the tolerance is set on
+ * the packing list and the discount on the invoice (owner, 2026-11-17). The consignee
+ * and notify party are NOT here — a shipment takes them from the real buyer master.
  */
 const SEED_BUYER_COMMERCIAL = [
   {
@@ -92,16 +92,6 @@ export const buyerCodeOf = (buyerName) => {
   return SEED_BUYER_COMMERCIAL.find((b) => b.buyerName.toLowerCase() === name)?.buyerCode ?? null;
 };
 
-export const DEFAULT_BUYER_COMMERCIAL = {
-  buyerCode: null,
-  buyerName: null,
-  currency: 'USD',
-  incoterm: 'FOB',
-  paymentTerms: 'TT 30 DAYS',
-  tolerancePercent: DEFAULT_TENANT_CONFIG.defaultTolerancePercent,
-  allowMultiInvoicePerPl: false,
-};
-
 /**
  * Exporter fields the org master does not carry. Mirrors the shape of the SR
  * module's SEED_COMPANY_PROFILE_EXTRA; the real org record supplies name, address,
@@ -124,18 +114,6 @@ const SEED_EXPORTER_PROFILE_EXTRA = {
     { order: 3, code: 'TRUE_VALUE', text: 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.' },
   ],
   invoiceSeries: [{ code: 'EXP', label: 'Export commercial invoice' }],
-};
-
-/** Last 30 days of rates so an invoice dated in the past still finds one. */
-const buildFxRates = () => {
-  const rows = [];
-  for (let i = 0; i < 30; i += 1) {
-    const date = d(-i);
-    rows.push({ date, from: 'USD', to: 'INR', rate: 83.2 + ((i % 7) * 0.05) });
-    rows.push({ date, from: 'EUR', to: 'INR', rate: 90.4 + ((i % 5) * 0.07) });
-    rows.push({ date, from: 'GBP', to: 'INR', rate: 105.6 + ((i % 6) * 0.09) });
-  }
-  return rows;
 };
 
 // ─── Packing entries ────────────────────────────────────────────────────────────
@@ -422,11 +400,13 @@ const STATUTORY_REFERENCES = new Set([
   'iecNumber', 'panNumber', 'adCode', 'lutNumber', 'swiftCode', 'aepcRegnNo', 'rexNumber', 'starExportHouse',
 ]);
 
-/** The export masters as first saved to the API: HS codes, buyer commercial profiles, FX history, exporter profile, tenant config. */
+/**
+ * The export masters as first saved to the API: HS codes, buyer commercial profiles, exporter
+ * profile, tenant config. Exchange rates are not here: an invoice reads the customs rate list.
+ */
 export const buildSeedMasters = () => ({
   hsCodes: SEED_HS_CODES,
   buyerCommercial: SEED_BUYER_COMMERCIAL,
-  fxRates: buildFxRates(),
   exporterProfileExtra: Object.fromEntries(
     Object.entries(SEED_EXPORTER_PROFILE_EXTRA).filter(([k]) => !STATUTORY_REFERENCES.has(k)),
   ),

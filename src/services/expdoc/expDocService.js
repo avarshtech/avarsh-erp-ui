@@ -106,9 +106,6 @@ const thenSyncShipment = (fn, before = () => null) => async (...a) => {
 // (services/master/portService.js).
 export const listIncoterms = async () => INCOTERMS;
 export const listHsCodes = withDocuments((...a) => masters.listHsCodes(...a));
-export const getHsDefault = (...a) => masters.getHsDefault(...a);
-export const getBuyerCommercial = (...a) => masters.getBuyerCommercial(...a);
-export const getTolerancePercent = (...a) => masters.getTolerancePercent(...a);
 export const getExporterProfileExtra = (...a) => masters.getExporterProfileExtra(...a);
 export const getTenantConfig = (...a) => masters.getTenantConfig(...a);
 export const getFxRate = withDocuments((...a) => masters.getFxRate(...a));
@@ -240,13 +237,27 @@ const invoiceWrite = (fn, before) => thenSyncShipment(docWrite(withShipments(fn)
 export const searchInvoices = withDocuments(withShipments((...a) => invoices.searchInvoices(...a)));
 export const getInvoice = withDocuments(withShipments((...a) => invoices.getInvoice(...a)));
 export const listInvoiceablePls = withDocuments(withShipments((...a) => invoices.listInvoiceablePls(...a)));
+/**
+ * The shipment's orders' currency, payment terms and style HS codes. Creating an invoice needs
+ * them; a rebuild does without (`optional`): its lines keep the HS codes they had.
+ */
+const orderTermsOf = (shipmentId, { optional = false } = {}) => {
+  if (shipmentId == null) return Promise.resolve(optional ? null : []);
+  const read = shipmentApi.getApiOrderTerms(shipmentId, { silent: optional });
+  return optional ? read.catch(() => null) : read;
+};
 export const createInvoice = invoiceWrite(async (payload) => invoices.createInvoice({
-  ...payload, templateSnapshot: await loadTemplateSnapshot(payload.templateId),
+  ...payload,
+  templateSnapshot: await loadTemplateSnapshot(payload.templateId),
+  orderTerms: await orderTermsOf(mockShipments.shipmentOfDocument('packingLists', payload.plIds?.[0])),
 }));
 export const changeInvoiceTemplate = docWrite(withShipments(async (id, templateId, reason) =>
-  invoices.changeInvoiceTemplate(id, await loadTemplateSnapshot(templateId), { reason })));
+  invoices.changeInvoiceTemplate(id, await loadTemplateSnapshot(templateId), {
+    reason, orderTerms: await orderTermsOf(invoiceShipment(id), { optional: true }),
+  })));
 export const updateInvoice = docWrite(withShipments((...a) => invoices.updateInvoice(...a)));
-export const regenerateInvoiceLines = docWrite(withShipments((...a) => invoices.regenerateLines(...a)));
+export const regenerateInvoiceLines = docWrite(withShipments(async (id, options = {}) =>
+  invoices.regenerateLines(id, { ...options, orderTerms: await orderTermsOf(invoiceShipment(id), { optional: true }) })));
 export const acknowledgeInvoiceWarning = docWrite(withShipments((...a) => invoices.acknowledgeInvoiceWarning(...a)));
 /** Finalising numbers the invoice (EXP/…) on the documents just reloaded, so the series stays gapless. */
 export const changeInvoiceStatus = invoiceWrite((...a) => invoices.changeInvoiceStatus(...a));
