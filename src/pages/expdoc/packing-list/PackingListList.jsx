@@ -120,7 +120,7 @@ const PackingListList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText}
-          onSearchChange={setSearchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
           searchPlaceholder="Search PL no, shipment, buyer or order"
           filters={filters}
           style={{ marginBottom: 16 }}

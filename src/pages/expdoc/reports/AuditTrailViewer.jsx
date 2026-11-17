@@ -166,7 +166,7 @@ const AuditTrailViewer = () => {
         </Space>
         <SearchFilterBar
           searchText={searchText}
-          onSearchChange={setSearchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
           searchPlaceholder="Search document number, event, detail or reason"
           filters={filters}
           style={{ marginBottom: 16 }}

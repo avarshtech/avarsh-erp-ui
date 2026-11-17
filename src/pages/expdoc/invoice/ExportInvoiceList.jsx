@@ -114,7 +114,7 @@ const ExportInvoiceList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText}
-          onSearchChange={setSearchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
           searchPlaceholder="Search invoice no, buyer or shipment"
           filters={filters}
           style={{ marginBottom: 16 }}
