@@ -115,7 +115,9 @@ export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 // `update`: every role that may acknowledge already holds an edit right.
 // No `finalise` op — repo-wide, leaving Draft is gated on `update`
 // (see canSubmitOrder below, and Bill Passing).
-export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise', 'override'];
+// `approve` decides an approval flow on the document (Phase 0 review): kept apart from `update`, so whoever
+// edits and finalises a packing list or invoice is not, by that right, its approver.
+export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise', 'override', 'approve'];
 
 // Stickers have no lifecycle of their own — they inherit the packing list's
 // state, so there is nothing to add/update/delete. What varies is who may put ink

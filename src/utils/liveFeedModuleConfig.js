@@ -83,7 +83,8 @@ export const MODULE_CONFIG = {
   },
   // Export Documentation (PRD §11.1). Registered so the feed renders these events
   // with their own label, colour and deep link the moment the backend emits them —
-  // without a key they would all arrive as an unroutable "Activity".
+  // without a key they would all arrive as an unroutable "Activity". SHIPMENT and
+  // the three EXPORT_* keys are the API's FeedModule names.
   PACKING_ENTRY: {
     label: 'Carton Packing',
     color: '#0e7490',
@@ -98,7 +99,7 @@ export const MODULE_CONFIG = {
     icon: ContainerOutlined,
     route: (id) => `/export-docs/shipments/edit/${id}`,
   },
-  PACKING_LIST: {
+  EXPORT_PACKING_LIST: {
     label: 'Packing List',
     color: '#15803d',
     bg: 'rgba(21, 128, 61, 0.08)',
@@ -112,7 +113,7 @@ export const MODULE_CONFIG = {
     icon: DollarOutlined,
     route: (id) => `/export-docs/invoices/edit/${id}`,
   },
-  STICKER_RUN: {
+  EXPORT_STICKER: {
     label: 'Carton Stickers',
     color: '#7e22ce',
     bg: 'rgba(126, 34, 206, 0.08)',
