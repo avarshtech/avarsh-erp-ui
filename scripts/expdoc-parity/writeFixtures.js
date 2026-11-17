@@ -4,21 +4,27 @@
  *
  * Fixture file: erp-purchase/src/test/resources/expdoc-parity/<moduleName>.json, an array of
  *   { id, fn, args, output }   or, for a call the browser rejects,   { id, fn, args, throws }
+ * With PARITY_OUT=<dir> in the environment the files go to that directory instead (npm run parity:check writes
+ * them to a temporary one and compares).
  *
  * What makes a fixture trustworthy:
- *  - The function runs on the args AS WRITTEN: they are serialised to JSON and parsed back before
- *    the call, so the browser computed `output` from exactly the input the Java test reads.
- *  - `output` is plain JSON. undefined becomes null (also inside objects, so the key stays visible),
- *    NaN and ±Infinity become null (JSON has neither), -0 becomes 0, a Map becomes an object, a Set
- *    or a generator becomes an array. A function in an output fails the dump: it is not data.
- *  - Keys keep the order JavaScript gives them: array-index keys ("74", "104") first in numeric
- *    order, then the rest as inserted. Deterministic for a given source.
+ *  - The function runs on the args AS WRITTEN: they are encoded, serialised to JSON and decoded back before the
+ *    call, so the browser computed `output` from exactly the input the Java test reads.
+ *  - Args and output are JSON, and what JSON cannot hold is written as a SENTINEL, an object whose only key is "$js":
+ *      undefined -> {"$js":"undefined"}   NaN -> {"$js":"NaN"}   Infinity -> {"$js":"Infinity"}
+ *      -Infinity -> {"$js":"-Infinity"}
+ *    so undefined, null, NaN and the two infinities stay five different values, inside objects and lists too (an
+ *    object's undefined key stays visible). Nothing real reads as a sentinel: data with a "$js" key fails the dump.
+ *    -0 becomes 0 (JSON.stringify(-0) is "0"), a Map becomes an object, a Set or a generator an array, a value with
+ *    toJSON what it returns. A function, a bigint or a symbol fails the dump: it is not data.
+ *  - Keys keep the order JavaScript gives them: array-index keys ("74", "104") first in numeric order, then the rest
+ *    as inserted. Deterministic for a given source.
  *  - The file is ASCII: every other character is written as a \uXXXX escape.
- *  - A case may give `argsJson` (JSON text) instead of `args` when the KEY ORDER of the text matters:
- *    the browser re-orders keys on JSON.parse, the API's Jackson keeps the text's order, so only a
- *    text in a non-JavaScript order (as PostgreSQL jsonb returns sizes) proves the Java port re-orders.
- *    The text is written to the fixture verbatim.
- *  - A case that throws must say so (`throws: true`); any other throw fails the dump.
+ *  - A case may give `argsJson` (JSON text) instead of `args` when the KEY ORDER of the text matters: the browser
+ *    re-orders keys on JSON.parse, the API's Jackson keeps the text's order, so only a text in a non-JavaScript order
+ *    (as PostgreSQL jsonb returns sizes) proves the Java port re-orders. The text is written to the fixture verbatim.
+ *  - A case that throws must say so (`throws: true`); any other throw fails the dump. The fixture records the error
+ *    as "<name>: <message>".
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,18 +34,34 @@ const UI_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const API_ROOT = path.resolve(UI_ROOT, '..', 'erp-purchase');
 const API_TEST_RESOURCES = path.join(API_ROOT, 'src', 'test', 'resources');
 
-export const FIXTURE_DIR = path.join(API_TEST_RESOURCES, 'expdoc-parity');
+/** Where the API's parity tests read the fixtures, in the erp-purchase checkout beside this repo. */
+export const API_FIXTURE_DIR = path.join(API_TEST_RESOURCES, 'expdoc-parity');
+
+const OUT_OVERRIDE = process.env.PARITY_OUT ? path.resolve(process.env.PARITY_OUT) : null;
+
+/** Where this run writes the fixtures: PARITY_OUT when it is set, else the API's own directory. */
+export const FIXTURE_DIR = OUT_OVERRIDE ?? API_FIXTURE_DIR;
+
+/** The one key of a sentinel object. */
+export const SENTINEL_KEY = '$js';
+
+/** Each sentinel's name and the value it stands for. */
+const SENTINELS = new Map([['undefined', undefined], ['NaN', NaN], ['Infinity', Infinity], ['-Infinity', -Infinity]]);
+
+const sentinel = (name) => ({ [SENTINEL_KEY]: name });
 
 class NotJsonError extends Error {}
 
 const isIterator = (v) => typeof v?.next === 'function' && typeof v[Symbol.iterator] === 'function';
 
-/** A value as plain JSON data, by the rules at the top of this file. */
-export const jsonSafe = (value, where) => {
-  if (value === undefined || value === null) return null;
+/** A value as fixture JSON, by the rules at the top of this file. */
+export const toFixtureJson = (value, where) => {
+  if (value === undefined) return sentinel('undefined');
+  if (value === null) return null;
   switch (typeof value) {
     case 'number':
-      if (!Number.isFinite(value)) return null;
+      if (Number.isNaN(value)) return sentinel('NaN');
+      if (!Number.isFinite(value)) return sentinel(value > 0 ? 'Infinity' : '-Infinity');
       return Object.is(value, -0) ? 0 : value;
     case 'string':
     case 'boolean':
@@ -49,17 +71,30 @@ export const jsonSafe = (value, where) => {
     default:
       throw new NotJsonError(`${where}: a ${typeof value} is not JSON data`);
   }
-  if (Array.isArray(value)) return value.map((v, i) => jsonSafe(v, `${where}[${i}]`));
-  if (value instanceof Map) {
-    return Object.fromEntries([...value].map(([k, v]) => [String(k), jsonSafe(v, `${where}.${String(k)}`)]));
+  // Array.from visits a hole as undefined, which JSON.stringify would write as null
+  if (Array.isArray(value)) return Array.from(value, (v, i) => toFixtureJson(v, `${where}[${i}]`));
+  if (value instanceof Map) return objectOf([...value].map(([k, v]) => [String(k), v]), where);
+  if (value instanceof Set || isIterator(value)) return [...value].map((v, i) => toFixtureJson(v, `${where}[${i}]`));
+  if (typeof value.toJSON === 'function') return toFixtureJson(value.toJSON(), where);
+  return objectOf(Object.keys(value).map((k) => [k, value[k]]), where);
+};
+
+/** An object of encoded values; fromEntries makes even a "__proto__" key an own property, as JSON.parse does. */
+const objectOf = (entries, where) => Object.fromEntries(entries.map(([k, v]) => {
+  if (k === SENTINEL_KEY) throw new NotJsonError(`${where}: the key "${SENTINEL_KEY}" is the fixtures' sentinel; data cannot use it`);
+  return [k, toFixtureJson(v, `${where}.${k}`)];
+}));
+
+/** Fixture JSON as the browser's value: each sentinel the value it stands for, an undefined key kept as a key. */
+export const fromFixtureJson = (json, where) => {
+  if (Array.isArray(json)) return json.map((v, i) => fromFixtureJson(v, `${where}[${i}]`));
+  if (json === null || typeof json !== 'object') return json;
+  if (Object.hasOwn(json, SENTINEL_KEY)) {
+    const name = json[SENTINEL_KEY];
+    if (Object.keys(json).length !== 1 || !SENTINELS.has(name)) throw new Error(`${where}: ${JSON.stringify(json)} is not a sentinel`);
+    return SENTINELS.get(name);
   }
-  if (value instanceof Set || isIterator(value)) return [...value].map((v, i) => jsonSafe(v, `${where}[${i}]`));
-  if (typeof value.toJSON === 'function') return jsonSafe(value.toJSON(), where);
-  const out = {};
-  Object.keys(value).forEach((k) => {
-    out[k] = jsonSafe(value[k], `${where}.${k}`);
-  });
-  return out;
+  return Object.fromEntries(Object.keys(json).map((k) => [k, fromFixtureJson(json[k], `${where}.${k}`)]));
 };
 
 const argsTextOf = (c) => {
@@ -67,29 +102,31 @@ const argsTextOf = (c) => {
     if (c.args !== undefined) throw new Error(`${c.id}: give args or argsJson, not both`);
     return c.argsJson;
   }
-  return JSON.stringify(jsonSafe(c.args ?? [], `${c.id} args`));
+  return JSON.stringify(toFixtureJson(c.args ?? [], `${c.id} args`));
 };
 
 const run = (c) => {
   const argsText = argsTextOf(c);
-  let args;
+  let json;
   try {
-    args = JSON.parse(argsText);
+    json = JSON.parse(argsText);
   } catch (e) {
     throw new Error(`${c.id}: argsJson is not JSON (${e.message})`);
   }
-  if (!Array.isArray(args)) throw new Error(`${c.id}: args must be an array`);
+  if (!Array.isArray(json)) throw new Error(`${c.id}: args must be an array`);
+  // The browser runs on the args the fixture holds, each sentinel made its value again
+  const args = fromFixtureJson(json, `${c.id} args`);
   let output;
   try {
     // Materialised inside the try: a generator throws on its first step, not when it is called
-    output = jsonSafe(c.fn(...args), `${c.id} output`);
+    output = toFixtureJson(c.fn(...args), `${c.id} output`);
   } catch (e) {
     if (e instanceof NotJsonError) throw e;
     if (!c.throws) throw new Error(`${c.id}: ${c.fn.name} threw "${e}"; mark the case throws: true if the browser means to`);
-    return { args, argsText, thrown: `${e.name}: ${e.message}` };
+    return { args: json, argsText, thrown: `${e.name}: ${e.message}` };
   }
   if (c.throws) throw new Error(`${c.id}: ${c.fn.name} was expected to throw and returned`);
-  return { args, argsText, output };
+  return { args: json, argsText, output };
 };
 
 /**
@@ -104,7 +141,7 @@ const run = (c) => {
  * Returns { file, count, fns } for the dump to check.
  */
 export const writeFixtures = (moduleName, cases, { api, notPorted = {} } = {}) => {
-  if (!fs.existsSync(API_TEST_RESOURCES)) {
+  if (!OUT_OVERRIDE && !fs.existsSync(API_TEST_RESOURCES)) {
     throw new Error(`The API repo is not beside this one: ${API_TEST_RESOURCES} does not exist. `
       + 'Clone erp-purchase next to avarsh-erp-ui.');
   }

@@ -14,6 +14,7 @@
     "build": "vite build",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
+    "parity:check": "node scripts/expdoc-parity/checkFixtures.mjs",
     "lint": "eslint . --max-warnings 76",
     "lint:prune": "eslint . --prune-suppressions",
     "test": "vitest run",

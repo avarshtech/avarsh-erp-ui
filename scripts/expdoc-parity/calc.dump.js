@@ -225,7 +225,7 @@ const ROUNDING_CASES = [
     ['2.5-to-0dp', [2.5, 0]], ['minus-half', [-0.5, 0]], ['minus-1.5', [-1.5, 0]], ['minus-2.5', [-2.5, 0]],
     ['123.456-0dp', [123.456, 0]], ['123.456-1dp', [123.456, 1]], ['4-decimals-at-3', [123.4565, 3]],
     ['tiny-5dp', [0.000015, 5]], ['tiny-5dp-b', [0.000025, 5]], ['sum-drift', [0.1 + 0.2, 2]],
-    ['null', [null, 2]], ['text-number', ['3.14159', 3]], ['huge', [1e21, 2]], ['overflow-is-null', [1e308, 2]],
+    ['null', [null, 2]], ['text-number', ['3.14159', 3]], ['huge', [1e21, 2]], ['overflow-is-infinity', [1e308, 2]],
     ['big-weight', [1234567.8915, 3]],
   ].map(([id, args]) => ({ id: `round/${id}`, fn: round, args })),
   ...[[1.005], [1.335], [-2.675], [0.125], [null], [99.995], [1 / 3], [12.48 * 47]]
@@ -236,7 +236,8 @@ const ROUNDING_CASES = [
     .map((args, i) => ({ id: `round5/${i + 1}`, fn: round5, args })),
   ...[[12.48], [2.005], [1.0005], [0.0005], [-0.0005], [null], ['2.5'], [13.4999], [9.2], [0.1 + 0.2]]
     .map((args, i) => ({ id: `toMilliKg/${i + 1}`, fn: toMilliKg, args })),
-  ...[[12480], [2005], [0], [null], [1], [-1500], [123456789], [1.5]]
+  // NaN and Infinity in and out (the fixture's sentinels): mkg / 1000 keeps them, and so must the port
+  ...[[12480], [2005], [0], [null], [1], [-1500], [123456789], [1.5], [NaN], [-Infinity]]
     .map((args, i) => ({ id: `fromMilliKg/${i + 1}`, fn: fromMilliKg, args })),
   ...[[60], [60.25], [40.05], [35.15], [0.05], [-0.05], [null], ['35.5'], [12.345], [999.95]]
     .map((args, i) => ({ id: `toMm/${i + 1}`, fn: toMm, args })),
