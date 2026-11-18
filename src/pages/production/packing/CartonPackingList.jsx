@@ -8,6 +8,7 @@ import EmptyState from '../../../components/EmptyState';
 import StatCard from '../../../components/StatCard';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { hasPermission } from '../../../utils/permissions';
 import {
   PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
@@ -73,7 +74,7 @@ const CartonPackingList = () => {
           total: res.totalElements || 0,
         }));
       } catch (e) {
-        message.error(e.message || 'Failed to load packing entries');
+        toastUnlessHandled(message, e, 'Failed to load packing entries');
         setRows([]);
       } finally {
         setLoading(false);
@@ -95,7 +96,8 @@ const CartonPackingList = () => {
         fetchData();
         setSummaryKey((k) => k + 1);
       } catch (e) {
-        message.error(e.message || 'Failed to delete packing entry');
+        // The server's refusal (e.g. "CPK/… is on packing list PKL/…") was already shown by the interceptor
+        toastUnlessHandled(message, e, 'Failed to delete packing entry');
       }
     },
     [message, fetchData],
@@ -193,7 +195,7 @@ const CartonPackingList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText}
-          onSearchChange={setSearchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
           searchPlaceholder="Search packing no, order, style or buyer"
           filters={filters}
           style={{ marginBottom: 16 }}
