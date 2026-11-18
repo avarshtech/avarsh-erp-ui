@@ -32,21 +32,17 @@ export const raisePackingList = async (api, shipmentId, entryIds = null, { templ
 /** One packing list as the workspace reads it. */
 export const getPackingList = async (api, plId) => ok(await api.get(`${PL}/${plId}`), 'read packing list');
 
-/** A POST command on a packing list (`ack`, `submit`, `release`, `cancel`, …), answered with the list. */
+/** A POST command on a packing list (`ack`, `finalise`, `release`, `cancel`, …), answered with the list. */
 export const packingListCommand = async (api, plId, command, body) =>
   ok(await api.post(`${PL}/${plId}/${command}`, body), `packing list ${command}`);
 
 /**
- * Takes one packing list out of the way: a draft is deleted, a submission withdrawn and deleted, a final or
- * released one cancelled (it stays on record). Whether it went.
+ * Takes one packing list out of the way: a draft is deleted, a final or released one cancelled (it stays on
+ * record). Whether it went.
  */
 const retire = async (api, plId) => {
-  let res = await api.get(`${PL}/${plId}`);
+  const res = await api.get(`${PL}/${plId}`);
   if (res.status !== 200) return false;
-  if (res.data.status === 'PENDING_APPROVAL') {
-    res = await api.post(`${PL}/${plId}/withdraw`, { version: res.data.version });
-    if (res.status !== 200) return false;
-  }
   const pl = res.data;
   if (pl.status === 'DRAFT') return (await api.delete(`${PL}/${plId}?version=${pl.version}`)).status === 204;
   if (pl.status === 'FINAL' || pl.status === 'EXPORTED') {

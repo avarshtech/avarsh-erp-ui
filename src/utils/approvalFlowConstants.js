@@ -18,25 +18,21 @@ export const ENTITY_TYPES = [
   { value: 'BILL_PASSING', label: 'Bill Passing' },
   { value: 'CUT_PANEL_PO', label: 'Cut Panel PO' },
   { value: 'GARMENT_PROCESS_PO', label: 'Garment Process PO' },
-  { value: 'EXPORT_PACKING_LIST', label: 'Packing List' },
-  { value: 'EXPORT_INVOICE', label: 'Export Invoice' },
 ];
 
 /**
- * Entity types a flow cannot be created for yet, and why. GRN has no approval hooks in the backend
- * (submit goes straight to QC), so a GRN flow would collect decisions that never apply to the
- * document. Packing lists are submitted on the server, so their flows apply; export invoices get
- * theirs when finalising an invoice moves to the server, and until then nothing submits them, so a
- * flow would never fire.
+ * Entity-type options for flow creation. GRN is disabled: it has no approval
+ * hooks in the backend (submit goes straight to QC), so a GRN flow would
+ * collect decisions that never apply to the document.
  */
-const FLOW_UNAVAILABLE = {
-  GRN: 'GRN approval happens through QC — a flow on GRN would have no effect. Use QC or GRN Reversal instead.',
-  EXPORT_INVOICE: 'Export invoices are not sent for approval yet — this becomes available when finalising moves to the server.',
-};
-
-/** Entity-type options for flow creation; the unavailable ones are shown disabled with their reason. */
 export const FLOW_ENTITY_TYPE_OPTIONS = ENTITY_TYPES.map((t) =>
-  FLOW_UNAVAILABLE[t.value] ? { ...t, disabled: true, title: FLOW_UNAVAILABLE[t.value] } : t,
+  t.value === 'GRN'
+    ? {
+        ...t,
+        disabled: true,
+        title: 'GRN approval happens through QC — a flow on GRN would have no effect. Use QC or GRN Reversal instead.',
+      }
+    : t,
 );
 
 export const ENTITY_TYPE_COLORS = {
@@ -59,8 +55,6 @@ export const ENTITY_TYPE_COLORS = {
   BILL_PASSING: 'gold',
   CUT_PANEL_PO: 'geekblue',
   GARMENT_PROCESS_PO: 'magenta',
-  EXPORT_PACKING_LIST: 'green',
-  EXPORT_INVOICE: 'gold',
 };
 
 /** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
@@ -85,8 +79,6 @@ export const entityActionUrl = (entityType, entityId) => {
     case 'BILL_PASSING': return `/inventory/bill-passing?viewId=${entityId}`;
     case 'CUT_PANEL_PO': return `/purchase-orders/cut-panel-po/${entityId}`;
     case 'GARMENT_PROCESS_PO': return `/purchase-orders/garment-process-po/${entityId}`;
-    case 'EXPORT_PACKING_LIST': return `/export-docs/packing-lists/edit/${entityId}`;
-    case 'EXPORT_INVOICE': return `/export-docs/invoices/edit/${entityId}`;
     default: return '/';
   }
 };
@@ -194,16 +186,5 @@ export const CONDITION_FIELDS = {
   GARMENT_PROCESS_PO: [
     { value: 'amount', label: 'PO Value', type: 'number' },
     { value: 'branchId', label: 'Branch', type: 'branch' },
-  ],
-  // The export documents. An invoice's value is in its own currency (the orders' cost-sheet currency), so a
-  // value tier goes together with a Currency condition.
-  EXPORT_PACKING_LIST: [
-    { value: 'buyerId', label: 'Buyer', type: 'number' },
-    { value: 'totalCartons', label: 'Total Cartons', type: 'number' },
-  ],
-  EXPORT_INVOICE: [
-    { value: 'amount', label: 'Invoice Value', type: 'number' },
-    { value: 'currency', label: 'Currency', type: 'select', options: ['USD', 'EUR', 'GBP', 'INR'] },
-    { value: 'buyerId', label: 'Buyer', type: 'number' },
   ],
 };

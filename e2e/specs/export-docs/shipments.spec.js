@@ -279,8 +279,8 @@ test.describe('Shipments', { tag: '@dev-server' }, () => {
     await purgeMarked(api, orderId);
     const entry = await createEntry(api, { orderId, groups: [range({ cartonFrom: 1, cartonTo: 10 })] });
 
-    // The packing list is the API's: raised, its blocking warnings acknowledged, submitted (final at
-    // once where no approval flow applies) and released, all through REST; the server closes the shipment
+    // The packing list is the API's: raised, its blocking warnings acknowledged, finalised and
+    // released, all through REST; the server closes the shipment
     let pl = await raisePackingList(api, shipment.id, [entry.id]);
     for (let round = 0; round < 5 && pl.panelFindings.blocking.length; round += 1) {
       for (const finding of pl.panelFindings.blocking.filter((f) => f.acknowledgeable)) {
@@ -289,7 +289,7 @@ test.describe('Shipments', { tag: '@dev-server' }, () => {
         });
       }
     }
-    pl = await packingListCommand(api, pl.id, 'submit', { version: pl.version });
+    pl = await packingListCommand(api, pl.id, 'finalise', { version: pl.version });
     expect(pl.status).toBe('FINAL');
     pl = await packingListCommand(api, pl.id, 'release', { version: pl.version });
     expect(pl.sourceRefs).toHaveLength(1);

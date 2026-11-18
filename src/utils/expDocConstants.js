@@ -82,14 +82,12 @@ export const isPackingEntryEditable = (status) => status === PACKING_ENTRY_STATU
 // ─── Packing list lifecycle (PRD §16) ───────────────────────────────────────────
 // The server's (PlStatus). Revise does NOT transition in place: it creates a new DRAFT
 // row and moves the old one to SUPERSEDED, so buyers keep referencing one plNo across
-// revisions (PRD §17). Submitting a draft finalises it at once, or, where an approval
-// flow applies, waits for approval (PENDING_APPROVAL), from which it is approved (FINAL)
-// or comes back to DRAFT (referred back, rejected or withdrawn).
+// revisions (PRD §17).
+// There is no approval step: the person who builds the document finalises it.
 // FINAL is the freeze — it snapshots data and template version, which is what
 // stickers, invoices and reports bind to (BR-08). It is a state, not a verdict.
 export const PL_STATUS = {
   DRAFT: 'DRAFT',
-  PENDING_APPROVAL: 'PENDING_APPROVAL',
   FINAL: 'FINAL',
   EXPORTED: 'EXPORTED',
   CANCELLED: 'CANCELLED',
@@ -98,7 +96,6 @@ export const PL_STATUS = {
 
 export const PL_STATUS_LABELS = {
   DRAFT: 'Draft',
-  PENDING_APPROVAL: 'Pending approval',
   FINAL: 'Final',
   EXPORTED: 'Released',
   CANCELLED: 'Cancelled',
@@ -106,8 +103,7 @@ export const PL_STATUS_LABELS = {
 };
 
 export const PL_TRANSITIONS = {
-  DRAFT: ['PENDING_APPROVAL', 'FINAL'],
-  PENDING_APPROVAL: ['FINAL', 'DRAFT'],
+  DRAFT: ['FINAL'],
   FINAL: ['EXPORTED', 'CANCELLED', 'SUPERSEDED'], // to change it, Revise creates a new draft
   EXPORTED: ['CANCELLED', 'SUPERSEDED'],
   CANCELLED: [],
@@ -120,7 +116,7 @@ export const isPlFinal = (status) =>
   status === PL_STATUS.FINAL || status === PL_STATUS.EXPORTED;
 
 // ─── Export invoice lifecycle ───────────────────────────────────────────────────
-// The packing list's statuses but for the approval step: no approver, one
+// Same shape as the packing list, and for the same reason: no approver, one
 // finalise by the author. The invoice number is allocated at FINAL.
 export const INVOICE_STATUS = {
   DRAFT: 'DRAFT',

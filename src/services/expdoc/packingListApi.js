@@ -39,8 +39,6 @@ export const fromApi = (pl) => {
   if (!pl || typeof pl !== 'object') return pl;
   const out = { ...pl };
   STAMPED.filter((k) => k in out).forEach((k) => { out[k] = stamp(out[k]); });
-  if (out.approval) out.approval = { ...out.approval, submittedAt: stamp(out.approval.submittedAt) };
-  if (out.returned) out.returned = { ...out.returned, at: stamp(out.returned.at) };
   if (Array.isArray(out.revisions)) out.revisions = out.revisions.map(fromApi);
   return out;
 };
@@ -164,11 +162,8 @@ export const changeApiPlTemplate = (id, version, templateId, reason) =>
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-/** Final at once, or waiting for approval where a flow applies. */
-export const submitApiPackingList = (id, version) => list(axiosInstance.post(`${BASE}/${id}/submit`, { version }));
-
-/** A submission waiting for approval taken back to draft. */
-export const withdrawApiPackingList = (id, version) => list(axiosInstance.post(`${BASE}/${id}/withdraw`, { version }));
+/** A draft finalised: final at once. */
+export const finaliseApiPackingList = (id, version) => list(axiosInstance.post(`${BASE}/${id}/finalise`, { version }));
 
 /** A final list released with the export documents; `detail` says how. */
 export const releaseApiPackingList = (id, version, detail) =>

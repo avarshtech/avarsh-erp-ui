@@ -9,7 +9,7 @@
 import { PL_STATUS, SHIPMENT_STATUS } from '../../utils/expDocConstants.js';
 
 // Packing lists and invoices share these statuses; cancelled and superseded ones no longer
-// count, and every other one does: a packing list waiting for approval too, as on the server.
+// count, and every other one does, as on the server (one saved without a status too).
 const DEAD = [PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED];
 
 /** CLOSED once there is a live document and every live one is released; OPEN otherwise. */

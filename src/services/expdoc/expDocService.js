@@ -240,10 +240,8 @@ export const listOpenPlansForOrder = (orderId) => plApi.getApiOpenPlans(orderId,
 /** Move a draft to a newer revision of its template, or (with a reason) to another template. */
 export const changePlTemplate = async (pl, templateId, reason) =>
   adopt(await plApi.changeApiPlTemplate(pl.id, pl.version, apiTemplateId(templateId), reason));
-/** Submit a draft: final at once, or waiting for approval where an approval flow applies. */
-export const submitPackingList = lifecycle((pl) => plApi.submitApiPackingList(pl.id, pl.version));
-/** A submission waiting for approval, taken back to draft. */
-export const withdrawPackingList = lifecycle((pl) => plApi.withdrawApiPackingList(pl.id, pl.version));
+/** Finalise a draft: final at once, frozen with its template version. */
+export const finalisePackingList = lifecycle((pl) => plApi.finaliseApiPackingList(pl.id, pl.version));
 /** Release a final list with the export documents; `detail` says how. */
 export const markPackingListExported = lifecycle((pl, { detail } = {}) => plApi.releaseApiPackingList(pl.id, pl.version, detail));
 export const cancelPackingList = lifecycle((pl, reason) => plApi.cancelApiPackingList(pl.id, pl.version, reason));

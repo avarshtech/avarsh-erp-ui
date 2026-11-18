@@ -30,7 +30,7 @@ import { NUMBERING, rowsByGroup, groupCartonCount } from '../../utils/expDocPlNu
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
 
-/** A packing list that holds its cartons: any but cancelled and superseded (one waiting for approval too). */
+/** A packing list that holds its cartons: any but cancelled and superseded. */
 const isLive = (pl) => ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(pl.status);
 
 /**

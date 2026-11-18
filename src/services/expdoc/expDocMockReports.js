@@ -20,7 +20,7 @@ import {
 import { decorateInvoice } from './expDocMockInvoices';
 import { normBuyerName, templateMatchesBuyer, DOC_TYPE_TEMPLATE_ORDER } from '../../utils/expDocTemplateSchema';
 
-/** A packing list that holds its cartons: any but cancelled and superseded (one waiting for approval too). */
+/** A packing list that holds its cartons: any but cancelled and superseded. */
 const isLivePl = (pl) => ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(pl.status);
 const SHIPPED_PL = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);

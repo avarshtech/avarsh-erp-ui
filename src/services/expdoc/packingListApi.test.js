@@ -38,14 +38,12 @@ describe('reads', () => {
     expect(http.get).toHaveBeenLastCalledWith(BASE, { params: { page: 0, size: 25 } });
   });
 
-  test('one list: its times, its submission and return and its revisions stamped; stamped text left as it is', async () => {
+  test('one list: its times and its revisions stamped; stamped text left as it is', async () => {
     http.get.mockReturnValue(answer({
       id: 5,
       createdAt: '2026-11-18T09:00:00',
       updatedAt: '2026-11-18T10:05:59.9',
       finalisedAt: null,
-      approval: { requestId: 31, submittedAt: '2026-11-18T10:06:00', submittedBy: 'Priya S.' },
-      returned: { kind: 'REFERRED_BACK', by: 'Arun K.', at: '2026-11-18T11:30:00', reason: 'Wrong seal number' },
       finalSnapshot: { at: '2026-11-17 16:40', by: 'Priya S.' },
       revisions: [{ id: 4, createdAt: '2026-11-17T08:00:00', finalisedAt: '2026-11-17T16:40:00' }],
     }));
@@ -56,8 +54,6 @@ describe('reads', () => {
       createdAt: '2026-11-18 09:00',
       updatedAt: '2026-11-18 10:05',
       finalisedAt: null,
-      approval: { requestId: 31, submittedAt: '2026-11-18 10:06' },
-      returned: { kind: 'REFERRED_BACK', at: '2026-11-18 11:30' },
       finalSnapshot: { at: '2026-11-17 16:40' },
       revisions: [{ id: 4, createdAt: '2026-11-17 08:00', finalisedAt: '2026-11-17 16:40' }],
     });
@@ -175,8 +171,7 @@ describe('writes send the API\'s fields only, with the version', () => {
     ['refresh', () => plApi.refreshApiPackingList(5, 6), 'post', `${BASE}/5/refresh`, { version: 6 }],
     ['change the template', () => plApi.changeApiPlTemplate(5, 6, null, 'The buyer has no layout yet'), 'post',
       `${BASE}/5/template`, { version: 6, templateId: null, reason: 'The buyer has no layout yet' }],
-    ['submit', () => plApi.submitApiPackingList(5, 6), 'post', `${BASE}/5/submit`, { version: 6 }],
-    ['withdraw', () => plApi.withdrawApiPackingList(5, 6), 'post', `${BASE}/5/withdraw`, { version: 6 }],
+    ['finalise', () => plApi.finaliseApiPackingList(5, 6), 'post', `${BASE}/5/finalise`, { version: 6 }],
     ['release', () => plApi.releaseApiPackingList(5, 6), 'post', `${BASE}/5/release`, { version: 6, detail: null }],
     ['cancel', () => plApi.cancelApiPackingList(5, 6, 'Shipment cancelled'), 'post', `${BASE}/5/cancel`,
       { version: 6, reason: 'Shipment cancelled' }],
