@@ -1,11 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Button, Form, Space, Typography } from 'antd';
+import {
+  Button, Form, InputNumber, Space, Typography,
+} from 'antd';
 import dayjs from 'dayjs';
-import { FormSection, FormInput, FormDatePicker, FormInputNumber } from '../../../components/form';
+import { FormSection, FormInput, FormDatePicker } from '../../../components/form';
 import { ClassifiedLabel } from '../shared/FieldClassBadge';
 import { FIELD_CLASS } from '../../../utils/expDocConstants';
+import { numericInputProps } from '../../../utils/inputHelpers';
 
 const { Text } = Typography;
+const FULL_WIDTH = { width: '100%' };
 
 /**
  * The header fields a packing list owns (§12.1).
@@ -16,6 +20,10 @@ const { Text } = Typography;
  * at a glance that this document no longer follows its shipment. The seal no. is
  * the document's own — the shipment no longer carries one. The consignee is always
  * the shipment's (the buyer), so there is nothing to override.
+ *
+ * The shipping tolerance is the list's own (`ownTolerancePercent`): blank is none of its own,
+ * and the default applies, shown greyed while the list has none. Saving a blank never writes
+ * the default onto the list.
  */
 const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
   const [form] = Form.useForm();
@@ -28,8 +36,10 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
     containerNo: pl.containerNo || undefined,
     sealNo: pl.sealNo || undefined,
     remarks: pl.remarks || undefined,
-    tolerancePercent: pl.tolerancePercent ?? 0,
+    ownTolerancePercent: pl.ownTolerancePercent ?? null,
   }), [pl]);
+  // The default the list works with while it has no tolerance of its own (the API sends the one in force)
+  const defaultTolerance = pl.ownTolerancePercent == null ? pl.tolerancePercent : null;
 
   // Keyed on the document, not its version: an action elsewhere on the list (adding packing,
   // renumbering) must not wipe an edit in progress here. A revision is a new document.
@@ -86,12 +96,21 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
           <FormInput placeholder="Optional note printed under the totals" />
         </Form.Item>
         <Form.Item
-          name="tolerancePercent"
+          name="ownTolerancePercent"
           label="Shipping tolerance %"
-          tooltip="How far packed quantities may differ from the order before the list warns (short or excess)."
+          tooltip="How far packed quantities may differ from the order before the list warns (short or excess). Blank uses the default."
           extra={pl.toleranceCarriedFrom ? `From ${pl.toleranceCarriedFrom}, this buyer's last packing list` : undefined}
         >
-          <FormInputNumber min={0} max={100} precision={2} />
+          {/* Not FormInputNumber: it turns a blank into 0 on blur, and blank here means the default */}
+          <InputNumber
+            controls={false}
+            {...numericInputProps}
+            min={0}
+            max={100}
+            precision={2}
+            style={FULL_WIDTH}
+            placeholder={defaultTolerance == null ? 'Default' : `${defaultTolerance} (default)`}
+          />
         </Form.Item>
       </FormSection>
 

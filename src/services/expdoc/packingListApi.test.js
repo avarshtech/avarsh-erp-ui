@@ -131,7 +131,7 @@ describe('writes send the API\'s fields only, with the version', () => {
   test('the header goes whole with its version; the rest of a decorated list stays home', async () => {
     await plApi.updateApiPlHeader(5, {
       id: 5, version: 4, plDate: '2026-11-18', descriptionOfGoods: 'KNITTED GARMENTS', marksAndNos: undefined, containerNo: null,
-      sealNo: 'SL-1', remarks: '', numbering: 'PER_PO', firstCartonNo: 1, tolerancePercent: 3,
+      sealNo: 'SL-1', remarks: '', numbering: 'PER_PO', firstCartonNo: 1, tolerancePercent: 3, ownTolerancePercent: 3,
       blocks: [], resolved: { containerNo: 'MSKU1' }, panelFindings: {}, status: 'DRAFT',
     });
     expect(http.put).toHaveBeenCalledWith(`${BASE}/5`, {
@@ -146,6 +146,14 @@ describe('writes send the API\'s fields only, with the version', () => {
       firstCartonNo: 1,
       tolerancePercent: 3,
     });
+  });
+
+  test('the tolerance sent is the list\'s own: none of its own sends none, never the default it works with', async () => {
+    await plApi.updateApiPlHeader(5, { version: 4, plDate: '2026-11-18', tolerancePercent: 2, ownTolerancePercent: null });
+    expect(http.put.mock.calls.at(-1)[1].tolerancePercent).toBeNull();
+
+    await plApi.updateApiPlHeader(5, { version: 4, plDate: '2026-11-18', tolerancePercent: 2, ownTolerancePercent: 1.5 });
+    expect(http.put.mock.calls.at(-1)[1].tolerancePercent).toBe(1.5);
   });
 
   test.each([

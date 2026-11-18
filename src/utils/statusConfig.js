@@ -298,8 +298,9 @@ export const PRODUCTION_PO_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED
 // appended dynamically in SampleRequestView based on the record's outcome.
 export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISPATCHED', 'FEEDBACK_RECEIVED'];
 // Export documents share one happy path. CANCELLED and SUPERSEDED are outcomes, not
-// steps, so they stay off the flow and show as a status tag instead.
-export const PL_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
+// steps, so they stay off the flow and show as a status tag instead. A packing list
+// waits for approval on its way to FINAL where an approval flow applies to it.
+export const PL_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'FINAL', 'EXPORTED'];
 export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 export const REQUIREMENT_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'PARTIALLY_USED', 'FULLY_USED'];
 // Rejected and Cancelled are outcomes, shown as the status tag rather than a step.

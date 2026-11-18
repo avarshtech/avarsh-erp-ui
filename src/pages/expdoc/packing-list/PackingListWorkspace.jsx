@@ -17,8 +17,8 @@ import {
 import { hasPermission } from '../../../utils/permissions';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import {
-  getPackingList, refreshFromPacking, acknowledgeWarning, submitPackingList, cancelPackingList, revisePackingList,
-  getShipment, markPackingListExported, changePlTemplate, findNewerTemplateRevision,
+  getPackingList, refreshFromPacking, acknowledgeWarning, submitPackingList, withdrawPackingList, cancelPackingList,
+  revisePackingList, getShipment, markPackingListExported, changePlTemplate, findNewerTemplateRevision,
   updatePackingList, bindPackingEntries, removePackingEntry, moveBlock, dropBlock, savePlPlan, markPlanNotShipping,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
@@ -33,6 +33,7 @@ import ChangeTemplateModal from '../shared/ChangeTemplateModal';
 import PlPreviewDrawer from './PlPreviewDrawer';
 import PlHeaderEditor from './PlHeaderEditor';
 import PlCompareModal from './PlCompareModal';
+import { historyItems, returnedText } from './plApproval';
 
 const { Text } = Typography;
 const LIST_PATH = '/export-docs/packing-lists/list';
@@ -176,10 +177,11 @@ const PackingListWorkspace = () => {
     ),
   });
 
-  const handleFinalise = () => modal.confirm({
-    title: 'Finalise this packing list?',
+  const handleSubmit = () => modal.confirm({
+    title: 'Submit this packing list?',
     content: (
       <Space orientation="vertical" size={4}>
+        <Text>It is finalised now, or sent for approval when an approval flow applies to it.</Text>
         <Text>
           {`${pl.plNo} is locked for editing and snapshotted with its template version. Stickers and the export invoice can be raised from it, and later carton changes flag it stale rather than alter it.`}
         </Text>
@@ -191,12 +193,20 @@ const PackingListWorkspace = () => {
         )}
       </Space>
     ),
-    okText: 'Finalise',
+    okText: 'Submit',
     // Submitted: final at once, or waiting for approval where an approval flow applies
     onOk: async () => {
-      const next = await run('finalise', () => submitPackingList(pl));
+      const next = await run('submit', () => submitPackingList(pl));
       if (next) message.success(next.status === PL_STATUS.PENDING_APPROVAL ? `${pl.plNo} sent for approval` : `${pl.plNo} finalised`);
     },
+  });
+
+  // A submission waiting for approval, taken back: a draft again, its approval request cancelled
+  const handleWithdraw = () => modal.confirm({
+    title: 'Withdraw this submission?',
+    content: `${pl.plNo} goes back to draft and its approval request is cancelled. Submit it again when it is ready.`,
+    okText: 'Withdraw',
+    onOk: () => run('withdraw', () => withdrawPackingList(pl), 'Submission withdrawn'),
   });
 
   const handleRevise = () => setReasonCfg({
@@ -246,13 +256,13 @@ const PackingListWorkspace = () => {
             onClick={() => run('refresh', () => refreshFromPacking(pl), 'Carton data read again')} />,
         );
       }
-      // The single gate. There is no approver behind it, so the tooltip has to name
-      // what is blocking rather than leave the user waiting on somebody else.
+      // The gate before final (or before approval, where a flow applies): the tooltip names
+      // what is blocking rather than leave the user guessing.
       if (canUpdate) {
         actions.push(
-          <Tooltip key="finalise" title={pl.canFinalise ? undefined : `Blocked — ${pl.finaliseBlockers[0] || 'open issues'}`}>
+          <Tooltip key="submit" title={pl.canFinalise ? undefined : `Blocked — ${pl.finaliseBlockers[0] || 'open issues'}`}>
             <span>
-              <ActionButton action="approve" text="Finalise" {...busyProps('finalise', !pl.canFinalise)} onClick={handleFinalise} />
+              <ActionButton action="approve" text="Submit" {...busyProps('submit', !pl.canFinalise)} onClick={handleSubmit} />
             </span>
           </Tooltip>,
         );
@@ -508,15 +518,8 @@ const PackingListWorkspace = () => {
               <ActionButton action="view" text="Compare revisions" size="small" onClick={() => setCompareOpen(true)} />
             </Space>
           )}
-        <Timeline
-          items={[
-            { content: `Created by ${pl.createdBy} on ${pl.createdAt}` },
-            ...(pl.finalisedBy ? [{ content: `Finalised by ${pl.finalisedBy} on ${pl.finalSnapshot?.at}`, color: 'green' }] : []),
-            ...(pl.reviseReason ? [{ content: `Revision ${pl.revision}: ${pl.reviseReason}`, color: 'orange' }] : []),
-            ...(pl.supersededByPlId ? [{ content: 'Superseded by a later revision', color: 'gray' }] : []),
-            ...(pl.cancelReason ? [{ content: `Cancelled: ${pl.cancelReason}`, color: 'red' }] : []),
-          ]}
-        />
+        {/* Created, submitted for approval, sent back, finalised or approved, revised, superseded, cancelled */}
+        <Timeline items={historyItems(pl)} />
         </Space>
       ),
     },
@@ -546,6 +549,24 @@ const PackingListWorkspace = () => {
         getLabel={(s) => PL_STATUS_LABELS[s] || s}
         size="small"
       />
+
+      {/* Submitted where an approval flow applies: nothing changes until the approver decides, or the submission is withdrawn */}
+      {pl.status === PL_STATUS.PENDING_APPROVAL && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ margin: '16px 0' }}
+          title={`Waiting for approval since ${pl.approval?.submittedAt || '—'} — edits are locked.`}
+          action={pl.canWithdraw && canUpdate ? (
+            <ActionButton action="undo" size="small" text="Withdraw" {...busyProps('withdraw')} onClick={handleWithdraw} />
+          ) : undefined}
+        />
+      )}
+
+      {/* Back from a submission: the approver referred it back or rejected it, or it was withdrawn */}
+      {pl.status === PL_STATUS.DRAFT && pl.returned && (
+        <Alert type="warning" showIcon style={{ margin: '16px 0' }} title={returnedText(pl.returned)} />
+      )}
 
       {pl.isStale && (
         <Alert

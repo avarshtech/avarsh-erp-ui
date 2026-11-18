@@ -135,10 +135,14 @@ const addressBlocks = (template, ctx) => {
     .join('')}</tr></table>`;
 };
 
-/** One cell of the carton grid — the same derivations the screen performs. */
+/**
+ * One cell of the carton grid — the same derivations the screen performs. A row whose
+ * carton numbers are missing (the server keeps them null, F11) prints a dash, not an
+ * empty cell that reads as a printing fault.
+ */
 const cellValue = (col, row) => {
   switch (col.binding) {
-    case 'row.cartonRange': return formatRanges([{ from: row.cartonFrom, to: row.cartonTo }]);
+    case 'row.cartonRange': return formatRanges([{ from: row.cartonFrom, to: row.cartonTo }]) || '—';
     case 'row.cartonCount': return num(cartonCount(row));
     case 'row.packingType': return PACKING_TYPE_LABELS[row.packingType] || row.packingType;
     case 'calc.piecesPerCarton': return num(piecesPerCarton(row));

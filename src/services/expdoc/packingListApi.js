@@ -108,7 +108,11 @@ export const createApiPackingList = (p) => list(axiosInstance.post(BASE, {
   units: (p.units || []).map(unitOf),
 }));
 
-/** A draft's header, saved whole: the list's own values, with the version it was read at. */
+/**
+ * A draft's header, saved whole: the list's own values, with the version it was read at. The tolerance is
+ * the list's own (`ownTolerancePercent`, null for none: the default applies), never the one it works with
+ * (`tolerancePercent`), or every save would write the default onto a list that has none.
+ */
 export const updateApiPlHeader = (id, h) => list(axiosInstance.put(`${BASE}/${id}`, {
   version: h.version,
   plDate: h.plDate ?? null,
@@ -119,7 +123,7 @@ export const updateApiPlHeader = (id, h) => list(axiosInstance.put(`${BASE}/${id
   remarks: h.remarks ?? null,
   numbering: h.numbering ?? null,
   firstCartonNo: h.firstCartonNo ?? null,
-  tolerancePercent: h.tolerancePercent ?? null,
+  tolerancePercent: h.ownTolerancePercent ?? null,
 }));
 
 export const deleteApiPackingList = (id, version) => call(axiosInstance.delete(`${BASE}/${id}`, { params: { version } }));

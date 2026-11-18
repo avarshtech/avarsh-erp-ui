@@ -25,12 +25,12 @@ export const ENTITY_TYPES = [
 /**
  * Entity types a flow cannot be created for yet, and why. GRN has no approval hooks in the backend
  * (submit goes straight to QC), so a GRN flow would collect decisions that never apply to the
- * document. The export documents get theirs when finalising moves to the server (packing lists, then
- * invoices); until then nothing submits them, so a flow would never fire.
+ * document. Packing lists are submitted on the server, so their flows apply; export invoices get
+ * theirs when finalising an invoice moves to the server, and until then nothing submits them, so a
+ * flow would never fire.
  */
 const FLOW_UNAVAILABLE = {
   GRN: 'GRN approval happens through QC — a flow on GRN would have no effect. Use QC or GRN Reversal instead.',
-  EXPORT_PACKING_LIST: 'Packing lists are not sent for approval yet — this becomes available when finalising moves to the server.',
   EXPORT_INVOICE: 'Export invoices are not sent for approval yet — this becomes available when finalising moves to the server.',
 };
 
