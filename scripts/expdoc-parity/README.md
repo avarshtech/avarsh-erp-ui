@@ -1,10 +1,9 @@
 # Export documents: browser ⇄ server parity harness
 
 The export-document rules (`src/utils/expDoc*.js`) are being ported to the API
-(`erp-purchase`, package `com.avarsh.erp.exportdoc.rules`), and so is the
-packing-list assembly (`src/services/expdoc/expDocPl{Blocks,Plan,Assemble}.js`,
-`src/utils/orderSizes.js`, the standard layouts of `src/utils/expDocSystemTemplates.js`;
-package `com.avarsh.erp.exportdoc.packinglist`). The port must answer exactly as the
+(`erp-purchase`, package `com.avarsh.erp.exportdoc.rules`), and so are
+`src/utils/orderSizes.js` and the standard layouts of `src/utils/expDocSystemTemplates.js`
+(package `com.avarsh.erp.exportdoc.packinglist`). The port must answer exactly as the
 browser does, so the browser is the reference:
 
 1. A `*.dump.js` file here lists calls of one module — `{ id, fn, args }` — and
@@ -25,8 +24,7 @@ The fixtures are committed in the **API** repo, next to the tests that read them
 
 Nothing reruns the dumps on its own, so a change to a rule would leave the Java
 tests passing on fixtures the browser no longer agrees with. **After any change
-to `src/utils/expDoc*.js`, `src/utils/orderSizes.js`,
-`src/services/expdoc/expDocPl*.js` or to a dump here**, run:
+to `src/utils/expDoc*.js`, `src/utils/orderSizes.js` or to a dump here**, run:
 
 ```
 npm run parity:check
@@ -37,7 +35,8 @@ compares each with the API repo's copy, ignoring line endings (git on Windows
 checks them out with CRLF). It exits 0 when they all match and otherwise lists
 each file that differs, that no dump writes any more, or that the API repo lacks,
 and exits 1; it also fails, saying so, when the API repo is not beside this one
-or a dump fails. When it differs:
+or a dump fails. A frozen fixture (below) is only required to be in the API repo.
+When it differs:
 
 1. regenerate: `npx vitest run --config scripts/expdoc-parity/vitest.config.js`;
 2. in `erp-purchase`, re-run the parity tests:
@@ -60,9 +59,22 @@ instead of the API repo, for any run.
 | `invoiceTerms.dump.js` | `expDocInvoiceTerms.json` | `InvoiceTermsParityTest` |
 | `hashes.dump.js` | `expDocHashes.json` | `ContentHashesParityTest` |
 | `validation.dump.js` | `expDocValidation.json` | `ValidationParityTest` |
-| `plBlocks.dump.js` | `expDocPlBlocks.json` | step 3 (pending) |
-| `orderSizes.dump.js` | `orderSizes.json` | step 3 (pending) |
-| `systemTemplates.dump.js` | `expDocSystemTemplates.json` | step 3 (pending) |
+| `orderSizes.dump.js` | `orderSizes.json` | `OrderSizesParityTest` |
+| `systemTemplates.dump.js` | `expDocSystemTemplates.json` | `StandardTemplatesParityTest` |
+| — (retired: `plBlocks.dump.js`) | `expDocPlBlocks.json` (**frozen**) | `PlBlocksParityTest` |
+
+### Frozen fixtures
+
+`expDocPlBlocks.json` recorded the browser's packing-list assembly
+(`src/services/expdoc/expDocPl{Blocks,Plan,Assemble}.js`), which the server took over in
+Export Docs Phase 1: the web app now reads its packing lists from the API
+(`/api/v1/export-docs/packing-lists`), and those modules and their dump,
+`plBlocks.dump.js`, were deleted. The fixture stays in the API repo exactly as it was
+last written, so `PlBlocksParityTest` keeps proving the port against the browser it
+replaced. It is never regenerated: `npm run parity:check` lists it as `FROZEN`
+(`checkFixtures.mjs`) and only requires it to be there, and fails if a dump writes it
+again. A change to the assembly is now the server's alone, tested in Java; a fixture
+that must change with it is edited in the API repo, with the reason in its commit.
 
 Writing cases:
 
@@ -144,21 +156,24 @@ Say in the dump's header, and in the Java test's Javadoc, what each name means.
 - **A browser built-in** the rules lean on gets an adapter of its own and a fixture
   without `api`: `localeCompareRows` and `localeCompareNumericRows` compare every
   string of a family with every other.
+The retired `plBlocks.dump.js` used the next four; its frozen fixture keeps their
+shapes, which `PlBlocksParityTest` still reads.
+
 - **A Symbol** is written as a marker no real value can be: `plBlocks.dump.js`
-  writes `ELSEWHERE` (a range's PO is not on this shipment) as `{"elsewhere": true}`
+  wrote `ELSEWHERE` (a range's PO is not on this shipment) as `{"elsewhere": true}`
   where a function returns it or takes it, because a PO key is text or null.
 - **A Map whose keys may be null, or whose order counts,** is written as its
-  entries in order (`unitsOfEntry` gives `[{ key, groups }]`): an object would make
+  entries in order (`unitsOfEntry` gave `[{ key, groups }]`): an object would make
   a null key the text `"null"`, and the Java side compares objects in any key order.
   A Map keyed by text alone is written as an object (`takenBy`, `planRangesOf`).
 - **A function that writes onto its argument** and returns it records what it
-  writes: the `assemble` adapter returns the list's `blockOrder`, `sections`,
+  writes: the `assemble` adapter returned the list's `blockOrder`, `sections`,
   `orderNos` and `sizes`. Where the argument holds nothing else, the export is
-  called as it is (`applyPlan` is given a list of `plans` only).
+  called as it is (`applyPlan` was given a list of `plans` only).
 - **A dependency no recorded function calls** may be stubbed to keep a slow import
-  chain out of the run, saying so in the dump: `plBlocks.dump.js` stubs the packing
+  chain out of the run, saying so in the dump: `plBlocks.dump.js` stubbed the packing
   mirror (`vi.mock`), whose axios and antd imports take some 25 s; `blocksOf`, the
-  one export that reads it, is `notPorted`.
+  one export that read it, was `notPorted`.
 
 ## What JSON cannot carry to the server
 

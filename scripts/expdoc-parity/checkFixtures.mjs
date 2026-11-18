@@ -11,6 +11,10 @@
  * is caught, instead of the Java tests passing on fixtures the browser no longer agrees with. Line endings are not
  * compared: git on Windows (core.autocrlf) checks the API's fixtures out with CRLF, and JSON text holds no line
  * break of its own. A missing API repo, or a dump that fails, fails the check too, saying so.
+ *
+ * A FROZEN fixture is one whose browser module is gone, its rules now the server's (README.md): no dump writes it
+ * any more, the API repo keeps it for its parity test as it was last written, and the check only requires it to be
+ * there. A dump that writes it again is drift too: a frozen fixture is never regenerated.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,6 +30,12 @@ const CONFIG = path.join('scripts', 'expdoc-parity', 'vitest.config.js');
 /** The check could not compare at all. */
 class CannotCheck extends Error {}
 
+/**
+ * Fixtures kept as they were last written, for the API's parity tests: the browser modules that wrote them are gone
+ * (Export Docs Phase 1 moved the packing-list assembly to the server).
+ */
+const FROZEN = ['expDocPlBlocks.json'];
+
 const fixturesIn = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
 const textOf = (dir, file) => fs.readFileSync(path.join(dir, file), 'utf8').replace(/\r\n/g, '\n');
 
@@ -33,11 +43,15 @@ const textOf = (dir, file) => fs.readFileSync(path.join(dir, file), 'utf8').repl
 const driftOf = (fresh) => {
   const written = fixturesIn(fresh);
   const committed = fixturesIn(API_FIXTURE_DIR);
+  const live = written.filter((f) => !FROZEN.includes(f));
   return [
-    ...written.filter((f) => committed.includes(f) && textOf(fresh, f) !== textOf(API_FIXTURE_DIR, f))
+    ...live.filter((f) => committed.includes(f) && textOf(fresh, f) !== textOf(API_FIXTURE_DIR, f))
       .map((f) => `${f}: differs from what the dumps write now`),
-    ...written.filter((f) => !committed.includes(f)).map((f) => `${f}: written by a dump, missing from the API repo`),
-    ...committed.filter((f) => !written.includes(f)).map((f) => `${f}: in the API repo, but no dump writes it`),
+    ...live.filter((f) => !committed.includes(f)).map((f) => `${f}: written by a dump, missing from the API repo`),
+    ...committed.filter((f) => !written.includes(f) && !FROZEN.includes(f))
+      .map((f) => `${f}: in the API repo, but no dump writes it`),
+    ...FROZEN.filter((f) => written.includes(f)).map((f) => `${f}: frozen, but a dump writes it again`),
+    ...FROZEN.filter((f) => !committed.includes(f)).map((f) => `${f}: frozen, but missing from the API repo`),
   ];
 };
 
@@ -69,7 +83,9 @@ try {
       + 'run the API\'s parity tests (./gradlew test --rerun --tests "*ParityTest") and commit both repos together.');
     process.exitCode = 1;
   } else {
-    console.log(`\nParity check passed: the API's ${fixturesIn(API_FIXTURE_DIR).length} fixtures are what the dumps write today.`);
+    const current = fixturesIn(API_FIXTURE_DIR).length - FROZEN.length;
+    console.log(`\nParity check passed: the API's ${current} live fixtures are what the dumps write today`
+      + ` (${FROZEN.length} frozen: ${FROZEN.join(', ')}).`);
   }
 } catch (e) {
   if (!(e instanceof CannotCheck)) throw e;

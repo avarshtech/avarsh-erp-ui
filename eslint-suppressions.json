@@ -642,11 +642,6 @@
       "count": 1
     }
   },
-  "src/services/expdoc/expDocMockPackingLists.js": {
-    "max-lines": {
-      "count": 1
-    }
-  },
   "src/services/expdoc/expDocMockReports.js": {
     "max-lines": {
       "count": 1

@@ -9,6 +9,7 @@ import StatCard from '../../../components/StatCard';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { hasPermission } from '../../../utils/permissions';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { EXPDOC_MODULE, PL_STATUS, PL_STATUS_LABELS } from '../../../utils/expDocConstants';
 import { searchPackingLists, deletePackingList } from '../../../services/expdoc/expDocService';
 import { buildPlColumns } from './PlListColumns';
@@ -49,7 +50,7 @@ const PackingListList = () => {
         setRows(res.content || []);
         setPagination((p) => ({ ...p, current: nextPage, pageSize: nextSize, total: res.totalElements || 0 }));
       } catch (e) {
-        message.error(e.message || 'Failed to load packing lists');
+        toastUnlessHandled(message, e, 'Failed to load packing lists');
         setRows([]);
       } finally {
         setLoading(false);
@@ -63,11 +64,11 @@ const PackingListList = () => {
   const handleDelete = useCallback(
     async (record) => {
       try {
-        await deletePackingList(record.id);
+        await deletePackingList(record);
         message.success(`${record.plNo} deleted`);
         fetchData();
       } catch (e) {
-        message.error(e.message || 'Failed to delete packing list');
+        toastUnlessHandled(message, e, 'Failed to delete packing list');
       }
     },
     [message, fetchData],

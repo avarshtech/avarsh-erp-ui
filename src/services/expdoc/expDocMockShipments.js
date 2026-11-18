@@ -1,8 +1,9 @@
 /**
  * What the mock documents know about shipments. The shipment itself is the API's
  * (/export-docs/shipments, through expDocService); `db.shipments` here is the in-memory
- * mirror of it (expDocShipmentMirror). What stays is the document side: the counts a
- * shipment shows, the Carton Packing entries of its orders, and its document set (§18).
+ * mirror of it (expDocShipmentMirror), and `db.packingLists` the API's packing lists
+ * (expDocPlMirror). What stays is the document side: the counts a shipment shows, the
+ * Carton Packing entries of its orders, and its document set (§18).
  */
 import { loadDb } from './expDocStore';
 import { delay, clone, fail } from './expDocMockCommon';
@@ -12,10 +13,6 @@ export const entriesOfShipment = (db, shipment) => {
   const orders = new Set((shipment.orders || []).map((o) => o.orderId));
   return (db.packingEntries || []).filter((e) => orders.has(e.orderId));
 };
-
-/** One mirrored shipment's orders, or none. */
-export const shipmentOrders = (shipmentId) =>
-  (loadDb().shipments || []).find((s) => s.id === Number(shipmentId))?.orders || [];
 
 /** The orders of every open shipment the mirror holds: what the dashboard's readiness counts. */
 export const openShipmentOrderIds = () => [...new Set((loadDb().shipments || [])

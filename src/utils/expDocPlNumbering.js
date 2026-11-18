@@ -133,7 +133,7 @@ const placeAgainstPlan = (rows, planRanges) => {
  * Number the list. `segments` [{ orderId, poKey, buyerPoNo }] in print order; a row
  * belongs to the segment with its orderId and poKey. Rows of no segment are left out.
  * `plans`: Map planKeyOf(orderId, poKey) -> the buyer's planned ranges, in printed numbers
- * ([{ from, to, notShipping?, plan? }], as expDocPlPlan.planRangesOf gives them).
+ * ([{ from, to, notShipping?, plan? }], as the server's PlPlans.planRangesOf gives them).
  */
 export const printedRows = (rows, segments, { rule = DEFAULT_NUMBERING, firstCartonNo = 1, plans = new Map() } = {}) => {
   const cursor = new Map();

@@ -260,6 +260,7 @@ export const PACKING_ENTRY_STATUS_CONFIG = {
 
 export const PL_STATUS_CONFIG = {
   [PL_STATUS.DRAFT]:      { color: 'default',    icon: FileTextOutlined },
+  [PL_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: ClockCircleOutlined },
   [PL_STATUS.FINAL]:      { color: 'green',      icon: CheckCircleOutlined },
   [PL_STATUS.EXPORTED]:   { color: 'cyan',       icon: SafetyCertificateOutlined },
   [PL_STATUS.CANCELLED]:  { color: 'volcano',    icon: StopOutlined },

@@ -4,7 +4,7 @@
 //     npx playwright test e2e/specs/export-docs/packing-list-blocks.spec.js --project=export-docs
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { deleteShipmentDocuments } from '../../helpers/export-documents-api.js';
+import { deleteShipmentDocuments, getPackingList, raisePackingList } from '../../helpers/export-documents-api.js';
 import {
   createEntry, deleteEntry, orderIdOf, purgeMarked, range,
 } from '../../helpers/packing-api.js';
@@ -69,28 +69,24 @@ const zaraShipment = async (pos) => {
   return res.data;
 };
 
-/** A packing list raised through the service the screens call, taking these entries' units. */
-const raiseList = (page, shipmentId, entryIds) => page.evaluate(async ({ shipment, ids }) => {
-  const svc = await import('/src/services/expdoc/expDocService.js');
-  const { orders } = await svc.listBindableForShipment(shipment);
-  const units = orders.flatMap((o) => o.pos.flatMap((p) => p.units)).filter((u) => ids.includes(u.packingEntryId));
-  const pl = await svc.createPackingList({ shipmentId: shipment, units: units.map((u) => ({ packingEntryId: u.packingEntryId, poKey: u.poKey })) });
+/** A packing list raised through the API (as the New Packing List dialog raises it), taking these entries' units. */
+const raiseList = async (shipmentId, entryIds) => {
+  const pl = await raisePackingList(api, shipmentId, entryIds);
   return { id: pl.id, plNo: pl.plNo, version: pl.version };
-}, { shipment: shipmentId, ids: entryIds });
+};
 
-const printedOf = (page, plId) => page.evaluate(async (id) => {
-  const svc = await import('/src/services/expdoc/expDocService.js');
-  const pl = await svc.getPackingList(id);
+const printedOf = async (plId) => {
+  const pl = await getPackingList(api, plId);
   return {
     rows: pl.sections.flatMap((s) => s.rows).map((r) => [r.buyerPoNo, r.cartonFrom, r.cartonTo]),
     label: pl.cartonRangeLabel,
     version: pl.version,
     codes: pl.panelFindings.findings.map((f) => f.code),
   };
-}, plId);
+};
 
-// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
-// so CI runs this file in its dev-server lane, not against the preview build.
+// @dev-server: CI runs this file in its dev-server lane (e2e.yml). Its packing lists are the API's now and
+// are made through REST, so nothing here imports /src any more; the file could join the preview lane.
 test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
   test('one packing day feeds two shipments, each list taking only its own PO', async ({ page }) => {
     const entry = await createEntry(api, { orderId, groups: [ctn(1, 10, PO1), ctn(11, 15, PO2)] });
@@ -98,11 +94,11 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     const second = await zaraShipment([PO2]);
     await goTo(page, '/export-docs/packing-lists/list');
 
-    const pl1 = await raiseList(page, first.id, [entry.id]);
-    const pl2 = await raiseList(page, second.id, [entry.id]);
-    expect((await printedOf(page, pl1.id)).rows).toEqual([[PO1, 1, 10]]);
+    const pl1 = await raiseList(first.id, [entry.id]);
+    const pl2 = await raiseList(second.id, [entry.id]);
+    expect((await printedOf(pl1.id)).rows).toEqual([[PO1, 1, 10]]);
     // PO2's cartons are 11–15 in Carton Packing; a list of its own prints them from 1
-    expect((await printedOf(page, pl2.id)).rows).toEqual([[PO2, 1, 5]]);
+    expect((await printedOf(pl2.id)).rows).toEqual([[PO2, 1, 5]]);
 
     await goTo(page, `/export-docs/packing-lists/edit/${pl2.id}`);
     await expect(page.getByText(`PO ${PO2} · ${DEST}`).first()).toBeVisible({ timeout: 20000 });
@@ -120,15 +116,15 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     const newer = await createEntry(api, { orderId, groups: [ctn(1, 4, PO1), ctn(5, 7, PO2)] });
     const shipment = await zaraShipment([PO1, PO2]);
     await goTo(page, '/export-docs/packing-lists/list');
-    const pl = await raiseList(page, shipment.id, [older.id, newer.id]);
+    const pl = await raiseList(shipment.id, [older.id, newer.id]);
 
     // Continue across the shipment: PO1's days stacked by date, then PO2
-    expect((await printedOf(page, pl.id)).rows).toEqual([[PO1, 1, 5], [PO1, 6, 9], [PO2, 10, 12]]);
+    expect((await printedOf(pl.id)).rows).toEqual([[PO1, 1, 5], [PO1, 6, 9], [PO2, 10, 12]]);
 
     await goTo(page, `/export-docs/packing-lists/edit/${pl.id}`);
     await page.getByText('Restart for each buyer PO', { exact: true }).click();
     await expectToast(page, 'Cartons renumbered');
-    const after = await printedOf(page, pl.id);
+    const after = await printedOf(pl.id);
     expect(after.rows).toEqual([[PO1, 1, 5], [PO1, 6, 9], [PO2, 1, 3]]);
     expect(after.label).toBe(`PO ${PO1}: 1–9 · PO ${PO2}: 1–3`);
   });
@@ -137,7 +133,7 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     const shipment = await zaraShipment([PO1]);
     await goTo(page, '/export-docs/packing-lists/list');
     // Created before anything is packed: the buyer's list can come first
-    const pl = await raiseList(page, shipment.id, []);
+    const pl = await raiseList(shipment.id, []);
     const entry = await createEntry(api, { orderId, groups: [ctn(1, 8, PO1)] });
 
     await goTo(page, `/export-docs/packing-lists/edit/${pl.id}`);
@@ -145,29 +141,29 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     await expect(offer).toContainText(entry.packingNo, { timeout: 20000 });
     await offer.getByRole('button', { name: 'Add', exact: true }).click();
     await expectToast(page, 'Packing added');
-    expect((await printedOf(page, pl.id)).rows).toEqual([[PO1, 1, 8]]);
+    expect((await printedOf(pl.id)).rows).toEqual([[PO1, 1, 8]]);
 
     await page.getByRole('button', { name: 'Remove', exact: true }).click();
     await expectToast(page, 'Packing taken off this list');
     await expect(page.getByRole('button', { name: `${entry.packingNo} — add back` })).toBeVisible();
-    expect((await printedOf(page, pl.id)).rows).toEqual([]);
+    expect((await printedOf(pl.id)).rows).toEqual([]);
   });
 
   test('a PO taken off the shipment is flagged on its list, and Drop takes its cartons off', async ({ page }) => {
     const entry = await createEntry(api, { orderId, groups: [ctn(1, 6, PO1), ctn(7, 9, PO2)] });
     const shipment = await zaraShipment([PO1, PO2]);
     await goTo(page, '/export-docs/packing-lists/list');
-    const pl = await raiseList(page, shipment.id, [entry.id]);
+    const pl = await raiseList(shipment.id, [entry.id]);
 
     const res = await api.put(`${API}/${shipment.id}`, await shipmentBody([PO2], shipment.version));
     expect(res.status, JSON.stringify(res.data)).toBe(200);
 
     await goTo(page, `/export-docs/packing-lists/edit/${pl.id}`);
     await expect(page.getByText('No longer on the shipment').first()).toBeVisible({ timeout: 20000 });
-    expect((await printedOf(page, pl.id)).codes).toContain('V-20');
+    expect((await printedOf(pl.id)).codes).toContain('V-20');
     await page.getByRole('button', { name: 'delete Drop', exact: true }).click();
     await expectToast(page, 'Dropped from this list');
-    const after = await printedOf(page, pl.id);
+    const after = await printedOf(pl.id);
     expect(after.codes).not.toContain('V-20');
     expect(after.rows).toEqual([[PO2, 1, 3]]);
   });
@@ -175,17 +171,17 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
   test("the buyer's list first: a plan, Pack as per packing list, and the list fills to the plan", async ({ page }) => {
     const shipment = await zaraShipment([PO1]);
     await goTo(page, '/export-docs/packing-lists/list');
-    const pl = await raiseList(page, shipment.id, []);
+    const pl = await raiseList(shipment.id, []);
     // The buyer's packing list numbers PO1's cartons 21–30
-    const planned = await page.evaluate(async ({ id, order, po, dest }) => {
-      const svc = await import('/src/services/expdoc/expDocService.js');
-      const current = await svc.getPackingList(id);
-      const next = await svc.savePlPlan(id, order, [{
-        sectionKey: 'MAIN', packingType: 'SOLID', cartonFrom: 21, cartonTo: 30, buyerPoNo: po, destination: dest,
+    const saved = await api.put(`/export-docs/packing-lists/${pl.id}/plans/${orderId}`, {
+      version: pl.version,
+      rows: [{
+        sectionKey: 'MAIN', packingType: 'SOLID', cartonFrom: 21, cartonTo: 30, buyerPoNo: PO1, destination: DEST,
         colorName: 'Navy', sizeQty: { M: 10 }, netWeightKg: 10, grossWeightKg: 11, lengthCm: 60, breadthCm: 40, heightCm: 35,
-      }], current.version);
-      return next.panelFindings.findings.filter((f) => f.code === 'V-17').map((f) => f.message);
-    }, { id: pl.id, order: orderId, po: PO1, dest: DEST });
+      }],
+    });
+    expect(saved.status, JSON.stringify(saved.data)).toBe(200);
+    const planned = saved.data.panelFindings.findings.filter((f) => f.code === 'V-17').map((f) => f.message);
     expect(planned[0]).toContain('Cartons 21–30 of PO ZR-PO-2025-101');
     expect(planned[0]).toContain('Pack them, or mark them Not shipping');
 
@@ -211,7 +207,7 @@ test.describe('Packing lists by buyer PO', { tag: '@dev-server' }, () => {
     await expect(offer).toBeVisible({ timeout: 20000 });
     await offer.getByRole('button', { name: 'Add', exact: true }).click();
     await expectToast(page, 'Packing added');
-    const after = await printedOf(page, pl.id);
+    const after = await printedOf(pl.id);
     expect(after.rows).toEqual([[PO1, 21, 30]]);
     expect(after.codes).not.toContain('V-17');
     await deleteEntry(api, entryId);

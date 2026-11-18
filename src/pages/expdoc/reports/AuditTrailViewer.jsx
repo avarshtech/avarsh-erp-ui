@@ -5,6 +5,7 @@ import SearchFilterBar from '../../../components/SearchFilterBar';
 import EmptyState from '../../../components/EmptyState';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { searchAudit } from '../../../services/expdoc/expDocService';
 
 const { Text, Paragraph } = Typography;
@@ -59,7 +60,7 @@ const AuditTrailViewer = () => {
       setEntityTypes(res.entityTypes || []);
       setPagination((p) => ({ ...p, current: nextPage, pageSize: nextSize, total: res.totalElements || 0 }));
     } catch (e) {
-      message.error(e.message || 'Failed to load the audit trail');
+      toastUnlessHandled(message, e, 'Failed to load the audit trail');
       setRows([]);
     } finally {
       setLoading(false);

@@ -1,11 +1,15 @@
 /**
  * Carton Packing entries made through the API for the export-docs specs: packing lists
- * bind the REAL entries now (expDocPackingMirror), not seeded demo ones.
+ * bind the REAL entries (on the server), not seeded demo ones.
  *
  * Every entry carries a marker in its composition, so one a failed run left behind on a
  * long-lived stack is found and removed first (purgeMarked), and a spec deletes what it
  * made at the end. The orders must be CONFIRMED or IN_PRODUCTION (PackingEntryService).
+ * An entry on a live packing list cannot be deleted, so both take it off its lists first
+ * (export-documents-api releaseEntries).
  */
+import { releaseEntries } from './export-documents-api.js';
+
 export const E2E_PACKING_MARK = 'E2E packing fixture';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -37,14 +41,18 @@ export const createEntry = async (api, {
   return done.data;
 };
 
-export const deleteEntry = (api, id) => api.delete(`/packing/entries/${id}`);
+/** Delete an entry a spec made, taken off the packing lists holding it first. */
+export const deleteEntry = async (api, id) => {
+  await releaseEntries(api, [id]);
+  return api.delete(`/packing/entries/${id}`);
+};
 
-/** Remove the marked entries of an order a previous run left behind. */
+/** Remove the marked entries of an order a previous run left behind, and the packing lists holding them. */
 export const purgeMarked = async (api, orderId) => {
   const { data } = await api.get('/packing/entries', { orderId, page: 0, size: 200 });
-  for (const e of (data?.content || []).filter((x) => x.compositionText === E2E_PACKING_MARK)) {
-    await deleteEntry(api, e.id);
-  }
+  const marked = (data?.content || []).filter((x) => x.compositionText === E2E_PACKING_MARK);
+  if (marked.length) await releaseEntries(api, marked.map((e) => e.id));
+  for (const e of marked) await api.delete(`/packing/entries/${e.id}`);
 };
 
 /** The old demo entry's cartons (1–61, every packing type), as a real entry carries them: no EANs. */

@@ -1,23 +1,21 @@
 /**
  * The REAL Carton Packing entries (Production, /api/v1/packing/entries), mirrored in
- * memory for the packing-list rules that read them synchronously — the same arrangement
- * as the shipments (expDocShipmentMirror). loadDb() lays them over `db.packingEntries`
- * and saveDb() ignores them, so no entry is ever kept in the browser.
+ * memory for the browser rules that read them synchronously — the same arrangement as
+ * the shipments (expDocShipmentMirror). loadDb() lays them over `db.packingEntries` and
+ * saveDb() ignores them, so no entry is ever kept in the browser. The packing lists read
+ * their entries on the server; what stays here is the dashboard's "packed" step (the
+ * sticker and invoice rules read an entry only when it is here, else what its row copied).
  *
- * - Read per ORDER: a packing list takes the entries of its shipment's orders.
+ * - Read per ORDER: the entries of the open shipments' orders.
  * - Fresh for 30 s per order; concurrent syncs share one request. A failed read keeps
  *   the last good copy and is not asked again for a few seconds.
- * - Asked only with Carton Packing view: without it the order reads as UNREADABLE and
- *   the screens say so, rather than showing "nothing packed".
- * - The search covers the working branch (or every branch the user works in under "All
- *   branches"), so an entry missing from a read is deleted only when the read covered
- *   its branch (`readBranch`).
+ * - Asked only with Carton Packing view: without it the order reads as UNREADABLE.
  * - A save on the Carton Packing screen puts the entry here at once (putPackingEntry).
  */
 import { searchPackingEntries } from '../production/packingService';
 import { hasPermission } from '../../utils/permissions';
 
-export const PACKING_READ = { OK: 'OK', UNREADABLE: 'UNREADABLE' };
+const PACKING_READ = { OK: 'OK', UNREADABLE: 'UNREADABLE' };
 
 const TTL_MS = 30 * 1000;
 const RETRY_MS = 5 * 1000;
@@ -80,16 +78,6 @@ export const syncPackingMirror = async (orderIds = [], { force = false } = {}) =
 
 /** What loadDb() lays over `db.packingEntries`: copies, so a mock module can never edit the mirror. */
 export const mirroredPackingEntries = () => [...orders.values()].flatMap((o) => o.rows.map((r) => structuredClone(r)));
-
-/** How one order's entries were read: OK, UNREADABLE, or null when never asked. */
-export const packingReadOf = (orderId) => orders.get(Number(orderId))?.read ?? null;
-
-/** Whether the last read of an order covered `branchId`, so an entry absent from it is really gone. */
-export const readCoversBranch = (orderId, branchId) => {
-  const held = orders.get(Number(orderId));
-  if (!held || held.read !== PACKING_READ.OK) return false;
-  return held.branch === 'all' || branchId == null || String(held.branch) === String(branchId);
-};
 
 /** An entry the Carton Packing screen just saved. */
 export const putPackingEntry = (entry) => {

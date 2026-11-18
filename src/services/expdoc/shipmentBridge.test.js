@@ -19,6 +19,11 @@ describe('a shipment closes when its documents are released', () => {
     expect(shipmentStatusFor([doc('FINAL')])).toBe('OPEN');
   });
 
+  test('a packing list waiting for approval is live and keeps it open, as on the server', () => {
+    expect(shipmentStatusFor([doc('EXPORTED'), doc('PENDING_APPROVAL')])).toBe('OPEN');
+    expect(shipmentStatusFor([doc('PENDING_APPROVAL'), doc('CANCELLED')])).toBe('OPEN');
+  });
+
   test('every live document released closes it; cancelled and superseded ones do not count', () => {
     expect(shipmentStatusFor([doc('EXPORTED'), doc('EXPORTED')])).toBe('CLOSED');
     expect(shipmentStatusFor([doc('EXPORTED'), doc('CANCELLED'), doc('SUPERSEDED')])).toBe('CLOSED');

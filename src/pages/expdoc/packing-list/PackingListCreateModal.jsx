@@ -3,6 +3,7 @@ import { Alert, App, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
 import { DOC_TYPE } from '../../../utils/expDocConstants';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import {
   listShipmentOptions, listBindableForShipment, createPackingList,
 } from '../../../services/expdoc/expDocService';
@@ -17,7 +18,7 @@ const { Text } = Typography;
  *
  * The cartons offered are the REAL Carton Packing entries of the shipment's orders, one
  * row per entry and buyer PO (a day's packing can serve POs on different shipments), all
- * the free ones ticked. The order's quantities are read from the orders API by the service.
+ * the free ones ticked. The server reads the orders' quantities and numbers the list.
  */
 const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
   const { message } = App.useApp();
@@ -52,7 +53,7 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
       .catch((e) => {
         if (!alive) return;
         setBindable({ orders: [], unreadable: false });
-        message.error(e.message || 'The packed cartons could not be read');
+        toastUnlessHandled(message, e, 'The packed cartons could not be read');
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -67,22 +68,20 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
   const handleCreate = useCallback(async () => {
     setCreating(true);
     try {
+      // The server takes the buyer from the shipment
       const pl = await createPackingList({
         shipmentId,
         templateId,
-        buyerId: shipment?.buyerId ?? null,
-        buyerCode: shipment?.buyerCode ?? null,
-        buyerName: shipment?.buyerName ?? null,
         units: chosen.map((r) => ({ packingEntryId: r.packingEntryId, poKey: r.poKey })),
       });
       message.success(`${pl.plNo} created`);
       onCreated(pl);
     } catch (e) {
-      message.error(e.message || 'Could not create the packing list');
+      toastUnlessHandled(message, e, 'Could not create the packing list');
     } finally {
       setCreating(false);
     }
-  }, [chosen, shipmentId, shipment, templateId, message, onCreated]);
+  }, [chosen, shipmentId, templateId, message, onCreated]);
 
   const columns = useMemo(() => [
     { title: 'Order', dataIndex: 'orderNo', width: 150 },

@@ -16,7 +16,6 @@ vi.mock('./expDocStore.js', () => ({
   newDocId: () => 1000 + (store.seq += 1),
 }));
 vi.mock('./customsRateApi.js', () => ({ customsRateInForce: (...a) => rates.inForce(...a) }));
-vi.mock('./expDocMockPackingLists.js', () => ({ decoratePl: (pl) => JSON.parse(JSON.stringify(pl)) }));
 vi.mock('./expDocMockShipments.js', () => ({ decorate: (s) => s }));
 vi.mock('./expDocMockNotifications.js', () => ({ raise: () => {}, EXPDOC_NOTIFICATION: {} }));
 vi.mock('./expDocMockCommon.js', async (original) => ({ ...(await original()), delay: () => Promise.resolve() }));

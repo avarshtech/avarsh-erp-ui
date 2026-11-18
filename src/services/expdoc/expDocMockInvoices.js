@@ -22,7 +22,6 @@ import { getFxRate, fxFieldsOf, getExporterProfileExtra } from './expDocMockMast
 import {
   ordersOfPls, resolveInvoiceTerms, termsByOrder, hsCodeOfOrder, latestOfBuyer,
 } from '../../utils/expDocInvoiceTerms';
-import { decoratePl } from './expDocMockPackingLists';
 import { decorate as decorateShipment } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
@@ -64,8 +63,8 @@ const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
  * Rows for line generation, stamped with the order they came from.
  *
  * A packing-list row carries the order, garment and composition it was copied with
- * (expDocPlBlocks), so the per-order-line grain and the description need no join; the
- * packing entry, when this browser holds it, only fills what an older row lacks.
+ * (the server's assembly), so the per-order-line grain and the description need no join;
+ * the packing entry, when this browser holds it, only fills what an older row lacks.
  */
 const rowsWithOrder = (db, pls) => {
   const entryById = new Map((db.packingEntries || []).map((e) => [e.id, e]));
@@ -164,10 +163,10 @@ const generateAnnexes = (db, pls, template, byOrder) =>
 
 // ─── Decoration ─────────────────────────────────────────────────────────────────
 
+/** The packing lists an invoice binds, as the API decorates them (expDocPlMirror): totals, range label, hash. */
 const boundPls = (db, inv) => (inv.packingListRefs || [])
   .map((ref) => (db.packingLists || []).find((p) => p.id === ref.plId))
-  .filter(Boolean)
-  .map((pl) => decoratePl(pl, db));
+  .filter(Boolean);
 
 /**
  * Everything a screen needs, derived rather than stored: totals, tax, validation and
@@ -337,7 +336,6 @@ export const listInvoiceablePls = async (params = {}) => {
     .map((pl) => {
       const existing = (db.invoices || []).filter((inv) => LIVE_INVOICE_STATUSES.includes(inv.status)
         && (inv.packingListRefs || []).some((r) => r.plId === pl.id));
-      const decorated = decoratePl(pl, db);
       let reason = null;
       if (!INVOICEABLE_PL_STATUSES.includes(pl.status)) {
         reason = `Only a final packing list can be invoiced (this one is ${pl.status.toLowerCase()}).`;
@@ -353,9 +351,9 @@ export const listInvoiceablePls = async (params = {}) => {
         buyerName: pl.buyerName,
         shipmentId: pl.shipmentId,
         shipmentNo: pl.shipmentNo,
-        totals: decorated.totals,
-        cartonRangeLabel: decorated.cartonRangeLabel,
-        contentHash: decorated.contentHash,
+        totals: pl.totals,
+        cartonRangeLabel: pl.cartonRangeLabel,
+        contentHash: pl.contentHash,
         eligible: !reason,
         reason,
       };
@@ -378,7 +376,7 @@ export const createInvoice = async (payload = {}) => {
     if (!INVOICEABLE_PL_STATUSES.includes(pl.status)) {
       fail('CONFLICT', `${pl.plNo} is ${pl.status.toLowerCase()} — only a final packing list can be invoiced.`);
     }
-    return decoratePl(pl, db);
+    return pl;
   });
 
   // §8.1 allows several packing lists, but only of one shipment and one buyer —

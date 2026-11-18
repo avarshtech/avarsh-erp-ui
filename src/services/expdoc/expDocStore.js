@@ -1,7 +1,9 @@
 /**
- * The Export Documentation document store: packing lists, invoices, sticker runs, the audit
- * trail and the masters, kept by the API (/export-docs/documents, expDocDocumentApi) and held
- * here in memory for the modules that hold the documents' rules (expDocMock*.js).
+ * The Export Documentation document store: invoices, sticker runs, the audit trail and the
+ * masters, kept by the API (/export-docs/documents, expDocDocumentApi) and held here in memory
+ * for the modules that hold the documents' rules (expDocMock*.js). Packing lists are the API's
+ * own records (/export-docs/packing-lists) since Export Docs Phase 1: the copies this store once
+ * saved as documents are archived on the server, and are neither read nor written here.
  *
  * Those modules read and write one `db` object synchronously — `loadDb()`, change it,
  * `saveDb(db)` — and stay as they were. What changed is where `db` lives:
@@ -22,29 +24,31 @@
  * - New records take a time-ordered random id (`newDocId`), unique across users; it is the
  *   document's key on the API.
  *
- * Shipments and Carton Packing entries are the API's own records: `db.shipments` and
- * `db.packingEntries` are the in-memory mirrors (expDocShipmentMirror, expDocPackingMirror),
- * laid over every load and never saved. The template preview's sample cartons are a local
- * constant. The notifications stay in this browser (they carry a reader's read/dismissed
- * state); nothing else is kept in localStorage.
+ * Shipments, packing lists and Carton Packing entries are the API's own records:
+ * `db.shipments`, `db.packingLists` and `db.packingEntries` are the in-memory mirrors
+ * (expDocShipmentMirror, expDocPlMirror, expDocPackingMirror), laid over every load and never
+ * saved. The template preview's sample cartons are a local constant. The notifications stay in
+ * this browser (they carry a reader's read/dismissed state); nothing else is kept in localStorage.
  */
 import { buildSampleEntries, buildSeedMasters } from './expDocMockData';
 import { nextDocNo, EXPDOC_PREFIX } from './expDocDocNumbers';
 import { mirroredShipments } from './expDocShipmentMirror';
 import { mirroredPackingEntries } from './expDocPackingMirror';
+import { mirroredPackingLists } from './expDocPlMirror';
 import { listDocuments, saveDocuments, DOCUMENT_KIND } from './expDocDocumentApi';
 import { EXPDOC_MODULE } from '../../utils/expDocConstants';
 import { hasPermission } from '../../utils/permissions';
 
 /** db table -> document kind. */
 const TABLES = {
-  packingLists: DOCUMENT_KIND.PACKING_LIST,
   invoices: DOCUMENT_KIND.INVOICE,
   stickerRuns: DOCUMENT_KIND.STICKER_RUN,
   audit: DOCUMENT_KIND.AUDIT,
 };
+/** The kinds this store loads and saves: its tables and the masters. */
+const KINDS = [...Object.values(TABLES), DOCUMENT_KIND.SETTINGS];
 /** The kinds whose body carries its own `version`, which must read as the server's. */
-const VERSIONED = new Set([DOCUMENT_KIND.PACKING_LIST, DOCUMENT_KIND.INVOICE]);
+const VERSIONED = new Set([DOCUMENT_KIND.INVOICE]);
 const SETTINGS_KEY = 'settings';
 const TTL_MS = 30 * 1000;
 const NOTIFICATIONS_KEY = 'avarsh.expdoc.notifications.v1';
@@ -53,7 +57,7 @@ const READ_KEYS = [EXPDOC_MODULE.PACKING_LIST, EXPDOC_MODULE.INVOICE, EXPDOC_MOD
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-const emptyDocs = () => ({ packingLists: [], invoices: [], stickerRuns: [], audit: [], masters: buildSeedMasters() });
+const emptyDocs = () => ({ invoices: [], stickerRuns: [], audit: [], masters: buildSeedMasters() });
 
 let docs = emptyDocs();
 let docSeq = {};
@@ -81,7 +85,7 @@ export const newDocId = () => {
   return lastId;
 };
 
-/** "PKL/26-27/1004" and "EXP/26-27/1002-R1" -> ["PKL/26-27", 1004]. */
+/** "STK/26-27/1004" and "EXP/26-27/1002-R1" -> ["STK/26-27", 1004]. */
 const seriesOf = (no) => {
   const m = /^(.+\/\d{2}-\d{2})\/(\d+)(?:-R\d+)?$/.exec(String(no ?? '').trim());
   return m ? [m[1], Number(m[2])] : null;
@@ -97,7 +101,6 @@ const deriveDocSeq = () => {
     const s = seriesOf(no);
     if (s && s[1] > (seq[s[0]] || 0)) seq[s[0]] = s[1];
   };
-  docs.packingLists.forEach((p) => note(p.plNo));
   docs.invoices.forEach((i) => note(i.invoiceNo));
   docs.stickerRuns.forEach((r) => note(r.runNo));
   docs.audit.forEach((a) => note(a.entityNo));
@@ -124,12 +127,15 @@ const adopt = (list) => {
       remember(doc, next.masters);
       return;
     }
+    // A kind this store does not hold (the archived packing lists) is never tracked, or every save
+    // would try to delete it
+    if (!byKind[doc.kind]) return;
     const body = bodyOf(doc);
     // A record is tracked by its id; one whose body does not carry its own key was not written by
-    // these screens and is left alone, or every save would try to delete it
+    // these screens and is left alone, for the same reason
     if (String(body?.id) !== doc.key) return;
     remember(doc, body);
-    if (byKind[doc.kind]) next[byKind[doc.kind]].push(clone(body));
+    next[byKind[doc.kind]].push(clone(body));
   });
   docs = next;
   docSeq = deriveDocSeq();
@@ -184,7 +190,7 @@ const seedSettings = async () => {
 
 const load = async ({ silent }) => {
   const started = epoch;
-  const list = await listDocuments(undefined, { silent });
+  const list = await listDocuments(KINDS, { silent });
   if (started !== epoch) return;
   adopt(list || []);
   syncedAt = Date.now();
@@ -322,14 +328,17 @@ export const loadDb = () => {
     dismissedNotifications: clone(dismissedNotifications),
     sampleEntries: clone(sampleEntries),
     shipments: mirroredShipments(),
+    packingLists: mirroredPackingLists(),
     packingEntries: mirroredPackingEntries(),
   };
 };
 
-/** Keeps `db` as the new state; `flushDocuments` / `runWrite` sends it to the API. */
+/** The sticker runs printed from one packing list, of the documents loaded: renumbering a printed list asks first. */
+export const countStickerRuns = (plId) => docs.stickerRuns.filter((r) => r.plId === Number(plId)).length;
+
+/** Keeps `db` as the new state; `flushDocuments` / `runWrite` sends it to the API. The mirrors are never saved. */
 export const saveDb = (db) => {
   docs = clone({
-    packingLists: db.packingLists || [],
     invoices: db.invoices || [],
     stickerRuns: db.stickerRuns || [],
     audit: db.audit || [],
@@ -355,15 +364,9 @@ if (typeof window !== 'undefined') {
 
 // ── Numbering ──────────────────────────────────────────────────────────────
 // Every series follows the ERP standard <PREFIX>/<FY>/<NNNN> handed out by the
-// backend DocumentNumberService — see expDocDocNumbers.js. Shipments are numbered
-// by the API itself. The caller runs inside `runWrite`, so the documents are fresh.
-
-/**
- * Packing list, e.g. PKL/26-27/1001. Allocated at CREATE, unlike the invoice:
- * packing lists are referenced by production while still drafts, and a gap in an
- * internal series is harmless.
- */
-export const nextPackingListNo = (db) => nextDocNo(db, EXPDOC_PREFIX.PACKING_LIST);
+// backend DocumentNumberService — see expDocDocNumbers.js. Shipments and packing
+// lists are numbered by the API itself. The caller runs inside `runWrite`, so the
+// documents are fresh.
 
 /**
  * Export invoice, e.g. EXP/26-27/1001. Assigned ON FINALISE ONLY so the

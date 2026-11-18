@@ -8,16 +8,18 @@
  * notifying the bank asks which location prints under the consignee; H&M has no bank and
  * notifies a location. Orders: ORD/0002 is Zara's, ORD/0001 (a draft) is H&M's.
  *
- * A shipment closes when every packing list and invoice on it is released. Their rules run in
- * the browser (the API keeps the documents, /export-docs/documents), so the close is driven
- * through the service the screens call (its rule is unit-tested in
- * src/services/expdoc/shipmentBridge.test.js), and the spec checks what the screen does with a
- * closed shipment. Every shipment a spec makes is its own, and its documents are deleted with
- * it, so the specs can run again on the same stack.
+ * A shipment closes when every packing list and invoice on it is released. Packing lists are the
+ * API's (/export-docs/packing-lists), which closes and reopens the shipment as they move, so the
+ * close is driven through REST, and the spec checks what the screen does with a closed shipment.
+ * Every shipment a spec makes is its own, and its documents are cleared with it, so the specs can
+ * run again on the same stack; one whose packing list was cancelled is kept, as the list stays on
+ * record.
  */
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { deleteShipmentDocuments } from '../../helpers/export-documents-api.js';
+import {
+  deleteShipmentDocuments, packingListCommand, raisePackingList,
+} from '../../helpers/export-documents-api.js';
 import {
   createEntry, deleteEntry, orderIdOf, purgeMarked, range,
 } from '../../helpers/packing-api.js';
@@ -119,8 +121,8 @@ const findInRegister = async (page, shipmentNo) => {
   return page.locator('.ant-table-row').filter({ hasText: shipmentNo });
 };
 
-// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
-// so CI runs this file in its dev-server lane, not against the preview build.
+// @dev-server: CI runs this file in its dev-server lane (e2e.yml). Its packing lists are the API's now and
+// are made through REST, so nothing here imports /src any more; the file could join the preview lane.
 test.describe('Shipments', { tag: '@dev-server' }, () => {
   test('notifying the bank asks for the consignee address; the save keeps its version', async ({ page }) => {
     await goTo(page, '/export-docs/shipments/new');
@@ -270,40 +272,35 @@ test.describe('Shipments', { tag: '@dev-server' }, () => {
     await expect(page.getByText('Closed: every packing list and invoice on this shipment is released')).toHaveCount(0);
   });
 
-  test('releasing its only document closes the shipment, and cancelling it reopens the shipment', async ({ page }) => {
+  test('releasing its only document closes the shipment, and cancelling it reopens the shipment', async () => {
     // JOMO BV's e2e order (seed V20261008214442) with one real Carton Packing entry of its own
     const shipment = await apiShipment('JOMO BV', 'Valkenswaard DC', 'ORD/JOMO-E2E');
     const orderId = await orderIdOf(api, 'ORD/JOMO-E2E');
     await purgeMarked(api, orderId);
     const entry = await createEntry(api, { orderId, groups: [range({ cartonFrom: 1, cartonTo: 10 })] });
-    await goTo(page, LIST);
 
-    // Packing lists are driven through the same service the screens call
-    const raised = await page.evaluate(async ({ shipmentId, entryId }) => {
-      const svc = await import('/src/services/expdoc/expDocService.js');
-      const { orders } = await svc.listBindableForShipment(shipmentId);
-      const units = orders.flatMap((o) => o.pos.flatMap((p) => p.units)).filter((u) => u.packingEntryId === entryId);
-      let pl = await svc.createPackingList({ shipmentId, units: units.map((u) => ({ packingEntryId: u.packingEntryId, poKey: u.poKey })) });
-      for (let round = 0; round < 5 && pl.panelFindings.blocking.length; round += 1) {
-        for (const finding of pl.panelFindings.blocking) {
-          pl = await svc.acknowledgeWarning(pl.id, finding.targetKey, 'E2E: accepted for the closing check');
-        }
+    // The packing list is the API's: raised, its blocking warnings acknowledged, submitted (final at
+    // once where no approval flow applies) and released, all through REST; the server closes the shipment
+    let pl = await raisePackingList(api, shipment.id, [entry.id]);
+    for (let round = 0; round < 5 && pl.panelFindings.blocking.length; round += 1) {
+      for (const finding of pl.panelFindings.blocking.filter((f) => f.acknowledgeable)) {
+        pl = await packingListCommand(api, pl.id, 'ack', {
+          version: pl.version, code: finding.code, targetKey: finding.targetKey, reason: 'E2E: accepted for the closing check',
+        });
       }
-      pl = await svc.changePlStatus(pl.id, 'FINAL');
-      pl = await svc.markPackingListExported(pl.id);
-      return { plId: pl.id, status: pl.status, units: pl.sourceRefs.length };
-    }, { shipmentId: shipment.id, entryId: entry.id });
-    expect(raised.units).toBe(1);
-    expect(raised.status).toBe('EXPORTED');
+    }
+    pl = await packingListCommand(api, pl.id, 'submit', { version: pl.version });
+    expect(pl.status).toBe('FINAL');
+    pl = await packingListCommand(api, pl.id, 'release', { version: pl.version });
+    expect(pl.sourceRefs).toHaveLength(1);
+    expect(pl.status).toBe('EXPORTED');
     const closed = (await api.get(`${API}/${shipment.id}`)).data;
     expect(closed.status).toBe('CLOSED');
     expect(closed.closedByName).toBeTruthy();
 
-    await page.evaluate(async (plId) => {
-      const svc = await import('/src/services/expdoc/expDocService.js');
-      await svc.changePlStatus(plId, 'CANCELLED', 'E2E: reopening the shipment');
-    }, raised.plId);
+    await packingListCommand(api, pl.id, 'cancel', { version: pl.version, reason: 'E2E: reopening the shipment' });
     expect((await api.get(`${API}/${shipment.id}`)).data.status).toBe('OPEN');
+    // A cancelled list stays on record, so the shipment is kept; its cartons are free again
     await deleteEntry(api, entry.id);
   });
 

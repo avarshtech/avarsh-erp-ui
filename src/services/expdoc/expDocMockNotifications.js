@@ -142,14 +142,10 @@ const evaluateConditions = (db) => {
   });
 
   (db.packingLists || [])
-    .filter((p) => p.status === 'DRAFT')
+    // The server tells a list behind its Carton Packing entries (expDocPlMirror)
+    .filter((p) => p.status === 'DRAFT' && p.isStale)
     .forEach((p) => {
-      const drifted = (p.sourceRefs || []).filter((ref) => {
-        // Only entries this browser has read: an unread entry is not a changed one
-        const live = (db.packingEntries || []).find((e) => e.id === ref.packingEntryId);
-        return live && live.version !== ref.packingEntryVersion;
-      });
-      if (!drifted.length) return;
+      const drifted = p.staleSources || [];
       note({
         type: EXPDOC_NOTIFICATION.SOURCE_STALE,
         title: `${p.plNo} is behind its carton data`,

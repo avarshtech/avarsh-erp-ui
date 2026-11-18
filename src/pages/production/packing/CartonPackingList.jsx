@@ -13,7 +13,7 @@ import {
   PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { searchPackingEntries, deletePackingEntry } from '../../../services/production/packingService';
-import { packingListsOfEntries, afterPackingEntryDeleted, loadExportDocuments } from '../../../services/expdoc/expDocService';
+import { packingListsOfEntries, afterPackingEntryDeleted } from '../../../services/expdoc/expDocService';
 import { buildCartonPackingColumns } from './CartonPackingColumns';
 import CartonPackingView from './CartonPackingView';
 import DailyPackingSummary from './DailyPackingSummary';
@@ -101,14 +101,16 @@ const CartonPackingList = () => {
     [message, fetchData],
   );
 
-  // The packing lists holding each entry of the page, once the export documents have loaded
-  const [docsLoaded, setDocsLoaded] = useState(false);
+  // The packing lists holding each entry of the page, asked of the API once the page is in;
+  // none shown when it cannot be asked
+  const [listsByEntry, setListsByEntry] = useState({});
   useEffect(() => {
     let alive = true;
-    loadExportDocuments().then(() => { if (alive) setDocsLoaded(true); });
+    packingListsOfEntries(rows.map((r) => r.id))
+      .then((byEntry) => { if (alive) setListsByEntry(byEntry); })
+      .catch(() => { if (alive) setListsByEntry({}); });
     return () => { alive = false; };
-  }, []);
-  const listsByEntry = useMemo(() => (docsLoaded ? packingListsOfEntries(rows.map((r) => r.id)) : {}), [rows, docsLoaded]);
+  }, [rows]);
 
   const columns = useMemo(
     () =>

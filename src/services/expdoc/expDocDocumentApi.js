@@ -1,8 +1,10 @@
 /**
- * Export documents REST client (/api/v1/export-docs/documents): the packing lists, invoices,
- * sticker runs, audit trail and masters the document store (expDocStore) loads and saves.
+ * Export documents REST client (/api/v1/export-docs/documents): the invoices, sticker runs,
+ * audit trail and masters the document store (expDocStore) loads and saves. The packing lists
+ * once saved here are archived: the API keeps them read-only, and the web app reads the server's
+ * own lists instead (packingListApi).
  *
- *   GET  ?kinds=PACKING_LIST,INVOICE,…  → [{key, kind, docNo, shipmentId, status, version, body}]
+ *   GET  ?kinds=INVOICE,STICKER_RUN,…  → [{key, kind, docNo, shipmentId, status, version, body}]
  *   POST /batch {upserts:[{key, kind, version|null, body}], deletes:[{key, version}]} → the saved
  *        upserts, same shape. One transaction; a stale version is the usual 409
  *        OPTIMISTIC_LOCK_CONFLICT, a number another document holds a 409 CONFLICT.
@@ -12,7 +14,6 @@ import axiosInstance from '../core/axiosInstance';
 const BASE = '/export-docs/documents';
 
 export const DOCUMENT_KIND = {
-  PACKING_LIST: 'PACKING_LIST',
   INVOICE: 'INVOICE',
   STICKER_RUN: 'STICKER_RUN',
   AUDIT: 'AUDIT',
