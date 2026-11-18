@@ -1,8 +1,11 @@
 # Export documents: browser ⇄ server parity harness
 
 The export-document rules (`src/utils/expDoc*.js`) are being ported to the API
-(`erp-purchase`, package `com.avarsh.erp.exportdoc.rules`). The port must answer
-exactly as the browser does, so the browser is the reference:
+(`erp-purchase`, package `com.avarsh.erp.exportdoc.rules`), and so is the
+packing-list assembly (`src/services/expdoc/expDocPl{Blocks,Plan,Assemble}.js`,
+`src/utils/orderSizes.js`, the standard layouts of `src/utils/expDocSystemTemplates.js`;
+package `com.avarsh.erp.exportdoc.packinglist`). The port must answer exactly as the
+browser does, so the browser is the reference:
 
 1. A `*.dump.js` file here lists calls of one module — `{ id, fn, args }` — and
    `writeFixtures.js` runs them and writes `{ id, fn, args, output }` (or
@@ -22,7 +25,8 @@ The fixtures are committed in the **API** repo, next to the tests that read them
 
 Nothing reruns the dumps on its own, so a change to a rule would leave the Java
 tests passing on fixtures the browser no longer agrees with. **After any change
-to `src/utils/expDoc*.js` or to a dump here**, run:
+to `src/utils/expDoc*.js`, `src/utils/orderSizes.js`,
+`src/services/expdoc/expDocPl*.js` or to a dump here**, run:
 
 ```
 npm run parity:check
@@ -56,6 +60,9 @@ instead of the API repo, for any run.
 | `invoiceTerms.dump.js` | `expDocInvoiceTerms.json` | `InvoiceTermsParityTest` |
 | `hashes.dump.js` | `expDocHashes.json` | `ContentHashesParityTest` |
 | `validation.dump.js` | `expDocValidation.json` | `ValidationParityTest` |
+| `plBlocks.dump.js` | `expDocPlBlocks.json` | step 3 (pending) |
+| `orderSizes.dump.js` | `orderSizes.json` | step 3 (pending) |
+| `systemTemplates.dump.js` | `expDocSystemTemplates.json` | step 3 (pending) |
 
 Writing cases:
 
@@ -137,6 +144,21 @@ Say in the dump's header, and in the Java test's Javadoc, what each name means.
 - **A browser built-in** the rules lean on gets an adapter of its own and a fixture
   without `api`: `localeCompareRows` and `localeCompareNumericRows` compare every
   string of a family with every other.
+- **A Symbol** is written as a marker no real value can be: `plBlocks.dump.js`
+  writes `ELSEWHERE` (a range's PO is not on this shipment) as `{"elsewhere": true}`
+  where a function returns it or takes it, because a PO key is text or null.
+- **A Map whose keys may be null, or whose order counts,** is written as its
+  entries in order (`unitsOfEntry` gives `[{ key, groups }]`): an object would make
+  a null key the text `"null"`, and the Java side compares objects in any key order.
+  A Map keyed by text alone is written as an object (`takenBy`, `planRangesOf`).
+- **A function that writes onto its argument** and returns it records what it
+  writes: the `assemble` adapter returns the list's `blockOrder`, `sections`,
+  `orderNos` and `sizes`. Where the argument holds nothing else, the export is
+  called as it is (`applyPlan` is given a list of `plans` only).
+- **A dependency no recorded function calls** may be stubbed to keep a slow import
+  chain out of the run, saying so in the dump: `plBlocks.dump.js` stubs the packing
+  mirror (`vi.mock`), whose axios and antd imports take some 25 s; `blocksOf`, the
+  one export that reads it, is `notPorted`.
 
 ## What JSON cannot carry to the server
 
