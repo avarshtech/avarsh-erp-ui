@@ -39,11 +39,11 @@ export const renderColourOption = (opt) => (opt.data.color ? (
   </span>
 ) : <strong>{opt.data.label}</strong>);
 
-/** Panels are the Parts master; panels per garment is shown because it doubles paired panels. */
-export const panelOptions = (parts = []) => parts.map((p) => ({
-  value: p.id,
-  label: `${p.partName} ×${p.panelsPerGarment ?? 1}`,
-}));
+/**
+ * Panels are the Parts master, by name. Its panels per garment is not shown: it no longer multiplies
+ * the quantity, and a "×2" beside the panel read as if it did (owner, 2026-11-21).
+ */
+export const panelOptions = (parts = []) => parts.map((p) => ({ value: p.id, label: p.partName }));
 
 export const processOptions = (processes = []) => processes.map((p) => ({ value: p.id, label: p.processName }));
 

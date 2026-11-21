@@ -9,16 +9,18 @@
  *     sizes: { [size]: { baseQty, calculatedQty, requiredQty } },
  *     isManualOverride, varianceReason }
  *
- * PRD §9.1: Required Qty (size) = ROUNDUP(Base Qty x Panels per Garment x (1 + Allowance% / 100))
+ * Required Qty (size) = ROUNDUP(Base Qty x (1 + Allowance% / 100)). PRD §9.1 also multiplied by the
+ * panel's panels per garment; the owner dropped that (2026-11-21): a body cut in two panels was asked for
+ * twice the order. `panelsPerGarment` stays on the line as the Parts master's fact, it no longer counts.
  */
 import { CPR_VAL, OTHER_PROCESS_NAME } from './cutPanelConstants';
 
 /** Strips float noise first so 100 x 1.1 (= 110.00000000000001) does not round up to 111. */
 const round6 = (n) => Math.round(n * 1e6) / 1e6;
 
-export const calcRequiredQty = (baseQty, panelsPerGarment, allowancePct) => {
+export const calcRequiredQty = (baseQty, allowancePct) => {
   if (!(baseQty > 0)) return 0;
-  return Math.ceil(round6(baseQty * (panelsPerGarment || 1) * (1 + (Number(allowancePct) || 0) / 100)));
+  return Math.ceil(round6(baseQty * (1 + (Number(allowancePct) || 0) / 100)));
 };
 
 export const processLabel = (line) =>
@@ -30,10 +32,10 @@ export const sequenceGroupKey = (line) => `${line.fabricId}|${line.colorName}|${
 /** Uniqueness (BR-05): Fabric + Colour + Panel + Process — the "Other" text counts as the process. */
 export const duplicateKey = (line) => `${sequenceGroupKey(line)}|${processLabel(line)}`.toLowerCase();
 
-export const sizeCells = (order, colorName, panelsPerGarment, allowancePct) =>
+export const sizeCells = (order, colorName, allowancePct) =>
   Object.fromEntries(order.sizes.map((size) => {
     const baseQty = order.qtyMatrix[colorName]?.[size] || 0;
-    const calculatedQty = calcRequiredQty(baseQty, panelsPerGarment, allowancePct);
+    const calculatedQty = calcRequiredQty(baseQty, allowancePct);
     return [size, { baseQty, calculatedQty, requiredQty: calculatedQty }];
   }));
 
@@ -105,7 +107,7 @@ export const expandSelection = ({ fabric, colorNames, panels, processes, allowan
           ...line,
           key: nextKey(),
           sequenceNo: seq,
-          sizes: sizeCells(order, colorName, line.panelsPerGarment, line.allowancePct),
+          sizes: sizeCells(order, colorName, line.allowancePct),
         });
       });
     });
@@ -116,7 +118,7 @@ export const expandSelection = ({ fabric, colorNames, panels, processes, allowan
 /** Recalculate one line from the order (clears manual overrides on it). */
 export const recalcLine = (line, order) => ({
   ...line,
-  sizes: sizeCells(order, line.colorName, line.panelsPerGarment, line.allowancePct),
+  sizes: sizeCells(order, line.colorName, line.allowancePct),
   isManualOverride: false,
 });
 
