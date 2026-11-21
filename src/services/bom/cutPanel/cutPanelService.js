@@ -20,7 +20,12 @@ export const listCprs = async (filters) => toPage(await get(BASE, listParams(fil
 export const getCprFilterOptions = () => get(`${BASE}/filter-options`);
 export const getCpr = (id) => get(`${BASE}/${id}`);
 export const getCprsForOrder = (orderId, exceptId) => get(`${BASE}/by-order/${orderId}`, { exceptId: exceptId ?? undefined });
-export const getCprEligibleOrders = () => get(`${BASE}/eligible-orders`);
+/**
+ * The order picker's orders (released BOM, confirmed or in production): the newest few, or with `q` those whose
+ * order no., style or buyer contains it, an exact order no. first. Never the whole list (owner, 2026-11-21).
+ */
+const ORDER_PICKER_SIZE = 10;
+export const getCprEligibleOrders = (q) => get(`${BASE}/eligible-orders`, { q: q || undefined, limit: ORDER_PICKER_SIZE });
 export const getCprOrderContext = async (orderId) => toOrderContext(await get(`${BASE}/order-context/${orderId}`));
 export const getCprAllocation = (id) => get(`${BASE}/${id}/allocation`);
 export const getCprAudit = async (id) => toHistory(await get(`${BASE}/${id}/history`));

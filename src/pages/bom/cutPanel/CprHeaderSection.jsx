@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Alert, Button, Card, Col, Form, Row, Space, Tag, Tooltip, Typography } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import RequirementOrderSelect from '../shared/RequirementOrderSelect';
+import { getCprEligibleOrders } from '../../../services/bom/cutPanel/cutPanelService';
 import StatusTag from '../../../components/StatusTag';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getRequirementStatusLabel } from '../../../utils/requirementStatus';
@@ -32,7 +33,12 @@ const CprHeaderSection = memo(function CprHeaderSection({
             <Form.Item label="Order No." required htmlFor="cpr-order">
               {doc.id || !editable
                 ? <Text strong>{doc.orderNo}</Text>
-                : <RequirementOrderSelect id="cpr-order" orders={orders} value={doc.orderId ?? undefined} onChange={onSelectOrder} disabled={locked} />}
+                : (
+                  <RequirementOrderSelect
+                    id="cpr-order" orders={orders} search={getCprEligibleOrders} selected={order}
+                    value={doc.orderId ?? undefined} onChange={onSelectOrder} disabled={locked}
+                  />
+                )}
             </Form.Item>
           </Col>
           <Col xs={12} md={6} lg={4}>

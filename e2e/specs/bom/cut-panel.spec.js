@@ -9,6 +9,8 @@
  *   - BOM menu: BOM · Cut Panel · Garment Process, and no "Create BOM" item
  *   - Create: order → the order's BOM no. read-only → fabric, colour, panel, process → Add to Grid (quantities
  *     from the order) → Save Draft (server number) → Submit (WRN-03 confirm: colours without a process)
+ *   - The order picker loads the newest ten eligible orders, then asks the server for what is typed (exact
+ *     order no. first) — never every order (owner, 2026-11-21)
  *   - A panel cut twice per garment asks for the order quantity, not double it — on the screen and as
  *     the server stores it (owner, 2026-11-21: quantities do not count parts)
  *   - Edit a submitted CPR in place: a changed quantity needs a reason; stays Submitted; History shows R1
@@ -91,6 +93,32 @@ test('Create: order and its BOM, expand, save with the server number, submit', a
   await expect(page.getByText(/Submitted — the requirement is now available/)).toBeVisible();
   await expect(editButton(page)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
+});
+
+test('The order picker opens on the newest ten and asks the server for what is typed', async ({ page }) => {
+  const eligible = (r) => r.url().includes('/cut-panel-requirements/eligible-orders');
+  const opening = page.waitForRequest(eligible);
+  await navigateWithAuth(page, '/bom/cut-panel/new');
+  const first = new URL((await opening).url()).searchParams;
+  expect(first.get('limit')).toBe('10'); // never every eligible order (owner, 2026-11-21)
+  expect(first.get('q')).toBeNull();
+  await waitForPageReady(page);
+
+  const searched = page.waitForRequest((r) => eligible(r) && new URL(r.url()).searchParams.get('q') === 'ORD/0002');
+  await pickOption(page, 'cpr-order', 'ORD/0002');
+  expect(new URL((await searched).url()).searchParams.get('limit')).toBe('10');
+  await expect(page.locator('.ant-form-item').filter({ hasText: 'BOM No.' })).toContainText('ORD/0002');
+
+  // The server answers with matches, the exact order no. first
+  const api = await createAuthenticatedClient();
+  try {
+    const found = (await api.get('/cut-panel-requirements/eligible-orders', { q: 'ORD/0002', limit: 10 })).data;
+    expect(found[0].orderNo).toBe('ORD/0002');
+    expect(found.every((o) => [o.orderNo, o.styleNo, o.buyer].join(' ').toLowerCase().includes('ord/0002'))).toBe(true);
+    expect((await api.get('/cut-panel-requirements/eligible-orders', { q: 'no such order zz', limit: 10 })).data).toEqual([]);
+  } finally {
+    await api.dispose();
+  }
 });
 
 test('A panel cut twice per garment asks for the order quantity, not double it', async ({ page }) => {
