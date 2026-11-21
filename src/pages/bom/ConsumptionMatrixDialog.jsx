@@ -327,6 +327,9 @@ const ConsumptionMatrixDialog = ({
       open={open}
       width={Math.max(650, Math.min(1050, 380 + allSizes.length * 110))}
       destroyOnHidden
+      // A whole grid of typed values: a stray click beside the dialog must not throw them away.
+      // Cancel, the close button and Esc still discard on purpose.
+      maskClosable={false}
       onCancel={onCancel}
       okText="Apply"
       onOk={handleApply}
