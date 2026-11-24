@@ -3,7 +3,7 @@ import { CheckOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { OP_LABELS, isGranted, opLabel, specialOps } from './permissionMatrixModel';
 import { changeKey, isBundle } from './accessGridModel';
 
-/** A CRUD right the screen words its own way ("Delete draft", "Delete item (API only)"): a marker that says how. */
+/** A CRUD right the screen words its own way ("Delete draft", "Delete unused item"): a marker that says how. */
 const Renamed = ({ screen, op }) => {
   const label = screen.opLabels?.[op];
   if (!label) return null;

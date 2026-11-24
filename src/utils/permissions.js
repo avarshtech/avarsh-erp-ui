@@ -458,7 +458,7 @@ export const SCREENS = [
   { id: 'items', name: 'Items', section: 'master', kind: 'tab',
     path: '/master', description: 'Purchase Order',
     ops: ['view', 'add', 'update', 'delete'],
-    opLabels: { delete: 'Delete item (API only)' } },
+    opLabels: { delete: 'Delete unused item' } },
   { id: 'master-data', name: 'Product Catalog', section: 'master', kind: 'tab',
     path: '/master', description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
     ops: STANDARD_OPERATIONS },

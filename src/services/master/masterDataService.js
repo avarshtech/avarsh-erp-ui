@@ -168,6 +168,25 @@ export const deleteItemType = async (id) => {
   return axiosInstance.delete(`${ENDPOINTS.ITEM_TYPES}/${id}`);
 };
 
+/**
+ * Where an item type is used. A used type is locked and may only be inactivated.
+ * @param {number} id - Item type ID
+ * @returns {Promise<{inUse: boolean, usages: string[]}>}
+ */
+export const getItemTypeUsage = async (id) => {
+  return axiosInstance.get(`${ENDPOINTS.ITEM_TYPES}/${id}/usage`);
+};
+
+/**
+ * Activate or inactivate an item type, used or not.
+ * @param {number} id - Item type ID
+ * @param {boolean} active
+ * @returns {Promise<Object>} The saved item type
+ */
+export const setItemTypeActive = async (id, active) => {
+  return axiosInstance.patch(`${ENDPOINTS.ITEM_TYPES}/${id}/active`, { active });
+};
+
 // ==================== ATTRIBUTES ====================
 
 /**
@@ -330,6 +349,8 @@ export default {
   createItemType,
   updateItemType,
   deleteItemType,
+  getItemTypeUsage,
+  setItemTypeActive,
   // Attributes
   getAllAttributes,
   getAttributeById,

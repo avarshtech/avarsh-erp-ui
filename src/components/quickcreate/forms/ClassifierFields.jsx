@@ -18,7 +18,7 @@ export default function ClassifierFields({ form, categories, category, sub, isNe
   const allowNew = canCreateClassifiers();
 
   const subOptions = withPending((category?.subCategories || []).map((s) => ({ value: s.id, label: s.name })), newSubName);
-  const typeOptions = withPending(isNewSub ? [] : (sub?.itemTypes || []).map((t) => ({ value: t.id, label: t.name })), newTypeName);
+  const typeOptions = withPending(isNewSub ? [] : (sub?.itemTypes || []).filter((t) => t.isActive !== false).map((t) => ({ value: t.id, label: t.name })), newTypeName);
 
   const createType = (text) => {
     if (!/^[A-Za-z0-9 ]+$/.test(text)) {

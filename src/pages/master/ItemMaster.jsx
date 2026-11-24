@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card, Table, Button, Input, InputNumber, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, App, Divider, Badge, Checkbox, Typography, Empty, Tooltip, Alert,
-  Drawer, Descriptions, Skeleton,
+  Drawer, Descriptions, Skeleton, ConfigProvider,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined,
@@ -11,7 +11,9 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
-import { getItemMetaData, getItemById, createItem, updateItem, searchItems } from '../../services/master/itemService';
+import {
+  getItemMetaData, getItemById, createItem, updateItem, searchItems, deleteItem, getItemUsage, setItemActive,
+} from '../../services/master/itemService';
 import useServerList from '../../hooks/useServerList';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -152,6 +154,10 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
   );
 };
 
+// Saved variants leave with a classifier change on an item being edited: they are marked inactive and
+// sent so the server retires them, instead of being dropped from the list and kept as they were.
+const retireSavedVariants = (list) => list.filter((v) => v.id != null).map((v) => ({ ...v, isActive: false }));
+
 const ITEM_FILTERS = { categoryId: '', subCategoryId: '', itemTypeId: '', status: '' };
 const ITEM_LIST_OPTIONS = { defaultSort: { field: 'itemCode', order: 'descend' } };
 
@@ -175,8 +181,7 @@ const ItemMaster = () => {
   // RBAC Permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
-  // No canDelete: items are never deleted through the UI, so the registry does
-  // not offer the operation. The flag was computed here and never read.
+  const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
 
   // List State: pages, sorts and filters on the server; a saved edit reloads the same page, so the row
@@ -235,6 +240,20 @@ const ItemMaster = () => {
   const [existingLookupLoading, setExistingLookupLoading] = useState(false);
 
   const isEditMode = !!selectedItem;
+
+  // Where the item being edited is used (GET /items/{id}/usage). A used item is locked: only Active
+  // and new variants change, and its used variants keep their name and attributes. An unused item can
+  // change anything. The fields stay locked until the answer arrives, and if it never does.
+  const [usage, setUsage] = useState(null);
+  const keyLocked = isEditMode && !(usage && !usage.inUse);
+  const usedVariantIds = useMemo(() => new Set(usage?.usedVariantIds || []), [usage]);
+  const isVariantLocked = (variant) => variant?.id != null && usedVariantIds.has(variant.id);
+  const loadUsage = (itemId) => {
+    setUsage(null);
+    getItemUsage(itemId)
+      .then((res) => setUsage(res?.data ?? res))
+      .catch(() => setUsage({ inUse: true, usages: [], usedVariantIds: [], failed: true }));
+  };
 
   // Resolve attribute value from variant/item attributes object
   const resolveAttributeValue = (attributesObj, attr) => {
@@ -611,6 +630,7 @@ const ItemMaster = () => {
 
     setSelectedItem(item);
     setSelectedItemId(item.id);
+    loadUsage(item.id);
     form.setFieldsValue({
       categoryId: item.categoryId?.toString(),
       subCategoryId: item.subCategoryId?.toString(),
@@ -716,7 +736,7 @@ const ItemMaster = () => {
       setFormItemTypes([]);
       setFormAttributes([]);
       setFormUomOptions([]);
-      setVariants([]);
+      setVariants(retireSavedVariants);
       setActiveVariantIndex(0);
 
       if (categoryId) {
@@ -741,7 +761,7 @@ const ItemMaster = () => {
       setFormItemTypes([]);
       setFormAttributes([]);
       setFormUomOptions([]);
-      setVariants([]);
+      setVariants(retireSavedVariants);
       setActiveVariantIndex(0);
 
       if (subCategoryId) {
@@ -764,7 +784,7 @@ const ItemMaster = () => {
       });
       setFormAttributes([]);
       setFormUomOptions([]);
-      setVariants([]);
+      setVariants(retireSavedVariants);
       setActiveVariantIndex(0);
 
       if (itemTypeId) {
@@ -777,20 +797,24 @@ const ItemMaster = () => {
           (itemType.attributes || []).forEach((attr) => {
             emptyVariant[attr.id] = '';
           });
-          setVariants([emptyVariant]);
+          // First, so it is the tab shown; an edited item's retired variants follow it.
+          setVariants((prev) => [emptyVariant, ...prev]);
           setActiveVariantIndex(0);
         }
         // The classifier triple is now complete. Only one item may exist per
         // Category + Sub-Category + Item Type, so load the existing one for editing
         // rather than letting the user fill the form and hit a duplicate error on save.
-        lookupExistingItem({
-          categoryId: form.getFieldValue('categoryId'),
-          subCategoryId: form.getFieldValue('subCategoryId'),
-          itemTypeId,
-        });
+        // An item being corrected stays itself; the server refuses a taken triple on save.
+        if (!isEditMode) {
+          lookupExistingItem({
+            categoryId: form.getFieldValue('categoryId'),
+            subCategoryId: form.getFieldValue('subCategoryId'),
+            itemTypeId,
+          });
+        }
       }
     },
-    [formItemTypes, form, lookupExistingItem]
+    [formItemTypes, form, lookupExistingItem, isEditMode]
   );
 
   // Open Add Modal
@@ -824,6 +848,7 @@ const ItemMaster = () => {
     }
     setSelectedItem(item);
     setSelectedItemId(item.id);
+    loadUsage(item.id);
     setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
@@ -958,6 +983,7 @@ const ItemMaster = () => {
     });
     setSelectedItem(null);
     setSelectedItemId(null);
+    setUsage(null);
     form.resetFields();
     setVariants([]);
     setDuplicateVariantIndex(null);
@@ -1375,6 +1401,62 @@ const ItemMaster = () => {
     }
   };
 
+  // Delete an item nothing uses; a used one is offered Inactivate instead (the server refuses its delete).
+  const handleDeleteRequest = async (record) => {
+    let info;
+    try {
+      const res = await getItemUsage(record.id);
+      info = res?.data ?? res;
+    } catch {
+      return; // The interceptor has shown the error.
+    }
+    const refresh = () => {
+      invalidateCache?.('items');
+      reloadItems();
+    };
+    if (info?.inUse) {
+      const where = `It is used in ${info.usages.join(', ')}.`;
+      if (record.isActive === false) {
+        modal.info({ title: `${record.itemCode} cannot be deleted`, content: `${where} It is already inactive.` });
+        return;
+      }
+      modal.confirm({
+        title: `${record.itemCode} cannot be deleted`,
+        content: `${where} Inactivate it instead?`,
+        okText: 'Inactivate',
+        cancelText: 'Cancel',
+        onOk: async () => {
+          try {
+            await setItemActive(record.id, false);
+            message.success(`${record.itemCode} inactivated`);
+            doCloseModal();
+            refresh();
+          } catch {
+            // The interceptor has shown the error.
+          }
+        },
+      });
+      return;
+    }
+    modal.confirm({
+      title: `Delete ${record.itemCode}?`,
+      content: 'Nothing uses this item. It and its variants will be deleted permanently.',
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await deleteItem(record.id);
+          message.success(`${record.itemCode} deleted`);
+          doCloseModal();
+          refresh();
+        } catch {
+          // The interceptor has shown the error.
+        }
+      },
+    });
+  };
+
   // Render Attribute Field
   const renderAttributeField = (attr, variantIndex) => {
     const variant = variants[variantIndex] || {};
@@ -1498,12 +1580,12 @@ const ItemMaster = () => {
       sorter: true,
       render: (date) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
     },
-    ...((canView || canUpdate)
+    ...((canView || canUpdate || canDelete)
       ? [
           {
             title: 'Actions',
             key: 'actions',
-            width: 100,
+            width: 130,
             fixed: 'right',
             render: (_, record) => (
               <Space size="small">
@@ -1512,6 +1594,9 @@ const ItemMaster = () => {
                 )}
                 {canUpdate && (
                   <ActionButton action="edit" onClick={() => handleEdit(record)} />
+                )}
+                {canDelete && (
+                  <ActionButton action="delete" onClick={() => handleDeleteRequest(record)} />
                 )}
               </Space>
             ),
@@ -1650,15 +1735,26 @@ const ItemMaster = () => {
         afterClose={handleAfterClose}
         width={'80vw'}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={handleModalClose} icon={<CloseOutlined />}>
-              Cancel
-            </Button>
-            {(isEditMode ? canUpdate : canAdd) && (
-              <Button type="primary" onClick={() => form.submit()} loading={submitting} disabled={!formReady || (isEditMode && !unsavedChanges)} icon={<SaveOutlined />}>
-                {isEditMode ? 'Update' : 'Save'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              {isEditMode && canDelete && (
+                <Tooltip title={usage?.inUse ? 'A used item cannot be deleted. Untick Active to inactivate it.' : undefined}>
+                  <Button danger icon={<DeleteOutlined />} disabled={!usage || usage.inUse} onClick={() => handleDeleteRequest(selectedItem)}>
+                    Delete
+                  </Button>
+                </Tooltip>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <Button onClick={handleModalClose} icon={<CloseOutlined />}>
+                Cancel
               </Button>
-            )}
+              {(isEditMode ? canUpdate : canAdd) && (
+                <Button type="primary" onClick={() => form.submit()} loading={submitting} disabled={!formReady || (isEditMode && !unsavedChanges)} icon={<SaveOutlined />}>
+                  {isEditMode ? 'Update' : 'Save'}
+                </Button>
+              )}
+            </div>
           </div>
         }
         destroyOnHidden
@@ -1747,6 +1843,15 @@ const ItemMaster = () => {
           </div>
         ) : (
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
+            {isEditMode && usage?.inUse && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                title={usage.failed ? 'Could not check where this item is used, so it is locked' : `This item is used in ${usage.usages.join(', ')}`}
+                description="Only new variants and Active can be changed, and variants already used keep their name and attributes. It cannot be deleted: untick Active to inactivate it."
+              />
+            )}
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
@@ -1758,7 +1863,7 @@ const ItemMaster = () => {
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
                     loading={metaDataLoading}
-                    disabled={isEditMode}
+                    disabled={keyLocked}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     options={formCategories.map((cat) => ({ value: String(cat.id ?? ''), label: String(cat.name ?? '') }))}
                   />
@@ -1775,7 +1880,7 @@ const ItemMaster = () => {
                     onChange={handleFormSubcategoryChange}
                     loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
-                    disabled={isEditMode || !form.getFieldValue('categoryId')}
+                    disabled={keyLocked || !form.getFieldValue('categoryId')}
                     options={formSubcategories.map((sc) => ({ value: String(sc.id ?? ''), label: String(sc.name ?? '') }))}
                   />
                 </Form.Item>
@@ -1794,8 +1899,10 @@ const ItemMaster = () => {
                     onChange={handleFormItemTypeChange}
                     loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
-                    disabled={isEditMode || !form.getFieldValue('subCategoryId')}
-                    options={formItemTypes.map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
+                    disabled={keyLocked || !form.getFieldValue('subCategoryId')}
+                    options={formItemTypes
+                      .filter((it) => it.isActive !== false || it.id === selectedItem?.itemTypeId)
+                      .map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
                   />
                 </Form.Item>
               </Col>
@@ -1826,7 +1933,7 @@ const ItemMaster = () => {
                 >
                   <Select
                     placeholder="Select Primary UOM"
-                    disabled={isEditMode || !form.getFieldValue('itemTypeId')}
+                    disabled={keyLocked || !form.getFieldValue('itemTypeId')}
                     onChange={handleUomPairChange}
                     options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                   />
@@ -1840,13 +1947,13 @@ const ItemMaster = () => {
                   // Required when creating. Editing locks the field, so an older fabric saved without
                   // one must still save — otherwise its variants could never be added to or changed.
                   rules={[
-                    { required: isFabricCategory && !isEditMode, message: 'Secondary UOM is required for fabric items' },
+                    { required: isFabricCategory && !keyLocked, message: 'Secondary UOM is required for fabric items' },
                   ]}
                 >
                     <Select
                       placeholder={isFabricCategory ? 'Select Secondary UOM (required)' : 'Select Secondary UOM (optional)'}
                       allowClear={!isFabricCategory}
-                      disabled={isEditMode || !form.getFieldValue('itemTypeId')}
+                      disabled={keyLocked || !form.getFieldValue('itemTypeId')}
                       onChange={handleUomPairChange}
                       options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                     />
@@ -1867,6 +1974,7 @@ const ItemMaster = () => {
                   >
                     <InputNumber
                       placeholder="e.g. 144"
+                      disabled={keyLocked}
                       controls={false}
                       min={0.000001}
                       precision={6}
@@ -1881,7 +1989,7 @@ const ItemMaster = () => {
                   label="HSN Code"
                   rules={[{ required: true, message: 'HSN Code is required' }]}
                 >
-                  <Input placeholder="Enter HSN Code" disabled={isEditMode} />
+                  <Input placeholder="Enter HSN Code" disabled={keyLocked} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={12}>
@@ -1895,6 +2003,7 @@ const ItemMaster = () => {
                 >
                   <InputNumber
                     placeholder="Enter Allowance"
+                    disabled={keyLocked}
                     controls={false}
                     suffix="%"
                     min={0}
@@ -1906,7 +2015,7 @@ const ItemMaster = () => {
             </Row>
 
             <Form.Item name="description" label="Description">
-              <Input.TextArea rows={2} maxLength={500} placeholder="Optional description / composition (auto-fills costing fabric description)" />
+              <Input.TextArea rows={2} maxLength={500} disabled={keyLocked} placeholder="Optional description / composition (auto-fills costing fabric description)" />
             </Form.Item>
 
             {/* Edit only. A new item is always active and always has at least one variant, so
@@ -2010,6 +2119,8 @@ const ItemMaster = () => {
                           : 'This variant has duplicate attribute values. Please update at least one attribute.'}
                       </div>
                     )}
+                    {/* A used variant keeps its name and attributes; it can only be removed (inactivated). */}
+                    <ConfigProvider componentDisabled={isVariantLocked(variants[activeVariantIndex])}>
                     {/* Variant identity. The name is what users see everywhere downstream
                         (costing, BOM, PO, GRN); the code is a server-generated SKU. */}
                     <Row gutter={16}>
@@ -2059,6 +2170,7 @@ const ItemMaster = () => {
                         </Col>
                       ))}
                     </Row>
+                    </ConfigProvider>
 
                     {/* Variant Image Upload */}
                     <div style={{ marginTop: 4 }}>

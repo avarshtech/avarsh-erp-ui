@@ -63,6 +63,25 @@ export const deleteItem = async (id) => {
 };
 
 /**
+ * Where an item and its variants are used. A used item is locked: only Active and new variants change.
+ * @param {number} id - Item ID
+ * @returns {Promise<{inUse: boolean, usages: string[], usedVariantIds: number[]}>}
+ */
+export const getItemUsage = async (id) => {
+  return axiosInstance.get(`${ENDPOINTS.ITEMS}/${id}/usage`);
+};
+
+/**
+ * Activate or inactivate an item, used or not.
+ * @param {number} id - Item ID
+ * @param {boolean} active
+ * @returns {Promise<Object>} The saved item
+ */
+export const setItemActive = async (id, active) => {
+  return axiosInstance.patch(`${ENDPOINTS.ITEMS}/${id}/active`, { active });
+};
+
+/**
  * Autocomplete items by query string (for dropdowns/search inputs)
  * @param {string} query - Search query
  * @returns {Promise<Array>} Autocomplete results (ItemDTO[])
@@ -130,6 +149,8 @@ export default {
   createItem,
   updateItem,
   deleteItem,
+  getItemUsage,
+  setItemActive,
   autocompleteItems,
   searchItems,
   getItemsByIds,

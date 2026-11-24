@@ -4,11 +4,12 @@
  * What this tests:
  *   - API: list/search via GET /items/search, create (itemCode is
  *     SERVER-GENERATED — assert itemName echo + truthy itemCode only),
- *     update (PUT), delete (DELETE exists in API even though the UI has none)
+ *     update (PUT), delete (DELETE of an unused item)
  *   - List: columns, server-side filters (category/subcategory/itemType/status)
  *     + Clear, debounced server search
- *   - Row actions: View + Edit only — asserts the DELETE action is ABSENT
- *     (Item Master has no UI delete by design)
+ *   - Row actions: View + Edit + Delete. An unused item is editable in full and
+ *     deletable; a used one is locked (only Active and new variants change) and
+ *     its Delete offers Inactivate instead
  *   - Create (80vw Modal): full cascade categoryId → subCategoryId →
  *     itemTypeId → uomId (children disabled until parent picked), itemName
  *     (no #itemName id — selected via placeholder), primary/secondary UOM,
@@ -177,7 +178,7 @@ test.describe.serial('Item — CRUD', () => {
       expect(data.itemName).toContain(' / ');
     });
 
-    test('API — Delete removes record (API-only; the UI exposes no delete)', async () => {
+    test('API — Delete removes an unused item', async () => {
       test.skip(!createdId, 'No record created to delete');
       const { response } = await api.delete(`/items/${createdId}`);
       expect([200, 204].includes(response.status())).toBeTruthy();
@@ -197,11 +198,13 @@ test.describe.serial('Item — CRUD', () => {
     let plainD = {}; // free triple for the variants test
     let fabric = {};
     let seedItem;   // pre-existing item (with one variant) for search/filter/edit/autocomplete
+    let attrId;
 
     test.beforeAll(async () => {
       api = await createAuthenticatedClient();
 
       const { data: attr } = await api.post('/attribute-configs', { attributeName: attrName, dataType: 'string' });
+      attrId = attr.id;
       ({ data: uomA } = await api.post('/unit-of-measures', uomPayload({ name: `E2E UomA ${S}`, symbol: `a${S.slice(-3)}` })));
       ({ data: uomB } = await api.post('/unit-of-measures', uomPayload({ name: `E2E UomB ${S}`, symbol: `b${S.slice(-3)}` })));
 
@@ -279,7 +282,7 @@ test.describe.serial('Item — CRUD', () => {
       await antTableWaitForData(page);
     });
 
-    test('List: columns, View/Edit actions present, NO delete action', async ({ page }) => {
+    test('List: columns, View/Edit/Delete actions present', async ({ page }) => {
       // Since the refactor the list has NO "Item Name" column — the name is derived
       // and the classifier renders as three separate cells (see bug B-040).
       for (const col of ['Item Code', 'Category', 'Subcategory', 'Item Type', 'UOM', 'Status', 'Created', 'Actions']) {
@@ -293,9 +296,7 @@ test.describe.serial('Item — CRUD', () => {
       await expect(row).toBeVisible();
       await expect(row.locator('.anticon-eye')).toBeVisible();
       await expect(row.locator('.anticon-edit')).toBeVisible();
-      // Item Master deliberately has NO UI delete — assert the action is absent
-      await expect(row.locator('.anticon-delete')).toHaveCount(0);
-      await expect(page.locator('.ant-table .anticon-delete')).toHaveCount(0);
+      await expect(row.locator('.anticon-delete')).toBeVisible();
     });
 
     test('Search: debounced server-side search finds seeded item', async ({ page }) => {
@@ -542,9 +543,10 @@ test.describe.serial('Item — CRUD', () => {
       // seeded variant attribute value resolved back into the form
       await expect(modal.getByPlaceholder(`Enter ${attrName}`)).toHaveValue('SeedShade');
 
-      // HSN (like the classifier triple and UOMs) is LOCKED in edit mode by design —
-      // dirty the form through the fields that stay editable.
-      await expect(modal.locator('#hsnCode')).toBeDisabled();
+      // Nothing uses the seed item, so it can be corrected in full: HSN and the classifier
+      // triple open up once GET /items/{id}/usage answers (a used item keeps them locked).
+      await expect(modal.locator('#hsnCode')).toBeEnabled({ timeout: 10000 });
+      await expect(modal.locator('#categoryId')).toBeEnabled();
       await antInputNumberFill(page, '#defaultAllowance', 7.25);
       await modal.locator('#description').fill('Edited in regression');
       await expect(modal.getByRole('button', { name: /Update/i })).toBeEnabled();
@@ -555,6 +557,116 @@ test.describe.serial('Item — CRUD', () => {
       ]);
       expect(resp.status()).toBeLessThan(300);
       await expect(page.locator('.ant-message').getByText(/Item updated successfully/i)).toBeVisible({ timeout: 8000 });
+    });
+
+    /** An item of its own on a fresh item type of the plain chain, so no other test's triple is taken. */
+    async function createUnusedItem(label) {
+      const { data: type } = await api.post('/item-types', {
+        name: `E2E Plain Type${label} ${S}`, subCategoryId: plain.subId,
+        attributeIds: [attrId], uomIds: [uomA.id, uomB.id],
+      });
+      const { data: item } = await api.post('/items', itemPayload(
+        { categoryId: plain.catId, subCategoryId: plain.subId, itemTypeId: type.id, uomId: uomA.id },
+        {
+          variants: [{
+            variantName: `${label} Variant ${S}`,
+            isActive: true,
+            attributes: { [attrName.toLowerCase()]: 'Shade' },
+          }],
+        },
+      ));
+      expect(item?.id, `item create failed: ${JSON.stringify(item).slice(0, 300)}`).toBeTruthy();
+      return { item, type, searchKey: `${label} Variant ${S}` };
+    }
+
+    test('Edit: an unused item created on the wrong item type is moved to the right one', async ({ page }) => {
+      const { item, searchKey } = await createUnusedItem('Wrong');
+      const { data: right } = await api.post('/item-types', {
+        name: `E2E Plain TypeRight ${S}`, subCategoryId: plain.subId,
+        attributeIds: [attrId], uomIds: [uomA.id, uomB.id],
+      });
+
+      // The list searches the server and the form loads /items/meta on open, so both see the new rows.
+      await searchItems(page, searchKey);
+      await page.locator('.ant-table-row').filter({ hasText: item.itemCode }).locator('.anticon-edit').click();
+      const modal = itemModal(page);
+      await expect(modal.locator('#itemTypeId')).toBeEnabled({ timeout: 20000 });
+
+      await antSelectType(page, modalSelect(page, 'itemTypeId'), right.name);
+      // The type's old variants are retired; the new type starts with one empty variant.
+      await modal.locator('input[name="variantName"]').fill(`Right Variant ${S}`);
+      await modal.getByPlaceholder(`Enter ${attrName}`).fill('RightShade');
+      await antSelectType(page, modalSelect(page, 'uomId'), uomA.symbol);
+
+      const [resp] = await Promise.all([
+        page.waitForResponse((r) => new RegExp(`/items/${item.id}$`).test(r.url()) && r.request().method() === 'PUT'),
+        modal.getByRole('button', { name: /Update/i }).click(),
+      ]);
+      expect(resp.status()).toBeLessThan(300);
+
+      const { data: saved } = await api.get(`/items/${item.id}`);
+      expect(saved.itemTypeId).toBe(right.id);
+      expect(saved.itemCode).not.toBe(item.itemCode);
+      expect(saved.variants.map((v) => v.variantName)).toEqual([`Right Variant ${S}`]);
+    });
+
+    test('Delete: an unused item is deleted from its row', async ({ page }) => {
+      const { item, searchKey } = await createUnusedItem('Gone');
+
+      await searchItems(page, searchKey);
+      const row = page.locator('.ant-table-row').filter({ hasText: item.itemCode });
+      await row.locator('.anticon-delete').click();
+      const dialog = page.getByRole('dialog').filter({ hasText: `Delete ${item.itemCode}?` });
+      await expect(dialog).toBeVisible();
+      const [resp] = await Promise.all([
+        page.waitForResponse((r) => new RegExp(`/items/${item.id}$`).test(r.url()) && r.request().method() === 'DELETE'),
+        dialog.getByRole('button', { name: /Delete/ }).click(),
+      ]);
+      expect(resp.status()).toBe(204);
+      await expect(page.locator('.ant-message').getByText(`${item.itemCode} deleted`)).toBeVisible({ timeout: 8000 });
+      await expect(row).toHaveCount(0);
+    });
+
+    test('Used item: locked, Delete is refused and offers Inactivate', async ({ page }) => {
+      // An active item some document uses — the e2e seed has POs, BOMs and stock against its items.
+      const { data: pageOfItems } = await api.get('/items/search', { page: 0, size: 50, isActive: true });
+      let used = null;
+      for (const candidate of pageOfItems?.content || []) {
+        const { data: usage } = await api.get(`/items/${candidate.id}/usage`);
+        if (usage?.inUse) { used = { item: candidate, usage }; break; }
+      }
+      test.skip(!used, 'no used item in the e2e seed');
+      const { item, usage } = used;
+
+      try {
+        await searchItems(page, item.itemCode);
+        // Exact: FAB-SJ-001 is also the start of FAB-SJ-0010 and its variants' codes.
+        const row = page.locator('.ant-table-row').filter({ has: page.getByText(item.itemCode, { exact: true }) });
+        await row.locator('.anticon-edit').click();
+        const modal = itemModal(page);
+        await expect(modal.getByText(`This item is used in ${usage.usages.join(', ')}`)).toBeVisible({ timeout: 20000 });
+        for (const field of ['#categoryId', '#itemTypeId', '#hsnCode', '#defaultAllowance', '#description']) {
+          await expect(modal.locator(field)).toBeDisabled();
+        }
+        await expect(modal.locator('.ant-modal-footer').getByRole('button', { name: /delete/i })).toBeDisabled();
+        await cancelItemModal(page);
+
+        await row.locator('.anticon-delete').click();
+        const dialog = page.getByRole('dialog').filter({ hasText: `${item.itemCode} cannot be deleted` });
+        await expect(dialog).toContainText(`It is used in ${usage.usages.join(', ')}`);
+        const [resp] = await Promise.all([
+          page.waitForResponse((r) => new RegExp(`/items/${item.id}/active$`).test(r.url()) && r.request().method() === 'PATCH'),
+          dialog.getByRole('button', { name: 'Inactivate' }).click(),
+        ]);
+        expect(resp.status()).toBe(200);
+        await expect(page.locator('.ant-message').getByText(`${item.itemCode} inactivated`)).toBeVisible({ timeout: 8000 });
+        await expect(row).toContainText('Inactive');
+
+        const { status } = await api.delete(`/items/${item.id}`);
+        expect(status).toBe(409);
+      } finally {
+        await api.patch(`/items/${item.id}/active`, { active: true });
+      }
     });
 
     test('Existing-triple lookup: picking a taken combination loads that item for editing', async ({ page }) => {
