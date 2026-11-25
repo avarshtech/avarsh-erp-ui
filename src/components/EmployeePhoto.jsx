@@ -65,12 +65,35 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
     try {
       const files = await getFilesByEntity('EMPLOYEE', employeeId);
       const photos = (Array.isArray(files) ? files : []).filter((f) => f.fileCategory === 'PHOTO');
-      const latest = photos.at(-1) ?? null;
-      setPhoto(latest);
-      // silent: this catch already handles it. Without it the interceptor toasted
-      // first and the fallback ran afterwards, so a record whose photo file had
-      // gone showed "Server error occurred" over a page that was otherwise fine.
-      show(latest ? await downloadFileAsBlob(latest.fileId, { silent: true }) : null);
+      // Newest first. The endpoint orders by createdAt DESCENDING, so the newest
+      // photo is the FIRST element - this took the last, which is the oldest one
+      // the employee ever had. It only showed while a replace left two rows
+      // behind (the old row's delete is best-effort), and then only after a
+      // reload, because until then the screen was showing the file just picked.
+      // Sorted here too rather than trusting the order: nothing in the contract
+      // promises it, and getting this backwards shows the wrong person's face.
+      const newestFirst = [...photos].sort(
+        (a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')),
+      );
+
+      // Walk down until one actually has bytes. A photo row can outlive its
+      // object - storage cleared, a file removed behind the app's back - and
+      // when it does, an older photo is a better answer than a blank frame.
+      for (const candidate of newestFirst) {
+        try {
+          // silent: handled here. Without it the interceptor toasted first and the
+          // fallback ran afterwards, so a record whose photo file had gone showed
+          // "Server error occurred" over a page that was otherwise fine.
+          const blob = await downloadFileAsBlob(candidate.fileId, { silent: true });
+          setPhoto(candidate);
+          show(blob);
+          return;
+        } catch {
+          // This one's bytes are gone; try the one before it.
+        }
+      }
+      setPhoto(null);
+      show(null);
     } catch {
       // A missing photo is not an error worth a toast - the placeholder says it.
       setPhoto(null);
@@ -101,7 +124,6 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
     }
 
     setBusy(true);
-    const previous = photo;
     try {
       const saved = await uploadFile(file, {
         module: 'HR', entity: 'EMPLOYEE', entityId: employeeId,
@@ -110,8 +132,19 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, 
       setPhoto(saved);
       show(file);
       message.success('Photo updated');
-      // Only now is the old one expendable.
-      if (previous?.fileId) await deleteFile(previous.fileId).catch(() => {});
+
+      // Every other photo goes, not just the one on screen. A replace whose
+      // delete quietly failed used to leave a second active photo behind, and
+      // the record then had two - so this clears whatever is actually there
+      // rather than the one row this component happened to be holding, which
+      // also tidies the records the old behaviour already left in that state.
+      // Best-effort on purpose: the new photo is safely stored by this point,
+      // and failing to tidy an old one is not worth undoing that or alarming
+      // anybody. The loader picks the newest regardless.
+      const existing = await getFilesByEntity('EMPLOYEE', employeeId).catch(() => []);
+      await Promise.all((Array.isArray(existing) ? existing : [])
+        .filter((f) => f.fileCategory === 'PHOTO' && f.fileId !== saved?.fileId)
+        .map((f) => deleteFile(f.fileId).catch(() => {})));
     } catch (e) {
       toastUnlessHandled(message, e, 'Could not upload the photo');
     } finally {

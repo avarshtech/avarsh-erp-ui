@@ -33,19 +33,40 @@ const CODES = [
   'BONUS_CALC_CEILING', 'BONUS_MIN_WORKING_DAYS',
   'GRATUITY_MIN_YEARS', 'GRATUITY_DAYS_FACTOR', 'GRATUITY_CEILING',
   'WAGE_DAYS_BASIS',
+  'LWF_EMPLOYEE_CONTRIB', 'LWF_EMPLOYER_CONTRIB', 'LWF_DEDUCTION_MONTH',
 ];
 
-/** A rate is stored as a fraction, so 0.12 is shown and typed as 12%. */
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+].map((label, i) => ({ value: i + 1, label }));
+
+/**
+ * PERCENT is stored as a fraction, so 0.12 is shown and typed as 12%.
+ *
+ * PERCENT_WHOLE is stored as the percentage itself - the two bonus figures are 8.33
+ * and 20, because BonusRules divides by a hundred. Reading those as fractions showed
+ * them as 833% and 2000%, and would have stored 0.0833 for anyone who tried to
+ * correct it, paying a hundredth of the statutory minimum on the next bonus run.
+ */
 const asPercent = (v) => (v == null ? null : Number((Number(v) * 100).toFixed(4)));
 const fromPercent = (v) => (v == null ? null : Number((Number(v) / 100).toFixed(6)));
+
+/** Which units the user types as a percentage, whatever the column holds. */
+const isPercent = (unit) => unit === 'PERCENT' || unit === 'PERCENT_WHOLE';
+/** Only PERCENT needs converting; PERCENT_WHOLE is already what it looks like. */
+const toInput = (unit, value) => (unit === 'PERCENT' ? asPercent(value) : value);
+const fromInput = (unit, value) => (unit === 'PERCENT' ? fromPercent(value) : value);
 
 const showValue = (row) => {
   if (row.value == null) return '-';
   const n = Number(row.value);
   if (row.unit === 'PERCENT') return `${asPercent(n)}%`;
+  if (row.unit === 'PERCENT_WHOLE') return `${n}%`;
   if (row.unit === 'RUPEES') return `₹${n.toLocaleString('en-IN')}`;
   if (row.unit === 'DAYS') return `${n} days`;
   if (row.unit === 'YEARS') return `${n} years`;
+  if (row.unit === 'MONTH') return MONTHS[n - 1]?.label ?? String(n);
   return String(n);
 };
 
@@ -124,7 +145,7 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
     skipDirty.current = true;
     form.setFieldsValue({
       ...record,
-      value: record.unit === 'PERCENT' ? asPercent(record.value) : record.value,
+      value: toInput(record.unit, record.value),
       effectiveFrom: record.effectiveFrom ? dayjs(record.effectiveFrom) : null,
       effectiveTo: record.effectiveTo ? dayjs(record.effectiveTo) : null,
     });
@@ -165,7 +186,7 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
       const unit = selected?.unit ?? unitOf(values.code);
       const payload = {
         ...values,
-        value: unit === 'PERCENT' ? fromPercent(values.value) : values.value,
+        value: fromInput(unit, values.value),
         effectiveFrom: values.effectiveFrom?.format('YYYY-MM-DD'),
         effectiveTo: values.effectiveTo ? values.effectiveTo.format('YYYY-MM-DD') : null,
       };
@@ -267,15 +288,21 @@ const StatutoryRateMaster = ({ onDirtyChange }) => {
 
       <Form.Item
         name="value"
-        label={unit === 'PERCENT' ? 'Value (%)' : unit === 'RUPEES' ? 'Value (₹)' : 'Value'}
-        rules={[{ required: true, message: 'Enter the figure' }]}
+        label={isPercent(unit) ? 'Value (%)' : unit === 'RUPEES' ? 'Value (₹)' : unit === 'MONTH' ? 'Month' : 'Value'}
+        rules={[{ required: true, message: unit === 'MONTH' ? 'Pick the month' : 'Enter the figure' }]}
       >
-        <InputNumber
-          style={{ width: '100%' }}
-          min={0}
-          prefix={unit === 'RUPEES' ? '₹' : undefined}
-          suffix={unit === 'PERCENT' ? '%' : undefined}
-        />
+        {/* A month is a choice of twelve, not a number to type: "13" is not a month,
+            and nobody should have to know December is 12. */}
+        {unit === 'MONTH' ? (
+          <Select options={MONTHS} placeholder="Select month" />
+        ) : (
+          <InputNumber
+            style={{ width: '100%' }}
+            min={0}
+            prefix={unit === 'RUPEES' ? '₹' : undefined}
+            suffix={isPercent(unit) ? '%' : undefined}
+          />
+        )}
       </Form.Item>
 
       <Form.Item

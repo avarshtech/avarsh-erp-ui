@@ -57,6 +57,17 @@ export const getPayrollRecords = async (runId) => {
 };
 
 /**
+ * One employee's salary history - every month they have been paid, newest first.
+ * GET /api/v1/hr/payroll/employees/{employeeId}/records
+ *
+ * On the payroll permission, not the employee one: these are pay figures.
+ */
+export const getEmployeeSalaryRecords = async (employeeId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/employees/${employeeId}/records`);
+  return response.data;
+};
+
+/**
  * Get salary slip for a specific payroll record.
  * GET /api/v1/hr/payroll/records/{recordId}/slip
  */

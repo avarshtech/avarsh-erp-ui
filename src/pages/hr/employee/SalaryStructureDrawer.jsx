@@ -4,7 +4,9 @@ import DateInput from '../../../components/DateInput';
 import dayjs from 'dayjs';
 import { createSalaryStructure, updateSalaryStructure } from '../../../services/hr/salaryStructureService';
 
-const SALARY_FIELDS = ['basic', 'da', 'hra', 'conveyance', 'washingAllowance', 'otherAllowance'];
+// Washing Allowance was retired on 2026-11-18. What employees held in it was folded
+// into Other Allowance by a migration, so no gross - and no wage - moved with it.
+const SALARY_FIELDS = ['basic', 'da', 'hra', 'conveyance', 'otherAllowance'];
 
 const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, currentStructure, editData, onSuccess }) => {
   const { message } = App.useApp();
@@ -91,7 +93,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
         </Descriptions>
       )}
 
-      <Form form={form} layout="vertical" initialValues={{ basic: 0, da: 0, hra: 0, conveyance: 0, washingAllowance: 0, otherAllowance: 0 }}>
+      <Form form={form} layout="vertical" initialValues={{ basic: 0, da: 0, hra: 0, conveyance: 0, otherAllowance: 0 }}>
         <Form.Item
           label="Effective From"
           name="effectiveFrom"
@@ -130,9 +132,6 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
           <InputNumber prefix="₹" min={0} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item label="Conveyance" name="conveyance">
-          <InputNumber prefix="₹" min={0} style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item label="Washing Allowance" name="washingAllowance">
           <InputNumber prefix="₹" min={0} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item label="Other Allowance" name="otherAllowance">

@@ -59,7 +59,13 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Line label="DA" value={record.earnedDa} hint={`Full month ${formatRupees(record.fixedDa)}`} />
           <Line label="HRA" value={record.earnedHra} hint={`Full month ${formatRupees(record.fixedHra)}`} />
           <Line label="Conveyance" value={record.earnedCa} hint={`Full month ${formatRupees(record.fixedCa)}`} />
-          <Line label="Washing" value={record.earnedWa} hint={`Full month ${formatRupees(record.fixedWa)}`} />
+          {/* Retired on 2026-11-18 and folded into Other Allowance, so a month run
+              since then has nothing here. A month run before it does, and the line
+              appears for that month alone - without it the components of an old
+              payslip would not come to the earned gross printed under them. */}
+          {Number(record.earnedWa) > 0 && (
+            <Line label="Washing" value={record.earnedWa} hint={`Full month ${formatRupees(record.fixedWa)}`} />
+          )}
           <Line label="Other allowance" value={record.earnedOther} hint={`Full month ${formatRupees(record.fixedOther)}`} />
           <Divider dashed style={{ margin: '8px 0' }} />
           <Line label="Earned gross" value={record.earnedGross} strong />
