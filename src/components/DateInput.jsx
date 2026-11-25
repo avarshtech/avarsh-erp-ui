@@ -40,6 +40,11 @@ const DateInput = ({
   // from defaultValue once and is never synced again, as DatePicker behaves.
   const [digits, setDigits] = useState(() => toDigits(value ?? defaultValue));
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Which month the calendar is showing, kept apart from which date is chosen.
+  // antd's Calendar is controlled by `value` alone, so pinning that to the
+  // selected date left the panel unable to move: picking another month or year
+  // from the header re-rendered the same month and looked like nothing happened.
+  const [panelDate, setPanelDate] = useState(() => dayjs());
   const [uncontrolled, setUncontrolled] = useState(() => (value === undefined ? defaultValue ?? null : null));
   const current = value === undefined ? uncontrolled : value;
 
@@ -91,7 +96,13 @@ const DateInput = ({
       suffix={(
         <Popover
           open={calendarOpen}
-          onOpenChange={(open) => !disabled && setCalendarOpen(open)}
+          onOpenChange={(open) => {
+            if (disabled) return;
+            // Opening always starts at the chosen date, so reopening after a
+            // wander through 2021 does not resume where the wander ended.
+            if (open) setPanelDate(current ?? dayjs());
+            setCalendarOpen(open);
+          }}
           trigger="click"
           placement="bottomRight"
           styles={{ body: { padding: 8 } }}
@@ -102,12 +113,17 @@ const DateInput = ({
             <div className="date-input-calendar" style={{ width: 304 }}>
               <Calendar
                 fullscreen={false}
-                value={current ?? dayjs()}
+                value={panelDate}
                 disabledDate={disabledDate}
+                onPanelChange={(next) => setPanelDate(next)}
                 onSelect={(picked, info) => {
-                  // Clicking a month or year header also fires onSelect; only a
-                  // date click should close the popover and set the value.
-                  if (info?.source && info.source !== 'date') return;
+                  // Clicking a month or year header also fires onSelect. That is
+                  // navigation, not a choice: it moves the panel, and must not set
+                  // the value or close the popover. Only a date click does both.
+                  if (info?.source && info.source !== 'date') {
+                    setPanelDate(picked);
+                    return;
+                  }
                   pickFromCalendar(picked);
                 }}
               />
