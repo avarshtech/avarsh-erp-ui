@@ -13,18 +13,23 @@ const flatten = (report) => {
   (report?.units ?? []).forEach((unit) => {
     rows.push({ key: `u${unit.unitId}`, kind: 'unit', label: unit.unitName });
     unit.departments.forEach((dept, d) => {
-      const deptKey = `${dept.contract ? 'c' : 'd'}${dept.departmentId}`;
+      // The floor is part of the key as well as the label. B1's Production comes
+      // back twice, once per floor, and keying on the department id alone would
+      // give the same designation on both floors the same React key - which
+      // silently swaps their rows.
+      const deptKey = `${dept.contract ? 'c' : 'd'}${dept.departmentId}f${dept.floorId ?? 'none'}`;
+      const place = dept.floorName ? `${dept.departmentName} - ${dept.floorName}` : dept.departmentName;
       dept.designations.forEach((line, i) => rows.push({
         key: `u${unit.unitId}-${deptKey}-${line.id}`,
         kind: 'row',
         sno: i === 0 ? d + 1 : null,
-        department: dept.departmentName,
+        department: place,
         contract: dept.contract,
         span: i === 0 ? dept.designations.length : 0,
         label: line.label,
         counts: line.counts,
       }));
-      rows.push({ key: `u${unit.unitId}-${deptKey}-t`, kind: 'dept', label: `${dept.departmentName} total`, counts: dept.total });
+      rows.push({ key: `u${unit.unitId}-${deptKey}-t`, kind: 'dept', label: `${place} total`, counts: dept.total });
     });
     rows.push({ key: `u${unit.unitId}-t`, kind: 'unitTotal', label: `${unit.unitName} total`, counts: unit.total });
   });

@@ -5,9 +5,11 @@ import {
   BankOutlined, ApartmentOutlined, IdcardOutlined,
   ClockCircleOutlined, CalendarOutlined, FileProtectOutlined, PercentageOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined, SolutionOutlined,
+  BuildOutlined,
 } from '@ant-design/icons';
 import UnitMaster from './masters/UnitMaster';
 import DepartmentMaster from './masters/DepartmentMaster';
+import FloorMaster from './masters/FloorMaster';
 import DesignationMaster from './masters/DesignationMaster';
 import ShiftMaster from './masters/ShiftMaster';
 import HolidayMaster from './masters/HolidayMaster';
@@ -46,6 +48,17 @@ const NAV_GROUPS = [
         moduleId: 'hr-masters',
         Component: DepartmentMaster,
         description: 'Departments within each unit',
+      },
+      {
+        // B1 runs Production on the 1st floor and on the 2nd, and they are
+        // different places. The pair - department and floor - is what an
+        // employee and an asset are filed against.
+        key: 'floor',
+        label: 'Floors',
+        icon: <BuildOutlined />,
+        moduleId: 'hr-masters',
+        Component: FloorMaster,
+        description: 'Floors within each department, shared with the asset register',
       },
       {
         key: 'designation',
