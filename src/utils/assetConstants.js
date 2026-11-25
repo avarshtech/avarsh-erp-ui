@@ -35,7 +35,14 @@ export const MOVEMENT_EVENT = {
   CREATED: { label: 'Added to register', color: 'blue' },
   TRANSFER: { label: 'Transferred', color: 'orange' },
   DISPOSED: { label: 'Disposed', color: 'default' },
+  // Not a move: the asset stayed on its floor and changed line. Kept quiet on
+  // purpose - a busy floor produces these all week, and they must not bury the
+  // transfers in the history.
+  LINE_CHANGED: { label: 'Line changed', color: 'default' },
 };
+
+/** Which events are real moves, as opposed to a line being noted. */
+export const isRealMove = (event) => event !== 'LINE_CHANGED';
 
 /**
  * Why an asset is in the state it is in. Mirrors AssetStatusReason; the server

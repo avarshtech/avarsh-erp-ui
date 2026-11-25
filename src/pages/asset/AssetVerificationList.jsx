@@ -32,7 +32,7 @@ const AssetVerificationList = () => {
 
   const unitId = Form.useWatch('unitId', form);
   const departmentId = Form.useWatch('departmentId', form);
-  const sectionId = Form.useWatch('sectionId', form);
+  const floorId = Form.useWatch('floorId', form);
 
   const begin = async (values) => {
     setStarting(true);
@@ -201,30 +201,34 @@ const AssetVerificationList = () => {
             <Select
               allowClear
               disabled={!unitId}
+              // Without this a scope keeps the floor and line of the department
+              // that was selected before, and counts the wrong place.
+              onChange={() => form.setFieldsValue({ floorId: undefined, lineId: undefined })}
               showSearch
               optionFilterProp="label"
               options={lookups.departmentsOf(unitId)}
               placeholder={unitId ? 'Whole unit if left blank' : 'Pick a unit first'}
             />
           </Form.Item>
-          <Form.Item name="sectionId" label="Section">
+          <Form.Item name="floorId" label="Floor">
             <Select
               allowClear
               disabled={!departmentId}
+              onChange={() => form.setFieldValue('lineId', undefined)}
               showSearch
               optionFilterProp="label"
-              options={lookups.sectionsOf(departmentId)}
+              options={lookups.floorsOf(departmentId)}
               placeholder={departmentId ? 'Whole department if left blank' : 'Pick a department first'}
             />
           </Form.Item>
           <Form.Item name="lineId" label="Line">
             <Select
               allowClear
-              disabled={!sectionId}
+              disabled={!floorId}
               showSearch
               optionFilterProp="label"
-              options={lookups.linesOf(sectionId)}
-              placeholder={sectionId ? 'Whole section if left blank' : 'Pick a section first'}
+              options={lookups.linesOf(floorId)}
+              placeholder={floorId ? 'Whole floor if left blank' : 'Pick a floor first'}
             />
           </Form.Item>
         </Form>

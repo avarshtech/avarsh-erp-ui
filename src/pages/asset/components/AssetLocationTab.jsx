@@ -4,27 +4,26 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import {
-  createLine, createSection, deleteLine, deleteSection, updateLine, updateSection,
-} from '../../../services/asset/assetService';
+import { createLine, deleteLine, updateLine } from '../../../services/asset/assetService';
 import AssetLocationDrawer from './AssetLocationDrawer';
 import AssetLineList from './AssetLineList';
 
 /**
- * Sections and the lines inside them - the only two location levels this
- * module owns. Unit and Department are HR's masters, shared on purpose.
+ * The lines inside each floor - the only location level this module owns.
+ *
+ * Unit, department and floor are all HR's masters, shared on purpose: an asset's
+ * floor is the same record HR files its people against, so "machines on B1's 1st
+ * floor" and "people on B1's 1st floor" cannot drift apart. The floors are listed
+ * here to hang the lines off, and are added and renamed under HR Masters.
  */
 const AssetLocationTab = ({ lookups }) => {
   const { message, modal } = App.useApp();
   const [drawer, setDrawer] = useState(null);
 
   const save = async (values) => {
-    const { kind, record } = drawer;
+    const { record } = drawer;
     try {
-      if (kind === 'section') {
-        if (record?.id) await updateSection(record.id, { ...values, version: record.version });
-        else await createSection(values);
-      } else if (record?.id) await updateLine(record.id, { ...values, version: record.version });
+      if (record?.id) await updateLine(record.id, { ...values, version: record.version });
       else await createLine(values);
       message.success(record?.id ? 'Saved' : 'Added');
       setDrawer(null);
@@ -35,17 +34,14 @@ const AssetLocationTab = ({ lookups }) => {
     }
   };
 
-  /** Sections and lines delete the same way; the server decides what is allowed. */
-  const remove = (kind, row) => modal.confirm({
+  const remove = (row) => modal.confirm({
     title: `Delete ${row.name}?`,
-    content: kind === 'section'
-      ? 'The section is removed. Its lines must be gone first.'
-      : 'The line is removed. This cannot be undone.',
+    content: 'The line is removed. This cannot be undone.',
     okText: 'Delete',
     okButtonProps: { danger: true },
     onOk: async () => {
       try {
-        await (kind === 'section' ? deleteSection(row.id) : deleteLine(row.id));
+        await deleteLine(row.id);
         message.success(`${row.name} deleted`);
         lookups.reload();
       } catch (e) {
@@ -58,8 +54,9 @@ const AssetLocationTab = ({ lookups }) => {
     // Only Department is left flexible. With every column unsized and
     // scroll.x 'max-content', Name absorbed all the slack and its header sat
     // centred half a screen from the name under it.
-    { title: 'Section', dataIndex: 'name', width: 260, render: (v) => <strong>{v}</strong> },
+    { title: 'Floor', dataIndex: 'name', width: 220, render: (v) => <strong>{v}</strong> },
     { title: 'Department', dataIndex: 'departmentName' },
+    { title: 'Unit', dataIndex: 'unitName', width: 160 },
     {
       title: 'Lines',
       key: 'lines',
@@ -81,31 +78,17 @@ const AssetLocationTab = ({ lookups }) => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 150,
+      width: 110,
       align: 'right',
       render: (_, row) => (
-        <PermissionGuard module="asset-setup" operation="update">
-          <Space size={0}>
-            <ActionButton
-              action="edit"
-              size="small"
-              aria-label={`Edit ${row.name}`}
-              onClick={() => setDrawer({ kind: 'section', record: row })}
-            />
-            <ActionButton
-              action="create"
-              size="small"
-              tooltip="Add line"
-              aria-label={`Add a line in ${row.name}`}
-              onClick={() => setDrawer({ kind: 'line', record: { sectionId: row.id } })}
-            />
-            <ActionButton
-              action="delete"
-              size="small"
-              aria-label={`Delete ${row.name}`}
-              onClick={() => remove('section', row)}
-            />
-          </Space>
+        <PermissionGuard module="asset-setup" operation="add">
+          <ActionButton
+            action="create"
+            size="small"
+            tooltip="Add line"
+            aria-label={`Add a line on ${row.name}`}
+            onClick={() => setDrawer({ record: { floorId: row.id } })}
+          />
         </PermissionGuard>
       ),
     },
@@ -116,44 +99,35 @@ const AssetLocationTab = ({ lookups }) => {
       <Alert
         type="info"
         showIcon
-        title="Units and departments come from HR"
-        description="An asset's department is the same record HR uses for its employees, so assets and people in Sewing can never disagree. Add them under HR Masters."
+        title="Units, departments and floors come from HR"
+        description="An asset's floor is the same record HR uses for its employees, so the machines and the people on B1's 1st floor can never disagree. Add and rename them under HR Masters; the lines on each floor are added here."
         style={{ marginBottom: 16 }}
       />
 
-      <PermissionGuard module="asset-setup" operation="add">
-        <ActionButton
-          action="create"
-          text="Add Section"
-          onClick={() => setDrawer({ kind: 'section', record: null })}
-          style={{ marginBottom: 16 }}
-        />
-      </PermissionGuard>
-
       <Table
         columns={columns}
-        dataSource={lookups.sections}
+        dataSource={lookups.floors}
         loading={lookups.loading}
         rowKey="id"
         size="middle"
         pagination={false}
         className="asset-setup-table"
-        scroll={{ x: 760 }}
+        scroll={{ x: 860 }}
         expandable={{
           rowExpandable: (row) => (row.lines?.length ?? 0) > 0,
           expandedRowRender: (row) => (
             <AssetLineList
-              section={row}
-              onEdit={(line) => setDrawer({ kind: 'line', record: line })}
-              onDelete={(line) => remove('line', line)}
+              floor={row}
+              onEdit={(line) => setDrawer({ record: line })}
+              onDelete={(line) => remove(line)}
             />
           ),
         }}
         locale={{
           emptyText: (
             <EmptyState
-              title="No sections yet"
-              description="Sections and lines are optional - an asset only needs a unit and a department."
+              title="No floors yet"
+              description="Floors are added under HR Masters, under the department they belong to. An asset only needs a unit and a department until then."
             />
           ),
         }}
@@ -161,8 +135,10 @@ const AssetLocationTab = ({ lookups }) => {
 
       <AssetLocationDrawer
         drawer={drawer}
-        departmentOptions={lookups.departmentsOf()}
-        sectionOptions={lookups.sections.map((s) => ({ value: s.id, label: s.name }))}
+        floorOptions={lookups.floors.map((f) => ({
+          value: f.id,
+          label: f.departmentName ? `${f.departmentName} / ${f.name}` : f.name,
+        }))}
         onClose={() => setDrawer(null)}
         onSave={save}
       />

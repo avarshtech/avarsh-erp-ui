@@ -7,13 +7,14 @@ import AssetCategoryTab from './components/AssetCategoryTab';
 import AssetLocationTab from './components/AssetLocationTab';
 
 /**
- * Asset Setup - the categories every asset is filed under and the section and
- * line levels of a location.
+ * Asset Setup - the categories every asset is filed under, and the lines on each
+ * floor.
  *
  * Its own permission key: a category's code becomes part of every asset ID
  * printed under it, so inventing categories is a different job from adding
- * assets. Unit and Department are not here - they are HR's masters, shared on
- * purpose so "assets in Sewing" and "people in Sewing" cannot drift apart.
+ * assets. Unit, Department and Floor are not here - they are HR's masters, shared
+ * on purpose so "assets on B1's 1st floor" and "people on B1's 1st floor" cannot
+ * drift apart.
  */
 const AssetSetup = () => {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ const AssetSetup = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Asset Setup"
-        subtitle="Categories and their extra fields, and the sections and lines an asset can sit in"
+        subtitle="Categories and their extra fields, and the lines an asset can stand on"
         onBack={() => navigate('/assets')}
       />
       <Card>
@@ -39,7 +40,7 @@ const AssetSetup = () => {
             },
             {
               key: 'locations',
-              label: 'Sections & lines',
+              label: 'Lines',
               children: <AssetLocationTab lookups={lookups} />,
             },
           ]}

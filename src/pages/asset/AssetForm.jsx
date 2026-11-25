@@ -40,7 +40,7 @@ const AssetForm = () => {
   const subCategoryId = Form.useWatch('subCategoryId', form);
   const unitId = Form.useWatch('unitId', form);
   const departmentId = Form.useWatch('departmentId', form);
-  const sectionId = Form.useWatch('sectionId', form);
+  const floorId = Form.useWatch('floorId', form);
   const amcAvailable = Form.useWatch('amcAvailable', form);
 
   // Named individually rather than through `lookups`, so these do not rebuild
@@ -98,16 +98,16 @@ const AssetForm = () => {
   }, [categoryId, form]);
   useEffect(() => {
     if (previous.current.departmentId !== undefined && previous.current.departmentId !== departmentId) {
-      form.setFieldsValue({ sectionId: undefined, lineId: undefined });
+      form.setFieldsValue({ floorId: undefined, lineId: undefined });
     }
     previous.current.departmentId = departmentId;
   }, [departmentId, form]);
   useEffect(() => {
-    if (previous.current.sectionId !== undefined && previous.current.sectionId !== sectionId) {
+    if (previous.current.floorId !== undefined && previous.current.floorId !== floorId) {
       form.setFieldValue('lineId', undefined);
     }
-    previous.current.sectionId = sectionId;
-  }, [sectionId, form]);
+    previous.current.floorId = floorId;
+  }, [floorId, form]);
 
   const submit = async (values) => {
     setSaving(true);
@@ -159,7 +159,7 @@ const AssetForm = () => {
               lookups={lookups}
               unitId={unitId}
               departmentId={departmentId}
-              sectionId={sectionId}
+              floorId={floorId}
               employeeOptions={employeeOptions}
               onEmployeeSearch={searchEmployees}
               locked={isEdit}

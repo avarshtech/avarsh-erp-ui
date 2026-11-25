@@ -11,6 +11,7 @@ import { conditionMeta, dash, statusMeta } from '../../utils/assetConstants';
 import AssetMovementHistory from './components/AssetMovementHistory';
 import AssetStatusHistory from './components/AssetStatusHistory';
 import AssetStatusDialog from './components/AssetStatusDialog';
+import AssetLineDialog from './components/AssetLineDialog';
 import AssetDocuments from './components/AssetDocuments';
 import AssetMaintenancePanel from './components/AssetMaintenancePanel';
 import AssetAssignmentPanel from './components/AssetAssignmentPanel';
@@ -35,6 +36,7 @@ const AssetView = () => {
   const [statusVersion, setStatusVersion] = useState(0);
   const [disposeOpen, setDisposeOpen] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
+  const [lineOpen, setLineOpen] = useState(false);
   const canUpdate = hasPermission('assets', 'update');
   const canDispose = hasPermission('asset-disposals', 'add');
   // Only once the asset is actually here. `asset?.status !== 'DISPOSED'` is TRUE
@@ -61,7 +63,7 @@ const AssetView = () => {
     return () => { ignore = true; };
   }, [id, message]);
 
-  const location = [asset?.unitName, asset?.departmentName, asset?.sectionName, asset?.lineName]
+  const location = [asset?.unitName, asset?.departmentName, asset?.floorName, asset?.lineName]
     .filter(Boolean).join(' / ');
   const supplier = asset?.supplierName ?? asset?.supplierText;
 
@@ -78,6 +80,12 @@ const AssetView = () => {
         {loaded && !disposed && (
           <PermissionGuard module="assets" operation="update">
             <ActionButton action="custom" text="Change Status" onClick={() => setStatusOpen(true)} />
+            {/* A line is the one part of the location that is not a transfer:
+                the machine stays on its floor. Offered only once it has a floor,
+                because a line belongs to one. */}
+            {asset?.floorId && (
+              <ActionButton action="custom" text="Change Line" onClick={() => setLineOpen(true)} />
+            )}
             <ActionButton action="edit" text="Edit" onClick={() => navigate(`/assets/${id}/edit`)} />
           </PermissionGuard>
         )}
@@ -236,6 +244,12 @@ const AssetView = () => {
               asset={asset}
               onClose={() => setStatusOpen(false)}
               onSaved={(saved) => { setAsset(saved); setStatusVersion((n) => n + 1); }}
+            />
+            <AssetLineDialog
+              open={lineOpen}
+              asset={asset}
+              onClose={() => setLineOpen(false)}
+              onSaved={setAsset}
             />
           </>
         )}

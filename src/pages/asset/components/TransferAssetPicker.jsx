@@ -66,7 +66,7 @@ const TransferAssetPicker = ({ value = [], onChange, lockedUnitId, lookups }) =>
       title: 'Standing at',
       key: 'where',
       width: 240,
-      render: (_, row) => [row.unitName, row.departmentName, row.sectionName, row.lineName]
+      render: (_, row) => [row.unitName, row.departmentName, row.floorName, row.lineName]
         .filter(Boolean).join(' / ') || '-',
     },
     {

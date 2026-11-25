@@ -45,7 +45,7 @@ const css = (stock) => `
 `;
 
 /** "U1 / Sewing / Overlock" - as much of the path as the stock has room for. */
-const placeOf = (asset, stock) => [asset.unitName, asset.departmentName, stock.compact ? null : asset.sectionName]
+const placeOf = (asset, stock) => [asset.unitName, asset.departmentName, stock.compact ? null : asset.floorName]
   .filter(Boolean).join(' / ');
 
 const labelHtml = (asset, stock, companyName) => {
