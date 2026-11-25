@@ -3,6 +3,7 @@ import { Button, Spin } from 'antd';
 import { PrinterOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSalarySlip } from '../../../services/hr/payrollService';
+import { companyForPrint } from '../../../utils/printCompany';
 import { formatAmount } from '../../../utils/formatters';
 import L from './salarySlipLabels';
 import './salarySlip.css';
@@ -25,19 +26,34 @@ const MONTH_SHORT = [
  * and read by people who use different ones.</p>
  */
 
-/** A figure, or a dash. The form uses "-" for a line that does not apply. */
+/**
+ * A figure, or a dash. The form uses "-" for a line that does not apply.
+ *
+ * Whole rupees: the server rounds every figure on the slip and sums the totals from
+ * the rounded parts, so the column adds up to the total printed under it. Showing two
+ * decimals here would print ".00" down the sheet and suggest a precision the document
+ * does not carry - the factory pays and files in rupees.
+ */
 const money = (v) => (v == null || Number(v) === 0
   ? '-'
-  : formatAmount(v, { minDecimals: 2, empty: '-' }));
+  : formatAmount(v, { minDecimals: 0, maxDecimals: 0, empty: '-' }));
 
 /** Days and hours read as 22.5, not 22.50. */
 const num = (v) => (v == null ? '-' : String(Number(v)));
 
-/** A label in both languages, stacked. */
+/**
+ * A label in all three languages, stacked.
+ *
+ * English on top because that is what the form's own headings are, then Tamil and
+ * Hindi beneath it. Tamil and Hindi share a line where they fit, so a third language
+ * costs the row height of one line rather than two - which is what keeps two slips
+ * on one A4.
+ */
 const Label = ({ k }) => (
   <>
     <span className="slip-en">{L[k].en}</span>
     <span className="slip-ta">{L[k].ta}</span>
+    <span className="slip-hi">{L[k].hi}</span>
   </>
 );
 
@@ -72,6 +88,7 @@ const SalarySlipView = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [slip, setSlip] = useState(null);
+  const [company, setCompany] = useState(null);
 
   const fetchSlip = useCallback(async () => {
     setLoading(true);
@@ -86,6 +103,22 @@ const SalarySlipView = () => {
 
   useEffect(() => { fetchSlip(); }, [fetchSlip]);
 
+  /**
+   * The name at the top of a payslip is the employer's, not the unit's. The slip
+   * printed the unit - "B1" - which is where the person works, and the Dept line
+   * already says that. Form 25B is issued by the company, and it is the company a
+   * worker takes the slip to a bank or an inspector with.
+   *
+   * Cached in memory after login, so this normally resolves before first paint;
+   * with no company profile configured it returns null and the header prints
+   * blank, exactly as the asset labels and export invoices already do.
+   */
+  useEffect(() => {
+    let alive = true;
+    companyForPrint().then((org) => { if (alive) setCompany(org); });
+    return () => { alive = false; };
+  }, []);
+
   if (loading) return <Spin style={{ display: 'block', margin: '100px auto' }} />;
   if (!slip) return null;
 
@@ -96,118 +129,173 @@ const SalarySlipView = () => {
     ? `XXXX${String(slip.accountNumber).slice(-4)}`
     : '-';
 
+  // Form 25B has no washing-allowance line, so it is paid under Others. Added
+  // rather than dropped: the column has to come to the total printed under it.
+  const sum = (a, b) => (a == null && b == null ? null : Number(a || 0) + Number(b || 0));
+  const otherFixed = sum(slip.fixedOther, slip.fixedWa);
+  const otherEarned = sum(slip.earnedOther, slip.earnedWa);
+
+  /**
+   * Print, and have the saved PDF named after the slip.
+   *
+   * "Save as PDF" takes its file name from document.title, which is the app's -
+   * so every payslip saved itself as "Avarsh ERP Dashboard" and a folder of them
+   * was indistinguishable. It used to come out right only because the slip was
+   * printed through a window of its own, and that window was dropped when it
+   * started printing blank; the name went with it.
+   *
+   * The title is put back afterwards. afterprint fires whether the dialog is used
+   * or cancelled, and the timeout covers the browsers that do not fire it at all -
+   * leaving the app titled after one employee's payslip would be worse than the
+   * problem being fixed.
+   */
+  const printSlip = () => {
+    const previous = document.title;
+    const safe = (value) => String(value ?? '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '');
+    const name = ['Payslip', safe(slip.employeeNo), safe(period)].filter(Boolean).join('_');
+
+    let restored = false;
+    const restore = () => {
+      if (restored) return;
+      restored = true;
+      document.title = previous;
+      window.removeEventListener('afterprint', restore);
+    };
+
+    document.title = name;
+    window.addEventListener('afterprint', restore);
+    window.print();
+    setTimeout(restore, 1000);
+  };
+
+  /**
+   * The slip, sized to half an A4.
+   *
+   * Not two copies - one slip whose box is half the sheet, so the other half is
+   * free for the next one. The form is issued at that size, and a printer loaded
+   * with A4 should get two slips out of a page rather than one and a blank half.
+   */
+  const sheet = () => (
+    <div className="slip-sheet">
+          <header className="slip-head">
+            <div className="slip-company">{company?.organisationName || ''}</div>
+            <div className="slip-title">
+              <Label k="payslip" /> <span className="slip-form-no">{L.formNo.en}</span>
+            </div>
+            <div className="slip-period">
+              <Label k="salaryMonth" /> <strong>{period}</strong>
+            </div>
+          </header>
+
+          {/* Three across, not two. The sheet is half an A4 printed wide, so the room
+              is horizontal - stacked in two columns these thirteen facts ran the page
+              over onto a second one. Who the person is, then their numbers, then the
+              days that made up the month. */}
+          <section className="slip-facts">
+            <Fact k="name">{slip.employeeName}</Fact>
+            <Fact k="idNo">{slip.employeeNo}</Fact>
+            <Fact k="earnDays">
+              {num(slip.payableDays)}
+              {slip.wageDaysBasis != null && (
+                <span className="slip-of"> / {num(slip.wageDaysBasis)}</span>
+              )}
+            </Fact>
+
+            <Fact k="fatherHusbandName">{slip.fatherHusbandName}</Fact>
+            <Fact k="pfNo">{slip.pfNumber}</Fact>
+            <Fact k="lopDays">{num(slip.lopDays)}</Fact>
+
+            <Fact k="dept">{slip.departmentName}</Fact>
+            <Fact k="esiNo">{slip.esiNumber}</Fact>
+            {/* Taken this month, not the balance left: it reads with LOP Days as an
+                account of where the month's missing days went. */}
+            <Fact k="leaveDetails">
+              EL {num(slip.elDays)} &middot; CL {num(slip.clDays)}
+            </Fact>
+
+            <Fact k="designation">{slip.designationName}</Fact>
+            <Fact k="joinDate">{slip.dateOfJoining}</Fact>
+            <Fact k="nhDays">{num(slip.nhDays)}</Fact>
+
+            {/* Back among the facts. Below the signatures it was the only thing on a
+                second page, with the whole of the first left blank under the totals. */}
+            <Fact k="bankAcNo">{account}</Fact>
+            <Fact k="otHours">{num(slip.otHours)}</Fact>
+            <div className="slip-fact slip-fact-blank" />
+          </section>
+
+          <table className="slip-grid">
+            <thead>
+              <tr>
+                <th><Label k="particulars" /></th>
+                <th><Label k="actuals" /></th>
+                <th><Label k="earnings" /></th>
+                <th><Label k="deductionDetails" /></th>
+                <th><Label k="amount" /></th>
+              </tr>
+            </thead>
+            <tbody>
+              <Line earn="basic" actual={slip.fixedBasic} earned={slip.earnedBasic}
+                deduct="esi" amount={slip.esiEmployee} />
+              <Line earn="da" actual={slip.fixedDa} earned={slip.earnedDa}
+                deduct="pf" amount={slip.pfEmployee} />
+              <Line earn="hra" actual={slip.fixedHra} earned={slip.earnedHra}
+                deduct="profTax" amount={slip.professionalTax} />
+              <Line earn="conveyance" actual={slip.fixedCa} earned={slip.earnedCa}
+                deduct="lwf" amount={slip.lwf} />
+              <Line earn="arrears" actual={slip.arrears} earned={slip.arrears}
+                deduct="advance" amount={slip.advanceRecovery} />
+              <Line earn="incentive" actual={slip.incentive} earned={slip.incentive}
+                deduct="loan" amount={slip.loanRecovery} />
+              {/* Washing allowance rides in Others, because the form has no line of its
+                  own for it and a component printed nowhere would leave the earnings
+                  column short of its own total. */}
+              <Line earn="otherAllowance" actual={otherFixed} earned={otherEarned}
+                deduct="otherDeductions" amount={slip.otherDeductions} />
+              {/* Carried by the form, not by this payroll. Left as lines rather than
+                  removed: Form 25B is a fixed layout and a short one is not that form. */}
+              <Line earn="attdBonus" actual={null} earned={null}
+                deduct="lateArrival" amount={null} />
+              <Line earn="ot" actual={null} earned={slip.otAmount} deduct={null} />
+            </tbody>
+            <tfoot>
+              <tr className="slip-total">
+                <td><Label k="totalAmount" /></td>
+                <td className="slip-figure">{money(slip.fixedGross)}</td>
+                <td className="slip-figure">{money(slip.totalEarnings)}</td>
+                <td><Label k="total" /></td>
+                <td className="slip-figure">{money(slip.totalDeductions)}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <section className="slip-summary">
+            <div><span><Label k="grossSalary" /></span><strong>{money(slip.fixedGross)}</strong></div>
+            <div><span><Label k="earnedSalary" /></span><strong>{money(slip.totalEarnings)}</strong></div>
+            <div><span><Label k="deductions" /></span><strong>{money(slip.totalDeductions)}</strong></div>
+            <div className="slip-net">
+              <span><Label k="netAmount" /></span><strong>{money(slip.netSalary)}</strong>
+            </div>
+          </section>
+
+          {/* No employer contributions and no cost to company. Form 25B is what the
+              employee is handed, and what the company spends on top of their wage is
+              not their business - it is the company's, and it is on its own screens. */}
+          <footer className="slip-signatures">
+            <div><Label k="employeeSignature" /></div>
+            <div><Label k="managerSignature" /></div>
+          </footer>
+        </div>
+  );
+
   return (
     <div className="salary-slip-print">
       <div style={{ marginBottom: 16, display: 'flex', gap: 8 }} className="no-print">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>Back</Button>
-        <Button type="primary" icon={<PrinterOutlined />} onClick={() => window.print()}>Print</Button>
+        <Button type="primary" icon={<PrinterOutlined />} onClick={printSlip}>Print</Button>
       </div>
 
-      <div className="slip-sheet">
-        <header className="slip-head">
-          <div className="slip-company">{slip.unitName}</div>
-          <div className="slip-title">
-            <Label k="payslip" /> <span className="slip-form-no">{L.formNo.en}</span>
-          </div>
-          <div className="slip-period">
-            <Label k="salaryMonth" /> <strong>{period}</strong>
-          </div>
-        </header>
-
-        <section className="slip-facts">
-          <Fact k="name">{slip.employeeName}</Fact>
-          <Fact k="pfNo">{slip.pfNumber}</Fact>
-          <Fact k="fatherHusbandName">{slip.fatherHusbandName}</Fact>
-          <Fact k="joinDate">{slip.dateOfJoining}</Fact>
-          <Fact k="dept">{slip.departmentName}</Fact>
-          <Fact k="esiNo">{slip.esiNumber}</Fact>
-          <Fact k="designation">{slip.designationName}</Fact>
-          <Fact k="lopDays">{num(slip.lopDays)}</Fact>
-          <Fact k="idNo">{slip.employeeNo}</Fact>
-          <Fact k="otHours">{num(slip.otHours)}</Fact>
-          {/* Out of the wage-days basis, which is the whole reason the days add up
-              to 26 and not to the length of the month. */}
-          <Fact k="earnDays">
-            {num(slip.payableDays)}
-            {slip.wageDaysBasis != null && (
-              <span className="slip-of"> / {num(slip.wageDaysBasis)}</span>
-            )}
-          </Fact>
-          <Fact k="bankAcNo">{account}</Fact>
-        </section>
-
-        <table className="slip-grid">
-          <thead>
-            <tr>
-              <th><Label k="particulars" /></th>
-              <th><Label k="actuals" /></th>
-              <th><Label k="earnings" /></th>
-              <th><Label k="deductionDetails" /></th>
-              <th><Label k="amount" /></th>
-            </tr>
-          </thead>
-          <tbody>
-            <Line earn="basic" actual={slip.fixedBasic} earned={slip.earnedBasic}
-              deduct="esi" amount={slip.esiEmployee} />
-            <Line earn="da" actual={slip.fixedDa} earned={slip.earnedDa}
-              deduct="pf" amount={slip.pfEmployee} />
-            <Line earn="hra" actual={slip.fixedHra} earned={slip.earnedHra}
-              deduct="profTax" amount={slip.professionalTax} />
-            <Line earn="conveyance" actual={slip.fixedCa} earned={slip.earnedCa}
-              deduct="lwf" amount={slip.lwf} />
-            <Line earn="washing" actual={slip.fixedWa} earned={slip.earnedWa}
-              deduct="advance" amount={slip.advanceRecovery} />
-            <Line earn="otherAllowance" actual={slip.fixedOther} earned={slip.earnedOther}
-              deduct="loan" amount={slip.loanRecovery} />
-            <Line earn="arrears" actual={slip.arrears} earned={slip.arrears}
-              deduct="tds" amount={slip.tds} />
-            <Line earn="incentive" actual={slip.incentive} earned={slip.incentive}
-              deduct="otherDeductions" amount={slip.otherDeductions} />
-            {/* Carried by the form, not by this payroll. Left as lines rather than
-                removed: Form 25B is a fixed layout and a short one is not that form. */}
-            <Line earn="attdBonus" actual={null} earned={null}
-              deduct="lateArrival" amount={null} />
-            <Line earn="ot" actual={null} earned={slip.otAmount} deduct={null} />
-          </tbody>
-          <tfoot>
-            <tr className="slip-total">
-              <td><Label k="totalAmount" /></td>
-              <td className="slip-figure">{money(slip.fixedGross)}</td>
-              <td className="slip-figure">{money(slip.totalEarnings)}</td>
-              <td><Label k="total" /></td>
-              <td className="slip-figure">{money(slip.totalDeductions)}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        <section className="slip-summary">
-          <div><span><Label k="grossSalary" /></span><strong>{money(slip.fixedGross)}</strong></div>
-          <div><span><Label k="earnedSalary" /></span><strong>{money(slip.totalEarnings)}</strong></div>
-          <div><span><Label k="deductions" /></span><strong>{money(slip.totalDeductions)}</strong></div>
-          <div className="slip-net">
-            <span><Label k="netAmount" /></span><strong>{money(slip.netSalary)}</strong>
-          </div>
-        </section>
-
-        {/* Not deducted from anybody's pay, so it sits apart from the grid. */}
-        <section className="slip-employer">
-          <div className="slip-employer-title"><Label k="employerContributions" /></div>
-          <div><span><Label k="pfEmployer" /></span><span>{money(slip.pfEmployer)}</span></div>
-          <div><span><Label k="esiEmployer" /></span><span>{money(slip.esiEmployer)}</span></div>
-          <div><span><Label k="costToCompany" /></span>
-            <span>{money(
-              Number(slip.totalEarnings || 0)
-              + Number(slip.pfEmployer || 0)
-              + Number(slip.esiEmployer || 0),
-            )}</span>
-          </div>
-        </section>
-
-        <footer className="slip-signatures">
-          <div><Label k="employeeSignature" /></div>
-          <div><Label k="managerSignature" /></div>
-        </footer>
-      </div>
+      {sheet()}
     </div>
   );
 };
