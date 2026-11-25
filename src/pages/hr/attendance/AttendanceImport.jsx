@@ -3,15 +3,18 @@ import {
   App, Card, Row, Col, Select, DatePicker, Button, Upload, Table, Tag,
   Statistic, Space, Alert, Radio, Typography, Steps,
 } from 'antd';
-import { UploadOutlined, DownloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import {
+  UploadOutlined, DownloadOutlined, CheckCircleOutlined, PaperClipOutlined, CloseOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   downloadAttendanceTemplate, parseAttendanceFile, commitAttendanceImport,
   triggerBrowserDownload,
 } from '../../../services/hr/attendanceService';
 import { getActiveUnits } from '../../../services/master/unitService';
+import { getActiveLeaveTypes } from '../../../services/master/hrMasterService';
+import { importReviewColumns, hoursBetween } from './importReviewColumns';
 import { useBranch } from '../../../context/BranchContext';
-import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
 import { unitOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
@@ -19,7 +22,6 @@ import PageHeader from '../../../components/PageHeader';
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-const statusMap = Object.fromEntries(ATTENDANCE_STATUS.map((s) => [s.value, s]));
 
 const AttendanceImport = () => {
   const { message } = App.useApp();
@@ -36,10 +38,35 @@ const AttendanceImport = () => {
   const [committing, setCommitting] = useState(false);
   const [result, setResult] = useState(null);
   const [duplicateStrategy, setDuplicateStrategy] = useState('SKIP');
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   useEffect(() => {
     getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+    // For the Leave Type cell on the review grid: a day the machine called absent is
+    // often leave, and that is the correction somebody makes most.
+    getActiveLeaveTypes().then(setLeaveTypes).catch(() => setLeaveTypes([]));
   }, [activeBranchId]);
+
+  /**
+   * A correction to one row, before anything is saved.
+   *
+   * The rows are what Import posts, so editing them here is the whole of it - no
+   * second round trip, and no re-upload of a corrected file. Hours follow the punches
+   * so the number being corrected towards moves as the time is typed; the server works
+   * them out again on commit, from the employee's shift, and that is what is stored.
+   */
+  const editRow = useCallback((index, patch) => {
+    setResult((current) => {
+      if (!current) return current;
+      const rows = [...current.rows];
+      const next = { ...rows[index], ...patch };
+      if ('inTime' in patch || 'outTime' in patch) {
+        next.totalHours = hoursBetween(next.inTime, next.outTime);
+      }
+      rows[index] = next;
+      return { ...current, rows };
+    });
+  }, []);
 
   const contextReady = Boolean(unitId && period?.[0] && period?.[1]);
 
@@ -92,26 +119,32 @@ const AttendanceImport = () => {
     }
   }, [result, duplicateStrategy, message]);
 
-  const rowColumns = useMemo(() => [
-    { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 110 },
-    { title: 'Name', dataIndex: 'employeeName', key: 'employeeName', width: 180, ellipsis: true },
-    {
-      title: 'Date', dataIndex: 'attendanceDate', key: 'attendanceDate', width: 120,
-      render: (v) => (v ? dayjs(v).format('DD-MMM-YYYY') : '-'),
-    },
-    {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 130,
-      render: (v) => {
-        const s = statusMap[v];
-        return s ? <Tag color={s.tag}>{s.label}</Tag> : v;
-      },
-    },
-    { title: 'Session', dataIndex: 'halfDaySession', key: 'halfDaySession', width: 120, render: (v) => v || '—' },
-    { title: 'Leave Type', dataIndex: 'leaveTypeName', key: 'leaveTypeName', width: 140, render: (v) => v || '—' },
-    { title: 'In', dataIndex: 'inTime', key: 'inTime', width: 80, render: (v) => v || '—' },
-    { title: 'Out', dataIndex: 'outTime', key: 'outTime', width: 80, render: (v) => v || '—' },
-    { title: 'OT', dataIndex: 'otHours', key: 'otHours', width: 70, align: 'right', render: (v) => v ?? 0 },
-  ], []);
+  /** Issues keyed by the row they belong to, so the grid can flag that row. */
+  const issuesBy = useMemo(() => {
+    const map = new Map();
+    (result?.issues ?? []).forEach((issue) => {
+      // rowNumber is 1-based and counts every row read, including the ones that
+      // never made it into rows; matching on employee and date is what actually
+      // lines an issue up with the row somebody has to correct.
+      const index = (result?.rows ?? []).findIndex(
+        (r) => r.employeeNo === issue.employeeNo && String(issue.message).includes(r.attendanceDate),
+      );
+      if (index < 0) return;
+      map.set(index, [...(map.get(index) ?? []), issue]);
+    });
+    return map;
+  }, [result]);
+
+  const rowColumns = useMemo(
+    () => importReviewColumns({
+      // Editable once there is something to edit, which is also when it matters.
+      editable: !committing,
+      onEdit: editRow,
+      leaveTypes,
+      issuesBy,
+    }),
+    [committing, editRow, leaveTypes, issuesBy],
+  );
 
   const issueColumns = useMemo(() => [
     { title: 'Row', dataIndex: 'rowNumber', key: 'rowNumber', width: 70 },
@@ -166,7 +199,13 @@ const AttendanceImport = () => {
             />
           </Col>
           <Col xs={24} sm={12} md={10}>
-            <Space wrap>
+            {/* align="start" with the list hidden below: Upload used to render its
+                own file row INSIDE itself, which made it two lines tall the moment
+                a file was picked - and Space then centred Download Template and
+                Validate against that taller neighbour, so the row of three buttons
+                came apart. The chosen file now has a line of its own underneath,
+                where its name can be as long as it likes. */}
+            <Space wrap align="start">
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleDownloadTemplate}
@@ -177,11 +216,13 @@ const AttendanceImport = () => {
               <Upload
                 accept=".xlsx,.xls,.csv"
                 maxCount={1}
+                showUploadList={false}
                 beforeUpload={(f) => { setFile(f); setResult(null); return false; }}
-                onRemove={() => { setFile(null); setResult(null); }}
                 fileList={file ? [file] : []}
               >
-                <Button icon={<UploadOutlined />} disabled={!contextReady}>Select File</Button>
+                <Button icon={<UploadOutlined />} disabled={!contextReady}>
+                  {file ? 'Change File' : 'Select File'}
+                </Button>
               </Upload>
               <Button
                 type="primary"
@@ -192,6 +233,23 @@ const AttendanceImport = () => {
                 Validate
               </Button>
             </Space>
+
+            {file && (
+              <div className="attendance-import-file">
+                <PaperClipOutlined className="attendance-import-file-icon" />
+                <span className="attendance-import-file-name" title={file.name}>{file.name}</span>
+                <Text type="secondary" className="attendance-import-file-size">
+                  {(file.size / 1024).toFixed(0)} KB
+                </Text>
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label="Remove the selected file"
+                  icon={<CloseOutlined />}
+                  onClick={() => { setFile(null); setResult(null); }}
+                />
+              </div>
+            )}
           </Col>
         </Row>
 
@@ -262,13 +320,16 @@ const AttendanceImport = () => {
               </Space>
             )}
           >
+            {/* Corrections happen here, not by editing the file and uploading it
+                again. Nothing is saved until Import, and the server checks the
+                edited rows on the way in. */}
             <Table
-              rowKey={(r) => `${r.employeeId}-${r.attendanceDate}-${result.rows.indexOf(r)}`}
+              rowKey={(r) => `${r.employeeId}-${r.attendanceDate}`}
               dataSource={result.rows}
               columns={rowColumns}
               size="small"
               pagination={{ pageSize: 25, showSizeChanger: true }}
-              scroll={{ x: 1100 }}
+              scroll={{ x: 1500 }}
             />
           </Card>
         </>
