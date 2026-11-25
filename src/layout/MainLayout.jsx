@@ -554,6 +554,7 @@ const MainLayoutInner = () => {
         { key: "/hr/attendance/import", label: "Import Attendance", moduleId: "hr-attendance" },
         { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
         { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/permissions", label: "Permissions", moduleId: "hr-attendance" },
         { key: "/hr/attendance/strength", label: "Strength Report", moduleId: "hr-attendance" },
 
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
@@ -563,10 +564,12 @@ const MainLayoutInner = () => {
         { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
+        { key: "/hr/payroll/register", label: "Salary Register", moduleId: "hr-payroll" },
 
         { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
         { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
         { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/lwf", label: "Labour Welfare Fund", moduleId: "hr-statutory" },
 
         { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
@@ -724,10 +727,14 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/attendance/import')) return ['/hr/attendance/import'];
     if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
     if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
+    if (path.startsWith('/hr/attendance/permissions')) return ['/hr/attendance/permissions'];
     if (path.startsWith('/hr/attendance/strength')) return ['/hr/attendance/strength'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves/balances')) return ['/hr/leaves/balances'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
+    // Before the catch-all below it, or the register highlights Payroll - the
+    // same trap the attendance screens above have their own lines for.
+    if (path.startsWith('/hr/payroll/register')) return ['/hr/payroll/register'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
     if (path.startsWith('/hr/advances')) return ['/hr/advances'];
     if (path.startsWith('/hr/loans')) return ['/hr/loans'];
