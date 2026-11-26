@@ -33,6 +33,7 @@ import PackAsPlan from './PackAsPlan';
 const { Text } = Typography;
 const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 const SECTION_KEYS = [SECTION_KEY.MAIN, SECTION_KEY.EXTRA];
+const NO_LISTS = [];
 
 const num = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
@@ -224,8 +225,18 @@ const CartonPackingForm = () => {
   const missingPo = orderPos.length > 1 && groups.some((g) => !g.buyerPoNo
     // The same PO to two destinations: the range must say which
     || (!g.destination && orderPos.filter((p) => p.buyerPoNo === g.buyerPoNo).length > 1));
-  // The packing lists in this browser holding this entry (Export Docs still keeps them here)
-  const onLists = useMemo(() => (record?.id ? packingListsOfEntries([record.id])[record.id] || [] : []), [record]);
+  // The packing lists holding this entry, asked of the API once it is saved; none shown when it cannot be asked
+  const recordId = record?.id;
+  const [listsOf, setListsOf] = useState({ id: null, lists: NO_LISTS });
+  useEffect(() => {
+    if (!recordId) return undefined;
+    let alive = true;
+    packingListsOfEntries([recordId])
+      .then((byEntry) => { if (alive) setListsOf({ id: recordId, lists: byEntry[recordId] || NO_LISTS }); })
+      .catch(() => { if (alive) setListsOf({ id: recordId, lists: NO_LISTS }); });
+    return () => { alive = false; };
+  }, [recordId]);
+  const onLists = listsOf.id === recordId ? listsOf.lists : NO_LISTS;
 
   const handleGroupsChange = useCallback((next) => {
     setGroups(next);

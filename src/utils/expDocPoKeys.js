@@ -4,7 +4,8 @@
  * lines are rebuilt on every order save. Shared by the shipment form and the packing
  * lists. Pure.
  */
-const SEP = '\u0000';
+// U+241F (SYMBOL FOR UNIT SEPARATOR): never typed in a PO number, and PostgreSQL jsonb takes it (it refuses NUL)
+const SEP = '␟';
 
 export const poText = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
 

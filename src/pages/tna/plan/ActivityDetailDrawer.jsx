@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react';
 import {
   Alert, App, Button, Col, Drawer, Row, Skeleton, Space, Tag, Timeline,
 } from 'antd';
-import { ExportOutlined, LockOutlined, FlagOutlined } from '@ant-design/icons';
+import {
+  ExportOutlined, LockOutlined, FlagOutlined, EditOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getActivityDetail } from '../../../services/tna/tnaService';
 import {
   CHANGE_TYPE, SOURCE_ROUTES, fmtDate, fmtDateTime, fmtText,
 } from '../../../utils/tnaConstants';
+import { hasPermission } from '../../../utils/permissions';
 import TnaStatusTag from '../components/TnaStatusTag';
 import ActivityFacts from './ActivityFacts';
+import RecordMilestoneModal from './RecordMilestoneModal';
 
 const auditLine = (r) => {
   const change = r.oldValue ? `${r.field} ${fmtDate(r.oldValue)} → ${fmtDate(r.newValue)}` : `${r.field} ${r.newValue && /^\d{4}-/.test(r.newValue) ? fmtDate(r.newValue) : r.newValue}`;
@@ -17,27 +21,32 @@ const auditLine = (r) => {
 };
 
 /**
- * WF-05 — read-only, fully source-linked; replaces "Record Actual". The only action that
- * writes anything is "Report data issue", and it writes a task, not a plan value (FR-6.4).
+ * WF-05 — fully source-linked; replaces "Record Actual". "Report data issue" writes a task, not a plan
+ * value (FR-6.4); the three manual milestones (no source record exists) are recorded with remarks.
  */
-const ActivityDetailDrawer = ({ planId, code, onClose, onReportIssue }) => {
+const ActivityDetailDrawer = ({
+  planId, code, orderDate, onClose, onReportIssue, onChanged,
+}) => {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [loaded, setLoaded] = useState({ code: null, detail: null });
+  const [recording, setRecording] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     if (!code) return undefined;
     let live = true;
     getActivityDetail(planId, code)
       .then((d) => { if (live) setLoaded({ code, detail: d }); })
-      .catch((e) => message.error(e.message || 'Could not load the activity'));
+      .catch(() => message.error('Could not load the activity'));
     return () => { live = false; };
-  }, [planId, code, message]);
+  }, [planId, code, message, reload]);
   const detail = loaded.code === code ? loaded.detail : null;
 
   const a = detail?.activity;
   const record = a && (a.evidence?.sourceRecord || a.sourceRecord);
   const module = a && (a.evidence?.sourceModule || a.sourceModule);
+  const canRecord = a?.isManual && hasPermission('tna', 'update');
 
   return (
     <Drawer
@@ -49,7 +58,7 @@ const ActivityDetailDrawer = ({ planId, code, onClose, onReportIssue }) => {
         <Space>
           <span>{a.code} · {a.name}</span>
           <TnaStatusTag status={a.status} />
-          <Tag icon={<LockOutlined />}>read-only</Tag>
+          {a.isManual ? <Tag color="purple">manual milestone</Tag> : <Tag icon={<LockOutlined />}>read-only</Tag>}
         </Space>
       ) : 'Activity'}
     >
@@ -61,11 +70,18 @@ const ActivityDetailDrawer = ({ planId, code, onClose, onReportIssue }) => {
               type="info"
               showIcon
               style={{ marginBottom: 14 }}
-              title="No editable field appears on this panel"
-              description={`Every value is computed or carried from a source record. To correct anything shown here, correct the underlying transaction in ${module}.`}
+              title={a.isManual ? 'Recorded on the plan — the ERP holds no source record for it' : 'No editable field appears on this panel'}
+              description={a.isManual
+                ? 'Record the date it happened with the minutes or reference that show it. Corrections keep the earlier entry in the audit.'
+                : `Every value is computed or carried from a source record. To correct anything shown here, correct the underlying transaction in ${module}.`}
             />
             <Space orientation="vertical" style={{ width: '100%', marginBottom: 16 }}>
-              {SOURCE_ROUTES[module] && (
+              {canRecord && (
+                <Button block type="primary" icon={<EditOutlined />} onClick={() => setRecording(true)}>
+                  {a.actualDate ? 'Correct the recorded completion' : 'Record completion'}
+                </Button>
+              )}
+              {!a.isManual && SOURCE_ROUTES[module] && (
                 <Button block icon={<ExportOutlined />} onClick={() => navigate(SOURCE_ROUTES[module])}>
                   {record ? `Open ${record} in ${module}` : `Open ${module}`}
                 </Button>
@@ -83,6 +99,13 @@ const ActivityDetailDrawer = ({ planId, code, onClose, onReportIssue }) => {
           </Col>
         </Row>
       )}
+      <RecordMilestoneModal
+        planId={planId}
+        activity={recording ? a : null}
+        orderDate={orderDate}
+        onClose={() => setRecording(false)}
+        onSaved={() => { setRecording(false); setReload((n) => n + 1); onChanged?.(); }}
+      />
     </Drawer>
   );
 };

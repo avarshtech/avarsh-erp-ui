@@ -80,8 +80,9 @@ export const PACKING_ENTRY_TRANSITIONS = {
 export const isPackingEntryEditable = (status) => status === PACKING_ENTRY_STATUS.OPEN;
 
 // ─── Packing list lifecycle (PRD §16) ───────────────────────────────────────────
-// Revise does NOT transition in place: it creates a new DRAFT row and moves the old
-// one to SUPERSEDED, so buyers keep referencing one plNo across revisions (PRD §17).
+// The server's (PlStatus). Revise does NOT transition in place: it creates a new DRAFT
+// row and moves the old one to SUPERSEDED, so buyers keep referencing one plNo across
+// revisions (PRD §17).
 // There is no approval step: the person who builds the document finalises it.
 // FINAL is the freeze — it snapshots data and template version, which is what
 // stickers, invoices and reports bind to (BR-08). It is a state, not a verdict.

@@ -163,7 +163,7 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
-      // Time & Action screens — read-only, derived plans (mock data until the API lands).
+      // Time & Action screens — plans derived from live source records (/api/v1/tna).
       name: 'tna',
       testDir: './e2e/specs/tna',
       timeout: 120000,

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, App, Tag, Select } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Select, Switch, Alert } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
-import { createItemType, updateItemType, deleteItemType } from '../../services/master/masterDataService';
+import {
+  createItemType, updateItemType, deleteItemType, getItemTypeUsage, setItemTypeActive,
+} from '../../services/master/masterDataService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 
@@ -20,6 +22,10 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
+  // Where the selected type is used (GET /item-types/{id}/usage). A used type is locked: only Active
+  // can change and it cannot be deleted. Locked until the answer arrives, and if it never does.
+  const [usage, setUsage] = useState(null);
+  const locked = !!selectedId && !(usage && !usage.inUse);
 
   // Check permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -44,6 +50,13 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       dataIndex: 'subCategoryId', 
       render: (id) => id ? <Tag color="blue">{getSubCategoryName(id)}</Tag> : '-'
     },
+    {
+      title: 'Status',
+      dataIndex: 'isActive',
+      render: (isActive) => (
+        <Tag color={isActive !== false ? 'success' : 'default'}>{isActive !== false ? 'Active' : 'Inactive'}</Tag>
+      ),
+    },
   ];
 
   const handleAdd = () => {
@@ -53,9 +66,10 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
     }
     skipDirty.current = true;
     setSelectedId(null);
+    setUsage(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ attributeIds: [], uomIds: [] });
+    form.setFieldsValue({ attributeIds: [], uomIds: [], isActive: true });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
@@ -67,9 +81,14 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
     }
     skipDirty.current = true;
     setSelectedId(record.id);
+    setUsage(null);
+    getItemTypeUsage(record.id)
+      .then((res) => setUsage(res?.data ?? res))
+      .catch(() => setUsage({ inUse: true, usages: [], failed: true }));
     setIsEditing(true);
     form.setFieldsValue({
       ...record,
+      isActive: record.isActive !== false,
       attributeIds: record.attributeIds || record.attributes?.map(a => a.id) || [],
       uomIds: record.uomIds || record.uoms?.map(u => u.id) || [],
     });
@@ -131,6 +150,32 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to delete item types');
       return;
     }
+    if (usage?.inUse) {
+      const record = itemTypes.find((it) => it.id === selectedId);
+      const where = usage.failed ? 'Could not check where it is used.' : `It is used in ${usage.usages.join(', ')}.`;
+      if (record?.isActive === false) {
+        modal.info({ title: 'Item type cannot be deleted', content: `${where} It is already inactive.` });
+        return;
+      }
+      modal.confirm({
+        title: 'Item type cannot be deleted',
+        icon: <ExclamationCircleOutlined />,
+        content: `${where} Inactivate it instead? An inactive type is not offered for new items.`,
+        okText: 'Inactivate',
+        cancelText: 'Cancel',
+        onOk: async () => {
+          try {
+            const response = await setItemTypeActive(selectedId, false);
+            updateItem('itemTypes', selectedId, response?.data || { ...record, isActive: false });
+            message.success('Item type inactivated');
+            handleCancel();
+          } catch {
+            // The interceptor has shown the error.
+          }
+        },
+      });
+      return;
+    }
 
     modal.confirm({
       title: 'Delete Item Type',
@@ -156,6 +201,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
   const handleCancel = () => {
     setIsEditing(false);
     setSelectedId(null);
+    setUsage(null);
     form.resetFields();
     markDirty(false);
   };
@@ -197,7 +243,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
               </h2>
               <Space>
                 {selectedId && canDelete && (
-                  <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
+                  <Button danger onClick={handleDelete} icon={<DeleteOutlined />} disabled={!usage}>
                     Delete
                   </Button>
                 )}
@@ -222,11 +268,20 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
 
             {/* Scrollable form content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+              {selectedId && usage?.inUse && (
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  title={usage.failed ? 'Could not check where this item type is used, so it is locked' : `This item type is used in ${usage.usages.join(', ')}`}
+                  description="Only Active can be changed, and it cannot be deleted. Switch Active off to inactivate it: it will no longer be offered for new items."
+                />
+              )}
               <Form
                 form={form}
                 layout="vertical"
                 onFinish={handleSave}
-                disabled={isReadOnly}
+                disabled={isReadOnly || locked}
                 onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
               >
                 <Form.Item
@@ -281,6 +336,10 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                     optionFilterProp="label"
                     options={attributes.map(a => ({ value: a.id, label: a.attributeName || a.name }))}
                   />
+                </Form.Item>
+                <Form.Item name="isActive" label="Active" valuePropName="checked">
+                  {/* Stays usable on a used (locked) type: Active is the one thing it may change. */}
+                  <Switch disabled={!!isReadOnly} />
                 </Form.Item>
                 <Form.Item
                   name="uomIds"

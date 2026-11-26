@@ -121,6 +121,17 @@ const OpeningStockBatchForm = ({ batchType }) => {
     });
   }, [rows, batchType]);
 
+  // The header's required fields (reference date) are checked before the rows
+  const validateHeader = async () => {
+    try {
+      await form.validateFields();
+      return true;
+    } catch (e) {
+      message.warning(e?.errorFields?.[0]?.errors?.[0] || 'Fill in the required fields before saving.');
+      return false;
+    }
+  };
+
   // ─── Save draft / Post / Cancel ────────────────────────────────────────
   const buildPayload = () => {
     const values = form.getFieldsValue();
@@ -136,6 +147,7 @@ const OpeningStockBatchForm = ({ batchType }) => {
   };
 
   const handleSaveDraft = async () => {
+    if (!(await validateHeader())) return;
     try { validateRows(); } catch (e) { return message.warning(e.message); }
     setSaving(true);
     try {
@@ -157,6 +169,7 @@ const OpeningStockBatchForm = ({ batchType }) => {
   };
 
   const handlePost = async () => {
+    if (!(await validateHeader())) return;
     try { validateRows(); } catch (e) { return message.warning(e.message); }
     modal.confirm({
       title: 'Post Opening Stock Batch?',

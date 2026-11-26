@@ -86,7 +86,12 @@ const ModuleReportCard = memo(function ModuleReportCard({
         {report.moduleName && (
           <Tag color={color}>{getModuleLabel(report.moduleName)}</Tag>
         )}
-        {showOwner && (
+        {report.isSystem && (
+          <Tooltip title="Shipped with the ERP for every role that can read its data. It cannot be changed or deleted.">
+            <Tag color="blue">Standard</Tag>
+          </Tooltip>
+        )}
+        {showOwner && !report.isSystem && (
           <Tag icon={<TeamOutlined />} color={report.ownerRoleName ? 'default' : 'warning'}>
             {report.ownerRoleName || 'No role'}
           </Tag>
@@ -107,14 +112,14 @@ const ModuleReportCard = memo(function ModuleReportCard({
         <Button type="primary" style={{ flex: 1 }} onClick={() => onOpen(report.id)}>
           Open Report
         </Button>
-        {onEdit && (
+        {onEdit && !report.isSystem && (
           <PermissionGuard module="reports" operation="update">
             <Tooltip title="Edit report">
               <Button icon={<EditOutlined />} onClick={() => onEdit(report)} />
             </Tooltip>
           </PermissionGuard>
         )}
-        {onDelete && (
+        {onDelete && !report.isSystem && (
           <PermissionGuard module="reports" operation="delete">
             <DeleteConfirm
               title="Delete Report"

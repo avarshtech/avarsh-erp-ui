@@ -182,7 +182,7 @@ const ExportDocReports = () => {
         {report.filters.includes('search') && (
           <SearchFilterBar
             searchText={searchText}
-            onSearchChange={setSearchText}
+            onSearchChange={(e) => setSearchText(e.target.value)}
             searchPlaceholder="Search"
             filters={filters}
             style={{ marginBottom: 16 }}

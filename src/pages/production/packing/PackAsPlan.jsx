@@ -22,7 +22,7 @@ const ofPlanPo = (g, key) => key == null || poKey(g) === key
 
 /**
  * "Pack as per packing list" (owner, 2026-10-09): when the buyer's plan came first, the
- * packing lists (in this browser) that plan cartons for this order offer them here. Ticking
+ * packing lists that plan cartons for this order offer them here. Ticking
  * today's ranges fills the grid with the planned contents, PO and the buyer's carton
  * numbers; the packer enters the real weights and saves as usual.
  */

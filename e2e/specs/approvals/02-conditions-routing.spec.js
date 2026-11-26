@@ -31,7 +31,7 @@ let roleId = {};
 async function createDraftPo(api, { unitPrice }) {
   // qty is fixed at 10, so unitPrice is the lever for grandTotal: 90,000 × 10 clears
   // the 1M threshold with tax on top; 10 × 10 stays far below it.
-  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { unitPrice });
+  const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { unitPrice, orderReferences: refs.orderReferences });
   const res = await api.post('/purchase-orders', po);
   expect(res.status).toBeLessThan(300);
   return res.data;

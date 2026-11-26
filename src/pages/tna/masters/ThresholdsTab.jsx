@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import { getSettings, saveSettings } from '../../../services/tna/tnaService';
 import { hasPermission } from '../../../utils/permissions';
-import { RULE_VERSION } from '../../../services/tna/tnaEngine';
+import { RULE_VERSION } from '../../../utils/tnaConstants';
 
 /** D-04, D-08, D-09 — thresholds held as configuration; the rule version is recorded on every plan (FR-12.1). */
 const ThresholdsTab = () => {
@@ -13,15 +13,15 @@ const ThresholdsTab = () => {
   const [saving, setSaving] = useState(false);
   const canEdit = hasPermission('tna-masters', 'update');
 
-  useEffect(() => { getSettings().then((s) => form.setFieldsValue(s)).catch((e) => message.error(e.message)); }, [form, message]);
+  useEffect(() => { getSettings().then((s) => form.setFieldsValue(s)).catch(() => message.error('Failed to load the thresholds')); }, [form, message]);
 
   const submit = async () => {
     const values = await form.validateFields();
     setSaving(true);
     try {
       await saveSettings(values);
-      message.success('Thresholds saved — they apply to plans generated from now on');
-    } catch (e) { message.error(e.message); } finally { setSaving(false); }
+      message.success('Thresholds saved — plans pick them up from their next sync');
+    } catch (e) { message.error(e?.response?.data?.message || 'Failed to save the thresholds'); } finally { setSaving(false); }
   };
 
   return (

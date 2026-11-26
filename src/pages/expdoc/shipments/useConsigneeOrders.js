@@ -18,7 +18,7 @@ const optionOf = ({ orderId, orderNo, styleNo, status, pos, fromPicker = false }
  * Every order seen stays in the list, and `savedOrders` are merged in, so a selection
  * never turns into a bare id when a later search does not return it.
  */
-const useConsigneeOrders = (buyerId, savedOrders) => {
+const useConsigneeOrders = (buyerId, savedOrders, shipmentId = null) => {
   // Typed text is kept WITH its consignee: antd clears the box on select and on blur
   // without calling onSearch, so text typed for one must not become the next one's search.
   const [typed, setTyped] = useState({ buyerId: null, text: '' });
@@ -37,7 +37,7 @@ const useConsigneeOrders = (buyerId, savedOrders) => {
   useEffect(() => {
     if (buyerId == null) return undefined;
     let cancelled = false;
-    listConsigneeOrders(buyerId, search)
+    listConsigneeOrders(buyerId, search, shipmentId)
       .then((rows) => {
         if (cancelled) return;
         setSeen((prev) => {
@@ -50,7 +50,7 @@ const useConsigneeOrders = (buyerId, savedOrders) => {
       // The interceptor has already toasted; the dropdown says so in place.
       .catch(() => { if (!cancelled) setAnswered({ requestKey, failed: true }); });
     return () => { cancelled = true; };
-  }, [buyerId, search, requestKey]);
+  }, [buyerId, search, requestKey, shipmentId]);
 
   const options = useMemo(() => {
     const out = (seen.buyerId === buyerId ? seen.rows : []).map((o) => optionOf({ ...o, fromPicker: true }));

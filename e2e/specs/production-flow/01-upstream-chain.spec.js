@@ -10,10 +10,12 @@ import { buildUpstreamChain } from '../../helpers/production-flow-seed.js';
 import { waitForTableSettled } from '../../helpers/ui-master.js';
 
 const STAMP = Date.now().toString().slice(-6);
+// E2E_FLOW_BUYER_ID runs the chain for another buyer (the T&A spec plans one order per buyer template).
+const BUYER_ID = process.env.E2E_FLOW_BUYER_ID ? Number(process.env.E2E_FLOW_BUYER_ID) : undefined;
 
 test.describe('Production flow — upstream chain', () => {
   test('costing → order → BOM → supplier PO → GRN → QC puts the fabric in stock for the order', async ({ api, authedPage, consoleGuard }) => {
-    const chain = await buildUpstreamChain(api, { stamp: STAMP });
+    const chain = await buildUpstreamChain(api, { stamp: STAMP, buyerId: BUYER_ID });
     expect(chain.order.status).toBe('CONFIRMED');
     expect(chain.bom.status).toBe('CREATED');
     expect(chain.po.status).toBe('Sent_To_Supplier');

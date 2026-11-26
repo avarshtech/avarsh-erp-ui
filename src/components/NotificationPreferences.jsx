@@ -9,6 +9,7 @@ import {
   ToolOutlined,
   InboxOutlined,
   NotificationOutlined,
+  ContainerOutlined,
 } from '@ant-design/icons';
 import { hasPermission } from '../utils/permissions';
 import { getPreferences, updatePreferences } from '../services/core/notificationService';
@@ -66,6 +67,14 @@ const NOTIFICATION_TYPES = [
     module: 'grn',
   },
   {
+    key: 'exportDocs',
+    label: 'Export Documentation',
+    description: 'Packing lists, export invoices and shipment reminders',
+    icon: <ContainerOutlined />,
+    color: '#0369a1',
+    module: ['export-shipments', 'export-packing-list', 'export-invoice'], // Any one of them
+  },
+  {
     key: 'generalAlerts',
     label: 'General Alerts',
     description: 'System announcements and reminders',
@@ -102,6 +111,7 @@ const NotificationPreferences = () => {
         costingUpdates: true,
         bomUpdates: true,
         grnUpdates: true,
+        exportDocs: true,
         generalAlerts: true,
       });
     } finally {
@@ -149,7 +159,8 @@ const NotificationPreferences = () => {
   // Filter notification types based on user's role permissions
   const visibleTypes = NOTIFICATION_TYPES.filter((type) => {
     if (!type.module) return true; // Always show general alerts and approval requests
-    return hasPermission(type.module, 'view');
+    // A category spanning several screens shows to anyone who can view one of them
+    return [].concat(type.module).some((moduleId) => hasPermission(moduleId, 'view'));
   });
 
   if (loading) {

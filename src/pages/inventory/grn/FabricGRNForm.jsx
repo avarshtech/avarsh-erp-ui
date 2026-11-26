@@ -301,7 +301,7 @@ const FabricGRNForm = () => {
     }
     const payload = buildPayload();
     // Cross-GRN duplicate-roll-number check + balance check now run server-side.
-    const errors = validateFabricGRN(payload, false, { po: selectedPO, currentGrnId: grnRecord?.id });
+    const errors = validateFabricGRN(payload, false, { po: selectedPO, currentGrnId: grnRecord?.id, isMultiBranch });
     if (errors.length) { errors.slice(0, 3).forEach((e) => message.error(e)); return; }
     setSavingDraft(true);
     try {
@@ -319,7 +319,7 @@ const FabricGRNForm = () => {
   const handleSubmit = async () => {
     if (savingDraft || submittingForm) return;
     const payload = buildPayload();
-    const errors = validateFabricGRN(payload, true, { po: selectedPO, currentGrnId: grnRecord?.id });
+    const errors = validateFabricGRN(payload, true, { po: selectedPO, currentGrnId: grnRecord?.id, isMultiBranch });
     if (errors.length) { errors.slice(0, 5).forEach((e) => message.error(e)); return; }
     setSubmittingForm(true);
     try {

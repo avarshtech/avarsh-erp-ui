@@ -24,7 +24,7 @@ const CprOrderFacts = memo(function CprOrderFacts({ order, doc }) {
       tiles: [
         { label: 'Order Qty', value: qty(order.totalQty) },
         { label: 'Allowance', value: `${allowance.toFixed(2)}%` },
-        { label: 'Qty incl. Allowance', value: qty(calcRequiredQty(order.totalQty, 1, allowance)), accent: true },
+        { label: 'Qty incl. Allowance', value: qty(calcRequiredQty(order.totalQty, allowance)), accent: true },
         { label: 'Order Date', value: date(order.orderDate) },
         { label: 'Delivery Date', value: date(order.deliveryDate) },
       ],

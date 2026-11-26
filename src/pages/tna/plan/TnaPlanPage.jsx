@@ -3,15 +3,17 @@ import {
   Alert, App, Button, Card, Segmented, Select, Skeleton, Space,
 } from 'antd';
 import {
-  TableOutlined, BarChartOutlined, AppstoreOutlined, HistoryOutlined, FlagOutlined,
+  TableOutlined, BarChartOutlined, AppstoreOutlined, HistoryOutlined, FlagOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import EmptyState from '../../../components/EmptyState';
-import { getPlan, getSettings } from '../../../services/tna/tnaService';
+import { getPlan, getSettings, syncPlan } from '../../../services/tna/tnaService';
 import { hasPermission } from '../../../utils/permissions';
-import { ACTIVITY_STATUS, DELAY_BASIS, fmtDate } from '../../../utils/tnaConstants';
-import MockDataNote from '../components/MockDataNote';
+import {
+  ACTIVITY_STATUS, DELAY_BASIS, fmtDate, fmtDateTime,
+} from '../../../utils/tnaConstants';
+import AsOfNote from '../components/AsOfNote';
 import TnaGantt from '../components/TnaGantt';
 import AcknowledgeInfeasibleModal from '../components/AcknowledgeInfeasibleModal';
 import PlanHeaderStrip from './PlanHeaderStrip';
@@ -40,16 +42,29 @@ const TnaPlanPage = () => {
   const [filters, setFilters] = useState({ module: null, status: null, floatBasis: 'latest' });
   const [issueFor, setIssueFor] = useState(null);
   const [ackOpen, setAckOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const view = params.get('view') || 'grid';
   const activityCode = params.get('activity');
 
   const load = useCallback(() => {
     Promise.all([getPlan(planId), getSettings()])
       .then(([p, s]) => { setPlan(p); setSettings(s); })
-      .catch((e) => message.error(e.message || 'Failed to load the plan'))
+      .catch(() => message.error('Failed to load the plan'))
       .finally(() => setLoading(false));
   }, [planId, message]);
   useEffect(load, [load]);
+
+  const resync = async () => {
+    setSyncing(true);
+    try {
+      setPlan(await syncPlan(planId));
+      message.success('Re-read from the source records');
+    } catch {
+      message.error('The re-sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const setParam = useCallback((key, value) => setParams((p) => {
     const next = new URLSearchParams(p);
@@ -70,11 +85,14 @@ const TnaPlanPage = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title={`T&A plan — ${h.orderNo}`}
-        subtitle={`${h.buyer} · ${h.styleNo} · ${h.garmentType} · order ${fmtDate(h.orderDate)} · ${h.qty.toLocaleString('en-IN')} pcs`}
+        subtitle={`${h.buyer || '—'} · ${h.styleNo || '—'} · ${h.garmentType || h.productType || '—'} · order ${fmtDate(h.orderDate)} · ${(h.qty || 0).toLocaleString('en-IN')} pcs${h.template?.name ? ` · template ${h.template.name} v${h.template.version}` : ''}`}
         backPath="/tna/control-tower"
         extra={(
           <Space wrap>
-            <MockDataNote asOf={h.asOf} />
+            <AsOfNote asOf={h.asOf} />
+            {hasPermission('tna', 'update') && (
+              <Button icon={<SyncOutlined />} loading={syncing} onClick={resync} title={h.lastSyncedAt ? `Last synced ${fmtDateTime(h.lastSyncedAt)}` : undefined}>Re-sync</Button>
+            )}
             <Button icon={<HistoryOutlined />} onClick={() => navigate(`/tna/revisions?plan=${h.id}`)}>Revisions & audit</Button>
             {plan.activities.length > 0 && <Button icon={<FlagOutlined />} onClick={() => setIssueFor('')}>Report data issue</Button>}
           </Space>
@@ -101,12 +119,12 @@ const TnaPlanPage = () => {
             <Alert
               type="info"
               style={{ marginTop: 12 }}
-              title={`All ${plan.activities.length} activities were derived from this order's Order Entry, BOM, Sample Request, Cut Panel and Garment Process records — their steps, sequence, colourways and quantities as recorded. Nothing on this screen is typed.`}
+              title={`All ${plan.activities.length} activities were derived from this order's template and its Order Entry, BOM, Sample Request, Cut Panel and Garment Process records; every date comes from the source transaction. Only PP meeting, pattern release and First Bulk Piece are recorded here, with remarks.`}
             />
           </Card>
         </>
       )}
-      <ActivityDetailDrawer planId={h.id} code={activityCode} onClose={() => setParam('activity', null)} onReportIssue={(code) => setIssueFor(code)} />
+      <ActivityDetailDrawer planId={h.id} code={activityCode} orderDate={h.orderDate} onClose={() => setParam('activity', null)} onReportIssue={(code) => setIssueFor(code)} onChanged={load} />
       <ReportIssueModal open={issueFor !== null} planId={h.id} activities={plan.activities} activityCode={issueFor || undefined} onClose={() => setIssueFor(null)} />
       <AcknowledgeInfeasibleModal open={ackOpen} planId={h.id} orderNo={h.orderNo} onClose={() => setAckOpen(false)} onDone={() => { setAckOpen(false); load(); }} />
     </div>

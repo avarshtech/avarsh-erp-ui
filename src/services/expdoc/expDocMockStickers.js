@@ -7,19 +7,18 @@
  *
  * Print history is stored as RANGES, never one row per carton. A shipment's carton
  * count follows the buyer's order quantity, so a per-carton map would grow without
- * bound and would be the first thing to blow the browser's storage budget. Per-carton
+ * bound and would be the first thing to bloat every document load. Per-carton
  * history ("who printed carton 57, when, how many times") is derived on read by
  * intersecting ranges — PRD §20 asks for the answer, not for that storage shape.
  *
  * The template a run prints with lives in the API. expDocService resolves it and hands
  * its layout in (`options.layout`, the choices as `options.layoutOptions`), so this
- * mock never calls the API; a run records the revision it printed with, not a copy.
+ * module never calls the API; a run records the revision it printed with, not a copy.
  */
-import { loadDb, saveDb, nextStickerRunNo } from './expDocMockStore';
+import { loadDb, saveDb, nextStickerRunNo, newDocId } from './expDocStore';
 import {
   delay, clone, fail, pageOf, pushAudit, nowStamp, currentUserName,
 } from './expDocMockCommon';
-import { decoratePl } from './expDocMockPackingLists';
 import { PL_STATUS, PHASE, STICKER_LINE_KIND } from '../../utils/expDocConstants';
 import {
   expandCartonRange, expandCartonNos, toRanges, countCartons, mergeRanges,
@@ -30,6 +29,9 @@ import { stickerAskQuestions } from '../../utils/expDocTemplateSchema';
 import { NUMBERING, rowsByGroup, groupCartonCount } from '../../utils/expDocPlNumbering';
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
+
+/** A packing list that holds its cartons: any but cancelled and superseded. */
+const isLive = (pl) => ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(pl.status);
 
 /**
  * Under "restart for each buyer PO / style" (owner, 2026-10-09) carton numbers repeat
@@ -65,8 +67,7 @@ const sameGroup = (pl, scope) => (run) => (run.scope?.group ?? null) === groupOf
 const shipmentCartonTotal = (db, pl, scope) => {
   if (restarts(pl)) return groupCartonCount(allRows(pl), groupOf(pl, scope));
   const ranges = (db.packingLists || [])
-    .filter((p) => p.shipmentId === pl.shipmentId
-      && [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(p.status))
+    .filter((p) => p.shipmentId === pl.shipmentId && isLive(p))
     .flatMap((p) => toRanges(allRows(p)));
   return countCartons(ranges) || countCartons(toRanges(allRows(pl)));
 };
@@ -217,12 +218,12 @@ const withSeason = (cartons, styles) =>
  * the screen prints (`options.exporter`), so a mandatory `exporter.*` field and the V-14
  * hash read what the labels carry; the mock's profile only stands in without one.
  */
-const printScope = (db, raw, pl, exporter) => {
-  const styles = styleByEntryOf(db, raw);
+const printScope = (db, pl, exporter) => {
+  const styles = styleByEntryOf(db, pl);
   const base = {
     pl,
-    shipment: (db.shipments || []).find((s) => s.id === raw.shipmentId) || {},
-    buyer: { name: raw.buyerName },
+    shipment: (db.shipments || []).find((s) => s.id === pl.shipmentId) || {},
+    buyer: { name: pl.buyerName },
     exporter: exporter || db.masters?.exporterProfileExtra || {},
   };
   return { styles, contextOf: (carton) => ({ ...base, carton, style: styles[carton.sourceEntryId] || {} }) };
@@ -244,7 +245,8 @@ export const getStickerContext = async (plId, options = {}) => {
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
-  const pl = decoratePl(raw, db);
+  // The list as the API decorates it (expDocPlMirror)
+  const pl = raw;
   const layout = options.layout || null;
   const shipment = (db.shipments || []).find((s) => s.id === raw.shipmentId) || null;
   const scope = options.scope || { mode: 'ALL' };
@@ -344,11 +346,12 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
-  const pl = decoratePl(raw, db);
+  // The list as the API decorates it (expDocPlMirror)
+  const pl = raw;
   const layout = options.layout || null;
   const scope = options.scope || { mode: 'ALL' };
   const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
-  const print = printScope(db, raw, pl, options.exporter);
+  const print = printScope(db, pl, options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
 
   const blocked = blockedCartons(cartons, layout, { contextOf: print.contextOf, printBarcodes: options.printBarcodes });
@@ -455,7 +458,7 @@ export const generateStickerRun = async (plId, options = {}) => {
 
   const scope = { ...(options.scope || { mode: 'ALL' }), group: groupOf(raw, options.scope) };
   const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
-  const print = printScope(db, raw, decoratePl(raw, db), options.exporter);
+  const print = printScope(db, raw, options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
   if (!cartons.length) fail('CONFLICT', 'The selected range contains no cartons.');
 
@@ -470,9 +473,8 @@ export const generateStickerRun = async (plId, options = {}) => {
   }
 
   const layoutBindings = printedPaths(layout);
-  // One entry per ROW. A per-carton map is O(cartons) in localStorage — the exact
-  // storage shape this module refuses everywhere else, and enough to blow the
-  // ~5 MB quota on a large shipment, taking the whole mock store with it.
+  // One entry per ROW. A per-carton map is O(cartons) in the stored run — the exact
+  // storage shape this module refuses everywhere else, and every user loads every run.
   const rowHashes = {};
   // And the numbers each row printed under: a later renumbering is then a reprint (V-14)
   const rowRanges = {};
@@ -484,7 +486,7 @@ export const generateStickerRun = async (plId, options = {}) => {
     rowRanges[rowId] = { from: row.cartonFrom, to: row.cartonTo };
   });
 
-  const id = Math.max(0, ...(db.stickerRuns || []).map((r) => r.id)) + 1;
+  const id = newDocId();
   const run = {
     id,
     runNo: nextStickerRunNo(db),

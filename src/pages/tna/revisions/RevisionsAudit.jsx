@@ -7,7 +7,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   listPlanOptions, listVersions, getBaselineComparison, getCommitments, getAuditTrail, getMeta,
 } from '../../../services/tna/tnaService';
-import MockDataNote from '../components/MockDataNote';
+import AsOfNote from '../components/AsOfNote';
 import VersionTable from './VersionTable';
 import BaselineComparison from './BaselineComparison';
 import CommitmentRegister from './CommitmentRegister';
@@ -66,7 +66,7 @@ const RevisionsAudit = () => {
         subtitle={selected ? `${selected.orderNo} · ${selected.buyer} · ${selected.styleNo}` : 'Plan versions, baseline comparison and the commitment register'}
         extra={(
           <Space wrap>
-            <MockDataNote asOf={meta?.asOf} />
+            <AsOfNote asOf={meta?.asOf} />
             <Select
               showSearch
               name="plan"

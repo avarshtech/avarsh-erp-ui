@@ -10,6 +10,7 @@
 import { test } from '@playwright/test';
 import { createAuthenticatedClient } from '../helpers/api-client.js';
 import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
+import { pickGeneralPoOrder } from '../helpers/po-seed.js';
 
 // The credentials every other spec signs in with (e2e/helpers/navigation.js): the e2e seed's
 // superadmin (admin123) by default; any other database needs E2E_PASSWORD set explicitly.
@@ -349,6 +350,12 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // Close any open picker
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
+
+    // Order(s) — a General PO must name the order(s) it is for
+    if (orderNo) {
+      await pickGeneralPoOrder(page, orderNo).catch(() => {});
+      console.log(`  ✓ Order(s): ${orderNo}`);
+    }
 
     // Remarks
     const poRemarks = page.locator('.ant-form-item').filter({ hasText: /Remarks/i }).locator('textarea').first();

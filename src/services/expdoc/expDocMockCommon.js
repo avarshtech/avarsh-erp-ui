@@ -75,12 +75,15 @@ let auditSeq = 0;
  * Append an audit entry. PRD §20 wants user, timestamp, document + version and
  * field-level before/after for edits, so `before`/`after` are first-class rather
  * than squeezed into the details string.
+ *
+ * The id is the entry's key on the API, so it carries a random part: two users
+ * writing in the same millisecond must not collide.
  */
 export const pushAudit = (db, entry) => {
   auditSeq += 1;
   db.audit = db.audit || [];
   db.audit.push({
-    id: `${Date.now()}-${auditSeq}`,
+    id: `${Date.now()}-${auditSeq}-${Math.random().toString(36).slice(2, 8)}`,
     at: nowStamp(),
     user: currentUserName(),
     before: null,

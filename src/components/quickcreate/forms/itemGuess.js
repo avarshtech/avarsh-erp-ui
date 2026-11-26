@@ -21,7 +21,7 @@ export function guessClassifiers(category, text) {
   const wanted = tokens(text);
   let best = null;
   (category?.subCategories || []).forEach((sub) => {
-    (sub.itemTypes || []).forEach((type) => {
+    (sub.itemTypes || []).filter((type) => type.isActive !== false).forEach((type) => {
       const score = overlap(wanted, type.name) * 2 + overlap(wanted, sub.name);
       if (score > 0 && (!best || score > best.score)) best = { score, sub, type };
     });

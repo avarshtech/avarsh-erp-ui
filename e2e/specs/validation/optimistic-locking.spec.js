@@ -124,7 +124,7 @@ test.describe('Optimistic Locking — API Tests', () => {
 
   test('PurchaseOrder — stale version update returns 409', async () => {
     const refs = await loadPoRefs(api);
-    const { data: created } = await api.post('/purchase-orders', buildGeneralPo(refs.localSupplier, refs.item, refs.terms));
+    const { data: created } = await api.post('/purchase-orders', buildGeneralPo(refs.localSupplier, refs.item, refs.terms, { orderReferences: refs.orderReferences }));
     const { data: po } = await api.get(`/purchase-orders/${created.id}`);
     expect(po.status).toBe('Draft');
     expect(po).toHaveProperty('version');

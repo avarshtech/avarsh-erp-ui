@@ -36,7 +36,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
           );
         }
         if (row.type === 'ref') return <Text type="secondary" style={{ fontSize: 12 }}>Order qty per size</Text>;
-        return <span>{row.panelName} <Text type="secondary" style={{ fontSize: 11 }}>×{row.panelsPerGarment}</Text></span>;
+        return row.panelName;
       },
     },
     {

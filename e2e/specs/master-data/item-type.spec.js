@@ -11,6 +11,8 @@
  *   - Edit via ROW CLICK (split-view, no per-row icons) with 400ms dirty-suppression settle;
  *     "Save Changes" disabled until dirty; prefilled multi-selects asserted; every field changed
  *   - Delete via form Delete button + confirm modal "Delete Item Type" (hard DELETE)
+ *   - A used item type (an item is on it) is locked: only Active changes, and its
+ *     Delete offers Inactivate; the list's Status column then shows Inactive
  *
  * Source of truth: e2e/plan/inventory-masters-core.md §5
  */
@@ -19,7 +21,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { antTableWaitForData } from '../../helpers/antd-helpers.js';
 import { ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
-import { categoryPayload, subCategoryPayload, uomPayload } from '../../helpers/test-data.js';
+import { categoryPayload, subCategoryPayload, uomPayload, itemPayload } from '../../helpers/test-data.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
 
@@ -131,6 +133,9 @@ test.describe.serial('Item Type — CRUD', () => {
     let uomId;
     let seedTypeName; // seeded item type for deterministic search
     let seedTypeId;
+    let usedTypeName; // an item type with an item on it
+    let usedTypeId;
+    let usedItemId;
 
     test.beforeAll(async () => {
       api = await createAuthenticatedClient();
@@ -164,11 +169,21 @@ test.describe.serial('Item Type — CRUD', () => {
         uomIds: uomId ? [uomId] : [],
       });
       seedTypeId = seed.data?.id;
+
+      usedTypeName = `E2E UsedType ${STAMP()}`;
+      const used = await api.post('/item-types', {
+        subCategoryId: subBId, name: usedTypeName, attributeIds: [], uomIds: uomId ? [uomId] : [],
+      });
+      usedTypeId = used.data?.id;
+      const item = await api.post('/items', itemPayload({ categoryId: catId, subCategoryId: subBId, itemTypeId: usedTypeId, uomId }));
+      usedItemId = item.data?.id;
     });
 
     test.afterAll(async () => {
       // best-effort cleanup, children first (hard deletes; FK failures swallowed)
       if (seedTypeId) await api.delete(`/item-types/${seedTypeId}`).catch(() => {});
+      if (usedItemId) await api.delete(`/items/${usedItemId}`).catch(() => {});
+      if (usedTypeId) await api.delete(`/item-types/${usedTypeId}`).catch(() => {});
       if (subAId) await api.delete(`/sub-categories/${subAId}`).catch(() => {});
       if (subBId) await api.delete(`/sub-categories/${subBId}`).catch(() => {});
       if (catId) await api.delete(`/categories/${catId}`).catch(() => {});
@@ -368,6 +383,34 @@ test.describe.serial('Item Type — CRUD', () => {
       await expect(page.getByText(/item type deleted successfully/i)).toBeVisible({ timeout: 8000 });
       await antTableWaitForData(page);
       await expect(page.locator('.ant-table-row').filter({ hasText: name })).toHaveCount(0);
+    });
+
+    test('Used item type: locked, Delete offers Inactivate, Status shows Inactive', async ({ page }) => {
+      expect(usedItemId, 'the item on the used type was not created').toBeTruthy();
+      const search = page.locator('.ant-card').filter({ has: page.locator('.ant-table') }).getByPlaceholder(/search/i).first();
+      await search.fill(usedTypeName);
+      const row = page.locator('.ant-table-row').filter({ hasText: usedTypeName });
+      await expect(row).toContainText('Active');
+      await row.click();
+
+      await expect(page.getByText('This item type is used in Items')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#name')).toBeDisabled();
+      await expect(page.getByRole('switch')).toBeEnabled();
+
+      await page.getByRole('button', { name: /Delete/i }).click();
+      const dialog = page.getByRole('dialog', { name: /cannot be deleted/i });
+      await expect(dialog).toContainText('It is used in Items');
+      const [resp] = await Promise.all([
+        page.waitForResponse((r) => /\/api\/v1\/item-types\/\d+\/active$/.test(r.url()) && r.request().method() === 'PATCH'),
+        dialog.getByRole('button', { name: 'Inactivate' }).click(),
+      ]);
+      expect(resp.status()).toBe(200);
+      await expect(page.getByText(/item type inactivated/i)).toBeVisible({ timeout: 8000 });
+      await search.fill(usedTypeName);
+      await expect(row).toContainText('Inactive');
+
+      const { status } = await api.delete(`/item-types/${usedTypeId}`);
+      expect(status).toBe(409);
     });
   });
 });

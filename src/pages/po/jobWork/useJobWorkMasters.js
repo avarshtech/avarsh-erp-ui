@@ -21,7 +21,12 @@ const useJobWorkMasters = (category, { enabled }) => {
   useEffect(() => {
     if (!key) return undefined;
     let alive = true;
-    const may = { Processes: hasPermission('process-master', 'view'), 'Payment Terms': hasPermission('payment-terms', 'view') };
+    // The API admits either job-work PO key to both lookups (GET /processes/active, GET /payment-terms).
+    const jobWorkPo = hasPermission('cut-panel-po', 'view') || hasPermission('garment-process-po', 'view');
+    const may = {
+      Processes: jobWorkPo || hasPermission('process-master', 'view'),
+      'Payment Terms': jobWorkPo || hasPermission('payment-terms', 'view'),
+    };
     Promise.all([
       getVendorOptions({ includeInactive: true }).then(list),
       may.Processes ? getActiveProcesses(key).then(list) : [],

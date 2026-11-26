@@ -10,7 +10,7 @@ import StatCard from '../../../components/StatCard';
 import { getAnalytics, getSettings } from '../../../services/tna/tnaService';
 import { ATTRIBUTION } from '../../../utils/tnaConstants';
 import { downloadCsv } from '../../../utils/download';
-import MockDataNote from '../components/MockDataNote';
+import AsOfNote from '../components/AsOfNote';
 import {
   AttributionPanel, CommitmentMovementPanel, ExposurePanel, MasterBiasPanel,
 } from './AnalyticsPanels';
@@ -62,7 +62,7 @@ const TnaAnalytics = () => {
         subtitle="Delay attribution and commitment movement, reported separately — closed orders by dispatch date"
         extra={(
           <Space wrap>
-            <MockDataNote asOf={data?.asOf} />
+            <AsOfNote asOf={data?.asOf} />
             <Segmented value={filters.months} onChange={(v) => setFilters((f) => ({ ...f, months: v }))} options={PERIODS} />
             <Select allowClear name="buyer" placeholder="Buyer: all" style={{ width: 150 }} value={filters.buyer} onChange={(v) => setFilters((f) => ({ ...f, buyer: v || null }))} options={(data?.buyers || []).map((b) => ({ value: b, label: b }))} />
             <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!data}>Export</Button>

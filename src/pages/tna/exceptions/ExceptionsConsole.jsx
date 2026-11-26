@@ -12,7 +12,7 @@ import {
 } from '../../../services/tna/tnaService';
 import { hasPermission } from '../../../utils/permissions';
 import { currentUserName, fmtDateTime } from '../../../utils/tnaConstants';
-import MockDataNote from '../components/MockDataNote';
+import AsOfNote from '../components/AsOfNote';
 import AcknowledgeInfeasibleModal from '../components/AcknowledgeInfeasibleModal';
 import ExceptionTable from './ExceptionTable';
 import { SyncStatusPanel, ReconciliationPanel } from './SyncPanels';
@@ -77,7 +77,7 @@ const ExceptionsConsole = () => {
       <PageHeader
         title="Exceptions & data quality"
         subtitle="Unresolved identity blocks plan generation rather than producing a guessed plan"
-        extra={<MockDataNote asOf={meta?.asOf} />}
+        extra={<AsOfNote asOf={meta?.asOf} />}
       />
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {kpis.map((c) => <Col key={c.title} xs={12} md={8} xl={4}><StatCard {...c} value={c.value ?? 0} loading={loading} /></Col>)}

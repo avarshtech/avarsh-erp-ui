@@ -15,8 +15,9 @@ import {
   DOC_TYPE, EXPDOC_MODULE, PL_STATUS, PL_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import {
-  getPackingList, refreshFromPacking, acknowledgeWarning, changePlStatus, revisePackingList,
+  getPackingList, refreshFromPacking, acknowledgeWarning, finalisePackingList, cancelPackingList, revisePackingList,
   getShipment, markPackingListExported, changePlTemplate, findNewerTemplateRevision,
   updatePackingList, bindPackingEntries, removePackingEntry, moveBlock, dropBlock, savePlPlan, markPlanNotShipping,
 } from '../../../services/expdoc/expDocService';
@@ -140,8 +141,8 @@ const PackingListWorkspace = () => {
       if (successMsg) message.success(successMsg);
       return next;
     } catch (e) {
-      // An API 409 opens the conflict dialog (axiosInstance); the mock's own conflict has no dialog, so it is said here
-      if (!e.isOptimisticLockConflict || !e.isAxiosError) message.error(e.message || 'Action failed');
+      // The API's refusals are toasted by axiosInstance (a 409 opens the conflict dialog); anything else is said here
+      toastUnlessHandled(message, e, 'Action failed');
       return null;
     } finally {
       setBusy(null);
@@ -170,7 +171,7 @@ const PackingListWorkspace = () => {
     okText: 'Acknowledge',
     onSubmit: (reason) => run(
       'ack',
-      () => acknowledgeWarning(pl.id, item, reason),
+      () => acknowledgeWarning(pl, item, reason),
       'Reason recorded against this document',
     ),
   });
@@ -191,7 +192,7 @@ const PackingListWorkspace = () => {
       </Space>
     ),
     okText: 'Finalise',
-    onOk: () => run('finalise', () => changePlStatus(pl.id, PL_STATUS.FINAL), `${pl.plNo} finalised`),
+    onOk: () => run('finalise', () => finalisePackingList(pl), `${pl.plNo} finalised`),
   });
 
   const handleRevise = () => setReasonCfg({
@@ -204,7 +205,7 @@ const PackingListWorkspace = () => {
     },
     okText: 'Create revision',
     onSubmit: async (reason) => {
-      const next = await run('revise', () => revisePackingList(pl.id, reason), 'Revision created');
+      const next = await run('revise', () => revisePackingList(pl, reason), 'Revision created');
       if (next?.id) navigate(`/export-docs/packing-lists/edit/${next.id}`, { replace: true });
     },
   });
@@ -227,7 +228,7 @@ const PackingListWorkspace = () => {
     label: 'Reason for cancelling',
     okText: 'Cancel packing list',
     danger: true,
-    onSubmit: (reason) => run('cancel', () => changePlStatus(pl.id, PL_STATUS.CANCELLED, reason), `${pl.plNo} cancelled`),
+    onSubmit: (reason) => run('cancel', () => cancelPackingList(pl, reason), `${pl.plNo} cancelled`),
   });
 
   const headerActions = useMemo(() => {
@@ -238,7 +239,7 @@ const PackingListWorkspace = () => {
         // Reads Carton Packing again: corrections, new packing for the list's POs, deleted entries
         actions.push(
           <ActionButton key="refresh" action="refresh" text="Check for new packing" {...busyProps('refresh')}
-            onClick={() => run('refresh', () => refreshFromPacking(pl.id), 'Carton data read again')} />,
+            onClick={() => run('refresh', () => refreshFromPacking(pl), 'Carton data read again')} />,
         );
       }
       // The single gate. There is no approver behind it, so the tooltip has to name
@@ -273,7 +274,7 @@ const PackingListWorkspace = () => {
               action="send"
               text="Mark released"
               {...busyProps('release')}
-              onClick={() => run('release', () => markPackingListExported(pl.id), 'Documents released')}
+              onClick={() => run('release', () => markPackingListExported(pl), 'Documents released')}
             />
           </span>
         </Tooltip>,
@@ -373,7 +374,7 @@ const PackingListWorkspace = () => {
             onDirtyChange={setHeaderDirty}
             onSave={(values) => run(
               'header',
-              () => updatePackingList(pl.id, { ...values, version: pl.version }),
+              () => updatePackingList(pl, values),
               'Document details saved',
             )}
           />
@@ -385,6 +386,7 @@ const PackingListWorkspace = () => {
             <DetailCard.Field label="Consignee" value={pl.resolved?.consignee?.name} />
             <DetailCard.Field label="Container no." value={pl.resolved?.containerNo} />
             <DetailCard.Field label="Seal no." value={pl.resolved?.sealNo} />
+            <DetailCard.Field label="Shipping tolerance" value={`${pl.tolerancePercent ?? 0}%`} />
             <DetailCard.Field label="Remarks" value={pl.remarks} span={16} />
           </DetailCard>
         )
@@ -401,7 +403,7 @@ const PackingListWorkspace = () => {
             pl={pl}
             editable={pl.status === PL_STATUS.DRAFT && canUpdate}
             busyKey={busy}
-            onApply={(patch) => run('numbering', () => updatePackingList(pl.id, { ...patch, version: pl.version }), 'Cartons renumbered')}
+            onApply={(patch) => run('numbering', () => updatePackingList(pl, patch), 'Cartons renumbered')}
           />
           <PlOrderBlocks
             key={pl.id}
@@ -594,7 +596,7 @@ const PackingListWorkspace = () => {
           action={(
             <ActionButton
               action="refresh" size="small" text={`Move to v${newerRevision.version}`} {...busyProps('upgrade')}
-              onClick={() => run('upgrade', () => changePlTemplate(pl.id, newerRevision.id), `Now on v${newerRevision.version}`)}
+              onClick={() => run('upgrade', () => changePlTemplate(pl, newerRevision.id), `Now on v${newerRevision.version}`)}
             />
           )}
         />
@@ -650,7 +652,7 @@ const PackingListWorkspace = () => {
           confirming={busy === 'template'}
           onCancel={() => setTemplateOpen(false)}
           onSubmit={async (templateId, reason) => {
-            const next = await run('template', () => changePlTemplate(pl.id, templateId, reason), 'Template changed for this document');
+            const next = await run('template', () => changePlTemplate(pl, templateId, reason), 'Template changed for this document');
             if (next?.id) setTemplateOpen(false);
           }}
         />

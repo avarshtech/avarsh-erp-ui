@@ -14,7 +14,7 @@ const numeric = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 /** Column unit for the carton packing register. */
-/** The packing lists (this browser) holding an entry, as "PKL/26-27/1001 · PO 4500123". */
+/** The packing lists holding an entry, as "PKL/26-27/1001 · PO 4500123". */
 const listText = (lists) => [...new Set(lists.map((l) => `${l.plNo}${l.buyerPoNo ? ` · PO ${l.buyerPoNo}` : ''}`))].join(', ');
 
 export const buildCartonPackingColumns = ({

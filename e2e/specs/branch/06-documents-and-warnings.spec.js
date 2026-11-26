@@ -11,6 +11,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { ensureBranch, ensureUnit, headOffice, eligibleOrder, branchHeader } from '../../helpers/branch-seed.js';
+import { loadPoOrder, poOrderReference } from '../../helpers/po-seed.js';
 
 let api;
 let ho;
@@ -54,7 +55,9 @@ test.describe('Purchase orders deliver to a branch', () => {
     test.skip(!candidate, 'no draft purchase order in the seed');
 
     const { data: full } = await api.get(`/purchase-orders/${candidate.id}`);
-    const { data: moved, status } = await api.put(`/purchase-orders/${candidate.id}`, { ...full, deliveryBranchId: second.id });
+    // Every PO must name its order(s) to save; a seeded draft predates that rule
+    const orderReferences = full.orderReferences?.length ? full.orderReferences : [poOrderReference(await loadPoOrder(api))];
+    const { data: moved, status } = await api.put(`/purchase-orders/${candidate.id}`, { ...full, orderReferences, deliveryBranchId: second.id });
     expect(status).toBe(200);
     expect(moved.deliveryBranchId).toBe(second.id);
     expect(moved.deliveryBranchName).toBe('E2E Tirupur');
@@ -144,8 +147,10 @@ test.describe('Approval flows can route by branch', () => {
     test.skip(!candidate, 'no draft purchase order left to submit');
 
     const { data: full } = await api.get(`/purchase-orders/${candidate.id}`);
+    // Every PO must name its order(s) to save or submit; a seeded draft predates that rule
+    const orderReferences = full.orderReferences?.length ? full.orderReferences : [poOrderReference(await loadPoOrder(api))];
     // Saved at the second branch as it is, then submitted by its own command with the saved version
-    const { data: atSecond } = await api.put(`/purchase-orders/${candidate.id}`, { ...full, deliveryBranchId: second.id });
+    const { data: atSecond } = await api.put(`/purchase-orders/${candidate.id}`, { ...full, orderReferences, deliveryBranchId: second.id });
     await api.post(`/purchase-orders/${candidate.id}/submit`, { version: atSecond.version });
 
     const { data: requests } = await api.get(`/approval-requests/entity/PURCHASE_ORDER/${candidate.id}`);

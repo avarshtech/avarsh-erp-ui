@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert, App, Empty, Modal, Space, Statistic, Table, Tag, Typography } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { comparePackingLists } from '../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
@@ -56,7 +57,7 @@ const PlCompareModal = ({ open, pl, onCancel }) => {
     if (!a || !b) return;
     comparePackingLists(a, b)
       .then((r) => { setResult(r); setLoading(false); })
-      .catch((e) => { message.error(e.message || 'Could not compare'); setResult(null); setLoading(false); });
+      .catch((e) => { toastUnlessHandled(message, e, 'Could not compare'); setResult(null); setLoading(false); });
   }, [message]);
 
   useEffect(() => { runCompare(aId, bId); }, [runCompare, aId, bId]);

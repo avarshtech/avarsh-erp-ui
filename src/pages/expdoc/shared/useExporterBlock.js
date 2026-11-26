@@ -6,8 +6,8 @@ import { getCachedOrganisation, fetchAndCacheOrganisation } from '../../../servi
  * The exporter block that every printed document in this module carries.
  *
  * It is a printable address, not just a name: the organisation master supplies the
- * address, and the mock profile supplies the statutory references the master has no
- * columns for (IEC, AD code, LUT) — the `exporterProfileExtra` gap in the ledger.
+ * address, the IEC and the SWIFT code, and the export masters (`exporterProfileExtra`)
+ * the references the organisation master has no columns for (AD code, LUT), when set.
  *
  * Shared by the packing list and the stickers so the same header cannot drift
  * between two documents describing the same shipment.
@@ -27,7 +27,7 @@ const compose = (org, extra) => {
     org.bankName ? `${org.bankName}${org.bankBranch ? `, ${org.bankBranch}` : ''}` : null,
     org.bankAccountNumber ? `A/C NO: ${org.bankAccountNumber}` : null,
     org.bankIfscCode ? `IFSC: ${org.bankIfscCode}` : null,
-    extra?.swiftCode ? `SWIFT CODE: ${extra.swiftCode}` : null,
+    (extra?.swiftCode || org.swiftCode) ? `SWIFT CODE: ${extra?.swiftCode || org.swiftCode}` : null,
   ].filter(Boolean).join('\n');
 
   const block = [
@@ -35,7 +35,7 @@ const compose = (org, extra) => {
     [org.addressLine1, org.addressLine2].filter(Boolean).join(', '),
     [org.city, org.state, org.pincode].filter(Boolean).join(', '),
     org.gstin ? `GSTIN: ${org.gstin}` : null,
-    extra?.iecNumber ? `IEC: ${extra.iecNumber}` : null,
+    (extra?.iecNumber || org.iecNumber) ? `IEC: ${extra?.iecNumber || org.iecNumber}` : null,
   ].filter(Boolean).join('\n');
   return { ...org, ...extra, name: org.organisationName, country: org.country || 'INDIA', block, bankBlock };
 };

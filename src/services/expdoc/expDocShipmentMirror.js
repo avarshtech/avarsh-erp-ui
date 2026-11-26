@@ -1,15 +1,15 @@
 /**
- * The API's shipments, mirrored in memory for the export documents that still run on
- * the mock.
+ * The API's shipments, mirrored in memory for the export document rules that read them
+ * synchronously (expDocStore).
  *
  * Packing lists, invoices, stickers, reports, the dashboard and the notifications are
- * mock modules that read `db.shipments` synchronously. loadDb() lays this mirror over
- * the stored db and saveDb() strips it again (expDocMockStore), so no shipment is ever
+ * modules that read `db.shipments` synchronously. loadDb() lays this mirror over the
+ * documents and saveDb() ignores it (expDocStore), so no shipment is ever
  * kept in the browser: the API holds the only record. The facade syncs the mirror
  * before each mock call that reads shipments.
  *
  * - It holds the OPEN shipments of the working branch, plus every shipment a document
- *   in this browser names (any status, any of the user's branches).
+ *   loaded names (any status, any of the user's branches).
  * - It is fresh for 30 s, and concurrent syncs share one request. A failed refresh
  *   keeps the last good copy.
  * - Saves, closes, reopens and deletes write it at once, so a document never waits

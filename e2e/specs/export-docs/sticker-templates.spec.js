@@ -57,8 +57,8 @@ const pickLayout = async (page, name) => {
     .filter({ hasText: name }).first().click();
 };
 
-// @dev-server: some tests import /src modules in the browser, which only the dev server serves,
-// so CI runs this file in its dev-server lane, not against the preview build.
+// @dev-server: CI runs this file in its dev-server lane (e2e.yml). Its packing list is the API's now and
+// is made through REST, so nothing here imports /src any more; the file could join the preview lane.
 test.describe('Carton-sticker templates', { tag: '@dev-server' }, () => {
   test.beforeEach(async ({ page }) => {
     await ensureSessionActive(page);
@@ -138,19 +138,17 @@ test.describe('Carton-sticker templates', { tag: '@dev-server' }, () => {
   });
 
   test('stickers print with the layout picked by name, its batch number asked once and kept on the run', async ({ page }) => {
-    // Packing lists are still the browser mock and bind REAL Carton Packing entries: one for
-    // JOMO BV's e2e order with the reference cartons 1–61 (every packing type), on the seeded
-    // shipment SHP/E2E/0001, raised through the same service the screens call.
+    // A packing list (the API's) binding a REAL Carton Packing entry: one for JOMO BV's e2e
+    // order with the reference cartons 1–61 (every packing type), the whole order (no PO), on
+    // the seeded shipment SHP/E2E/0001, made through REST.
     const orderId = await orderIdOf(api, 'ORD/JOMO-E2E');
     await purgeMarked(api, orderId);
     const entry = await createEntry(api, { orderId, groups: referenceRanges() });
     const { data: shipments } = await api.get('/export-docs/shipments', { search: 'SHP/E2E/0001', page: 0, size: 5 });
     const shipmentId = shipments.content.find((s) => s.shipmentNo === 'SHP/E2E/0001').id;
-    await goTo(page, '/export-docs/stickers');
-    const plId = await page.evaluate(async ({ shipment, entryId }) => {
-      const svc = await import('/src/services/expdoc/expDocService.js');
-      return (await svc.createPackingList({ shipmentId: shipment, units: [{ packingEntryId: entryId, poKey: null }] })).id;
-    }, { shipment: shipmentId, entryId: entry.id });
+    const created = await api.post('/export-docs/packing-lists', { shipmentId, units: [{ packingEntryId: entry.id, poKey: null }] });
+    expect(created.status, JSON.stringify(created.data)).toBe(201);
+    const plId = created.data.id;
     await goTo(page, `/export-docs/stickers/${plId}`);
 
     // JOMO BV has two layouts of its own, so nothing prints until one is picked.

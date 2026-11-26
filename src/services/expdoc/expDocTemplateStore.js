@@ -7,7 +7,7 @@
  */
 import * as api from './exportTemplateApi';
 import { uploadFile } from '../core/fileService';
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { TEMPLATE_STATUS } from '../../utils/expDocConstants';
 import {
   SYSTEM_TEMPLATES, isSystemTemplateId, TEMPLATE_SOURCE, pickLayout,

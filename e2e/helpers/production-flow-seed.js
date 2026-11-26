@@ -28,10 +28,11 @@ export const day = (n = 0) => {
 
 /**
  * Costing → order → BOM → PO → GRN → QC → stock. `fabricQty` is what the supplier PO buys and the GRN
- * receives, split over two rolls. Returns { order, bom, po, grn, qc, item, rolls }.
+ * receives, split over two rolls; `buyerId` picks the buyer (the seed's default when omitted), which is
+ * what decides the order's Time & Action template. Returns { order, bom, po, grn, qc, item, rolls }.
  */
-export async function buildUpstreamChain(api, { stamp, fabricQty = 200 } = {}) {
-  const costing = await seedApprovedCosting(api);
+export async function buildUpstreamChain(api, { stamp, fabricQty = 200, buyerId } = {}) {
+  const costing = await seedApprovedCosting(api, buyerId ? { buyerId } : {});
   const orderRefs = await loadOrderRefs(api, costing.buyerId);
   const created = ok(await api.post('/orders', buildOrderPayload(costing, orderRefs, { remarks: `${FLOW_MARK} ${stamp}` })), 'create order');
   ok(await api.put(`/orders/${created.id}/status`, { status: 'CONFIRMED', version: created.version }), 'confirm order');
@@ -46,8 +47,10 @@ export async function buildUpstreamChain(api, { stamp, fabricQty = 200 } = {}) {
   ok(await api.patch(`/production/pp-status/${order.id}`, { status: 'COMPLETED' }), 'complete PP sample');
 
   const poRefs = await loadPoRefs(api);
-  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, { qty: fabricQty, unitPrice: 120 });
-  draft.orderReferences = [{ orderId: order.id, orderNo: order.orderNo, styleName: order.styleNo }];
+  const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, {
+    qty: fabricQty, unitPrice: 120,
+    orderReferences: [{ orderId: order.id, orderNo: order.orderNo, styleName: order.styleNo }],
+  });
   draft.remarks = `${FLOW_MARK} ${stamp}`;
   let po = ok(await api.post('/purchase-orders', draft), 'create supplier PO');
   const poNow = ok(await api.get(`/purchase-orders/${po.id}`), 'read supplier PO');

@@ -59,8 +59,7 @@ export const buildShipmentColumns = ({ onView, onEdit, onDocuments, onDelete, ca
     render: (count) => (count ? count : orDash(null)),
   },
   {
-    // Packing lists still live in the browser that raised them.
-    title: <Tooltip title="Packing lists raised in this browser">Packing Lists</Tooltip>,
+    title: <Tooltip title="Packing lists raised against this shipment">Packing Lists</Tooltip>,
     dataIndex: 'packingListCount',
     key: 'packingListCount',
     align: 'right',

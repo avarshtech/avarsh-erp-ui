@@ -7,6 +7,7 @@ import RecordLink from '../../../components/RecordLink';
 import { ActionButton } from '../../../components/buttons';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { hasPermission } from '../../../utils/permissions';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { EXPDOC_MODULE, PL_STATUS } from '../../../utils/expDocConstants';
 import { searchPackingLists, searchStickerRuns } from '../../../services/expdoc/expDocService';
 
@@ -41,7 +42,7 @@ const StickerConsole = () => {
       setRows(res.content || []);
       setPagination((p) => ({ ...p, current: page, pageSize, total: res.totalElements || 0 }));
     } catch (e) {
-      message.error(e.message || 'Failed to load');
+      toastUnlessHandled(message, e, 'Failed to load');
       setRows([]);
     } finally {
       setLoading(false);

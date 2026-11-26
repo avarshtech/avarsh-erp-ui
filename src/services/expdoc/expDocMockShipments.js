@@ -1,10 +1,11 @@
 /**
  * What the mock documents know about shipments. The shipment itself is the API's
  * (/export-docs/shipments, through expDocService); `db.shipments` here is the in-memory
- * mirror of it (expDocShipmentMirror). What stays is the document side: the counts a
- * shipment shows, the Carton Packing entries of its orders, and its document set (§18).
+ * mirror of it (expDocShipmentMirror), and `db.packingLists` the API's packing lists
+ * (expDocPlMirror). What stays is the document side: the counts a shipment shows, the
+ * Carton Packing entries of its orders, and its document set (§18).
  */
-import { loadDb } from './expDocMockStore';
+import { loadDb } from './expDocStore';
 import { delay, clone, fail } from './expDocMockCommon';
 
 /** The Carton Packing entries of the shipment's orders this browser has read (expDocPackingMirror). */
@@ -13,26 +14,22 @@ export const entriesOfShipment = (db, shipment) => {
   return (db.packingEntries || []).filter((e) => orders.has(e.orderId));
 };
 
-/** One mirrored shipment's orders, or none. */
-export const shipmentOrders = (shipmentId) =>
-  (loadDb().shipments || []).find((s) => s.id === Number(shipmentId))?.orders || [];
-
 /** The orders of every open shipment the mirror holds: what the dashboard's readiness counts. */
 export const openShipmentOrderIds = () => [...new Set((loadDb().shipments || [])
   .filter((s) => s.status !== 'CLOSED').flatMap((s) => (s.orders || []).map((o) => o.orderId)))];
 
-/** This browser's packing lists and invoices on one shipment, any status. */
+/** The packing lists and invoices on one shipment, any status. */
 export const documentsOfShipment = (shipmentId) => {
   const db = loadDb();
   const id = Number(shipmentId);
   return [...(db.packingLists || []), ...(db.invoices || [])].filter((d) => d.shipmentId === id);
 };
 
-/** The shipment one of this browser's packing lists ('packingLists') or invoices ('invoices') names. */
+/** The shipment one of the packing lists ('packingLists') or invoices ('invoices') names. */
 export const shipmentOfDocument = (table, id) =>
   (loadDb()[table] || []).find((d) => d.id === Number(id))?.shipmentId ?? null;
 
-/** Every shipment this browser's packing lists and invoices were raised against. */
+/** Every shipment the packing lists and invoices were raised against. */
 export const documentShipmentIds = () => {
   const db = loadDb();
   return [...new Set([...(db.packingLists || []), ...(db.invoices || [])]
@@ -44,7 +41,7 @@ export const documentShipmentIds = () => {
  * Derived, read-only decoration, never persisted. Exported because the invoice header
  * prints the consignee and notify blocks and must not re-derive them.
  *
- * The counts are this browser's documents: packing lists and invoices still live here.
+ * The counts are the documents the store loaded from the API (expDocStore).
  */
 export const decorate = (shipment, db) => {
   const out = clone(shipment);
@@ -57,7 +54,7 @@ export const decorate = (shipment, db) => {
   return out;
 };
 
-/** An API shipment with this browser's document counts. */
+/** An API shipment with its document counts. */
 export const withLocalDocuments = (shipment) => (shipment ? decorate(shipment, loadDb()) : shipment);
 
 /** A page of them, reading the store once. */

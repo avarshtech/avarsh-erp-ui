@@ -1,21 +1,18 @@
 /**
- * Seed data for the Export Documentation mock store.
+ * Seed data for Export Documentation: the masters the first permitted user saves to the API
+ * (expDocStore), and the sample cartons the template preview prints. No document is seeded:
+ * packing lists, invoices and sticker runs are the API's (/export-docs/documents).
  *
  * Conventions carried over from srMockData.js:
  *  - Every date is relative to today via d(offset), so the demo never goes stale.
  *  - Every seeded record carries a comment naming the demo case it exists to prove.
- *  - docSeq is an explicit mirror of the backend sys_doc_counters (prefix, fy_code).
- *
- * BUMP SEED_VERSION on any change to this file, or existing demo browsers keep the
- * stale copy. Bumping discards user-entered demo data — that is the documented
- * reset path.
  *
  * Carton data is stored as RANGES (cartonFrom..cartonTo), never one row per carton.
  * Entry CPK/26-27/1002 deliberately covers 900 cartons in four rows to prove that
  * an unbounded carton count costs nothing in the store.
  */
 import dayjs from 'dayjs';
-import { docNo, fiscalYearLabel, EXPDOC_PREFIX, FIRST_DOC_NUMBER } from './expDocDocNumbers';
+import { docNo, fiscalYearLabel, EXPDOC_PREFIX } from './expDocDocNumbers';
 import {
   PACKING_TYPE,
   SECTION_KEY,
@@ -23,15 +20,6 @@ import {
   LINE_GRAIN,
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
-
-// 12 (2026-10-08): shipments take the consignee from the buyer master and carry
-// their orders; sub-client, end customer, seal, pallets and delivery centre removed.
-// 13 (2026-10-08): carton-sticker templates moved to the API, so the STK-n seeds are
-// gone (a stored run naming one would be looked up there); JOMO rows carry EANs for
-// some sizes, and every packing entry a season.
-// 14 (2026-10-08): shipments moved to the API. The seeded shipments, ports and
-// incoterms are gone, and packing entries bind to a shipment of their buyer.
-export const SEED_VERSION = 15;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -62,10 +50,10 @@ const SEED_HS_CODES = [
  * buyer master supplies ids we cannot know at seed time. Lookup falls back to a
  * neutral default so an unseeded buyer still produces a usable document.
  *
- * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms and
- * tolerance do not exist on mst_buyers today. The consignee and notify party are
- * NOT here — a shipment takes them from the real buyer master (the buyer, its
- * shipping locations and its bank).
+ * Only the demo buyer codes are still read (buyerCodeOf, the reports' buyer list). An
+ * invoice's currency and payment terms come from the orders, the tolerance is set on
+ * the packing list and the discount on the invoice (owner, 2026-11-17). The consignee
+ * and notify party are NOT here — a shipment takes them from the real buyer master.
  */
 const SEED_BUYER_COMMERCIAL = [
   {
@@ -104,16 +92,6 @@ export const buyerCodeOf = (buyerName) => {
   return SEED_BUYER_COMMERCIAL.find((b) => b.buyerName.toLowerCase() === name)?.buyerCode ?? null;
 };
 
-export const DEFAULT_BUYER_COMMERCIAL = {
-  buyerCode: null,
-  buyerName: null,
-  currency: 'USD',
-  incoterm: 'FOB',
-  paymentTerms: 'TT 30 DAYS',
-  tolerancePercent: DEFAULT_TENANT_CONFIG.defaultTolerancePercent,
-  allowMultiInvoicePerPl: false,
-};
-
 /**
  * Exporter fields the org master does not carry. Mirrors the shape of the SR
  * module's SEED_COMPANY_PROFILE_EXTRA; the real org record supplies name, address,
@@ -136,18 +114,6 @@ const SEED_EXPORTER_PROFILE_EXTRA = {
     { order: 3, code: 'TRUE_VALUE', text: 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.' },
   ],
   invoiceSeries: [{ code: 'EXP', label: 'Export commercial invoice' }],
-};
-
-/** Last 30 days of rates so an invoice dated in the past still finds one. */
-const buildFxRates = () => {
-  const rows = [];
-  for (let i = 0; i < 30; i += 1) {
-    const date = d(-i);
-    rows.push({ date, from: 'USD', to: 'INR', rate: 83.2 + ((i % 7) * 0.05) });
-    rows.push({ date, from: 'EUR', to: 'INR', rate: 90.4 + ((i % 5) * 0.07) });
-    rows.push({ date, from: 'GBP', to: 'INR', rate: 105.6 + ((i % 6) * 0.09) });
-  }
-  return rows;
 };
 
 // ─── Packing entries ────────────────────────────────────────────────────────────
@@ -415,33 +381,34 @@ const buildPackingEntries = () => [
 
 // ─── Seed assembly ──────────────────────────────────────────────────────────────
 
-export const buildSeedDb = () => {
+/**
+ * Sample cartons for the template preview only: packing lists bind the REAL Carton
+ * Packing entries (expDocPackingMirror), never these. Never saved anywhere.
+ */
+export const buildSampleEntries = () => {
   groupSeq = 0;
-  // Sample cartons for the template preview only: packing lists bind the REAL Carton
-  // Packing entries (expDocPackingMirror), never these.
-  const sampleEntries = buildPackingEntries();
-
-  // No shipments: they are the API's, mirrored over every load (expDocMockStore).
-  return {
-    seedVersion: SEED_VERSION,
-    // Explicit mirror of sys_doc_counters (prefix, fy_code): last number used.
-    docSeq: {
-      [`${EXPDOC_PREFIX.PACKING_ENTRY}/${FY}`]: FIRST_DOC_NUMBER - 1 + sampleEntries.length,
-      [`${EXPDOC_PREFIX.PACKING_LIST}/${FY}`]: FIRST_DOC_NUMBER - 1,
-      [`${EXPDOC_PREFIX.INVOICE}/${FY}`]: FIRST_DOC_NUMBER - 1,
-      [`${EXPDOC_PREFIX.STICKER_RUN}/${FY}`]: FIRST_DOC_NUMBER - 1,
-    },
-    sampleEntries,
-    packingLists: [],
-    invoices: [],
-    stickerRuns: [],
-    audit: [],
-    masters: {
-      hsCodes: SEED_HS_CODES,
-      buyerCommercial: SEED_BUYER_COMMERCIAL,
-      fxRates: buildFxRates(),
-      exporterProfileExtra: SEED_EXPORTER_PROFILE_EXTRA,
-      tenantConfig: { ...DEFAULT_TENANT_CONFIG },
-    },
-  };
+  return buildPackingEntries();
 };
+
+/**
+ * The statutory references an exporter prints on a customs invoice. The demo values in
+ * SEED_EXPORTER_PROFILE_EXTRA are not this exporter's, so the masters the API keeps start
+ * without them: the IEC and SWIFT code then come from the organisation master (Company
+ * Profile), and the rest print blank until an editor for them exists.
+ */
+const STATUTORY_REFERENCES = new Set([
+  'iecNumber', 'panNumber', 'adCode', 'lutNumber', 'swiftCode', 'aepcRegnNo', 'rexNumber', 'starExportHouse',
+]);
+
+/**
+ * The export masters as first saved to the API: HS codes, buyer commercial profiles, exporter
+ * profile, tenant config. Exchange rates are not here: an invoice reads the customs rate list.
+ */
+export const buildSeedMasters = () => ({
+  hsCodes: SEED_HS_CODES,
+  buyerCommercial: SEED_BUYER_COMMERCIAL,
+  exporterProfileExtra: Object.fromEntries(
+    Object.entries(SEED_EXPORTER_PROFILE_EXTRA).filter(([k]) => !STATUTORY_REFERENCES.has(k)),
+  ),
+  tenantConfig: { ...DEFAULT_TENANT_CONFIG },
+});

@@ -10,6 +10,7 @@ import {
   EXPDOC_MODULE, INVOICE_STATUS, INVOICE_STATUS_LABELS, LINE_GRAIN_LABELS, DOC_TYPE,
 } from '../../../utils/expDocConstants';
 import { EXPORT_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
+import { invoiceFxStatus } from '../../../utils/expDocInvoiceTerms';
 import {
   getInvoice, updateInvoice, regenerateInvoiceLines, acknowledgeInvoiceWarning,
   changeInvoiceStatus, reviseInvoice, getShipment, listIncoterms, markInvoiceExported,
@@ -185,7 +186,7 @@ const ExportInvoiceForm = () => {
       label: 'Reason for the override',
       context: {
         title: 'The rate is audited',
-        message: `Current rate: ${working?.fxRate ?? '—'} (${working?.fxSource === 'MANUAL' ? 'manual' : 'rate master'}). The new rate and this reason are recorded.`,
+        message: `Current rate: ${working?.fxRate ?? '—'} (${working ? invoiceFxStatus(working).tag : '—'}). The new rate and this reason are recorded.`,
       },
       okText: 'Apply rate',
       numberField: { label: 'New rate', initial: working?.fxRate },

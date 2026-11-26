@@ -1,26 +1,27 @@
 /**
- * Export Documentation reports and audit trail (PRD §20, §22).
+ * Export Documentation reports (PRD §22). The audit trail (§20) is the API's
+ * (/export-docs/audit, packingListApi).
  *
  * Every report reads the same records the screens read, so a report can never state
  * a figure the document itself does not — which is the point of BR-01 carried one
- * step further.
+ * step further. The packing lists are the API's, as it decorates them (expDocPlMirror).
  *
  * The carton master list is the one report that is genuinely per-carton, and carton
  * counts have no ceiling. It expands ONLY the requested page rather than materialising
  * a shipment and slicing it, so the cost of page 900 is the same as page 1.
  */
-import { loadDb } from './expDocMockStore';
-import { delay, clone, pageOf, matchesText, colourKey } from './expDocMockCommon';
+import { loadDb } from './expDocStore';
+import { delay, pageOf, matchesText, colourKey } from './expDocMockCommon';
 import { PL_STATUS, DOC_TYPE, TEMPLATE_STATUS } from '../../utils/expDocConstants';
 import {
   cartonCount, toRanges, formatRanges, expandCartonRange,
   intersectRanges, sizeQtyPerCarton, round,
 } from '../../utils/expDocCalc';
-import { decoratePl } from './expDocMockPackingLists';
 import { decorateInvoice } from './expDocMockInvoices';
 import { normBuyerName, templateMatchesBuyer, DOC_TYPE_TEMPLATE_ORDER } from '../../utils/expDocTemplateSchema';
 
-const LIVE_PL = [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED];
+/** A packing list that holds its cartons: any but cancelled and superseded. */
+const isLivePl = (pl) => ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(pl.status);
 const SHIPPED_PL = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 
@@ -56,7 +57,7 @@ export const packingStatusReport = async (params = {}) => {
   // Ordered comes from the order, as each live packing list read it for its shipment's POs
   // (PRD §7.4: never from packed data). Counted once per order, PO, colour and size.
   const counted = new Set();
-  (db.packingLists || []).filter((pl) => LIVE_PL.includes(pl.status)).forEach((pl) => {
+  (db.packingLists || []).filter(isLivePl).forEach((pl) => {
     (pl.orderBreakdown || []).forEach((l) => {
       const orderNo = l.sourceOrderNo ?? null;
       const once = `${orderNo}|${l.buyerPoNo ?? ''}|${l.destination ?? ''}|${key(l.styleNo, l.colorName, l.size)}`;
@@ -67,7 +68,7 @@ export const packingStatusReport = async (params = {}) => {
   });
 
   (db.packingLists || [])
-    .filter((pl) => LIVE_PL.includes(pl.status))
+    .filter(isLivePl)
     .forEach((pl) => {
       const shipped = SHIPPED_PL.includes(pl.status);
       allRows(pl).forEach((row) => {
@@ -253,9 +254,8 @@ export const varianceReport = async (params = {}) => {
   const out = [];
 
   (db.packingLists || [])
-    .filter((pl) => LIVE_PL.includes(pl.status))
-    .forEach((raw) => {
-      const pl = decoratePl(raw, db);
+    .filter(isLivePl)
+    .forEach((pl) => {
       (pl.orderVsPacked || [])
         .filter((v) => v.status !== 'MATCH')
         .forEach((v) => {
@@ -268,7 +268,7 @@ export const varianceReport = async (params = {}) => {
            * rule raised it.
            */
           const targetId = `LINE:${v.styleNo}|${v.colorName}|${v.size}`;
-          const ack = (raw.acknowledgements || []).find(
+          const ack = (pl.acknowledgements || []).find(
             (a) => String(a.targetKey || '').endsWith(targetId),
           );
           out.push({
@@ -320,7 +320,7 @@ export const cartonMasterReport = async (params = {}) => {
   if (!shipmentId) return { ...pageOf([], params), shipmentNo: null };
 
   const pls = (db.packingLists || [])
-    .filter((pl) => pl.shipmentId === shipmentId && LIVE_PL.includes(pl.status));
+    .filter((pl) => pl.shipmentId === shipmentId && isLivePl(pl));
   if (!pls.length) return { ...pageOf([], params), shipmentNo: null };
 
   /*
@@ -517,34 +517,6 @@ export const productivityReport = async (params = {}) => {
     .sort((a, b) => b.documents - a.documents);
 
   return pageOf(rows, params);
-};
-
-// ─── Audit trail (§20) ──────────────────────────────────────────────────────────
-
-export const searchAudit = async (params = {}) => {
-  await delay();
-  const db = loadDb();
-  const rows = (db.audit || [])
-    .filter((a) => (!params.entityType || a.entityType === params.entityType))
-    .filter((a) => (!params.entityId || String(a.entityId) === String(params.entityId)))
-    .filter((a) => (!params.user || a.user === params.user))
-    .filter((a) => (!params.dateFrom || String(a.at) >= params.dateFrom))
-    .filter((a) => (!params.dateTo || String(a.at) <= `${params.dateTo} 23:59`))
-    // A reason is what an override recorded, so "overrides only" is a real filter.
-    .filter((a) => (params.withReasonOnly ? Boolean(a.reason) : true))
-    // §20's field-level record, findable on its own.
-    .filter((a) => (params.withChangesOnly ? (a.changes || []).length > 0 : true))
-    .filter((a) => matchesText(a.entityNo, params.search)
-      || matchesText(a.action, params.search)
-      || matchesText(a.details, params.search)
-      || matchesText(a.reason, params.search)
-      || matchesText(a.user, params.search))
-    .map(clone)
-    .sort((a, b) => String(b.at).localeCompare(String(a.at)) || String(b.id).localeCompare(String(a.id)));
-
-  const users = [...new Set((db.audit || []).map((a) => a.user).filter(Boolean))].sort();
-  const entityTypes = [...new Set((db.audit || []).map((a) => a.entityType).filter(Boolean))].sort();
-  return { ...pageOf(rows, params), users, entityTypes };
 };
 
 export const REPORT_KEYS = {

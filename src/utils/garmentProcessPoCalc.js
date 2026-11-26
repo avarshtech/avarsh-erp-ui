@@ -110,6 +110,7 @@ export const validateGpo = (doc, ctx, { today = dayjs() } = {}) => {
     byLine[l.key] = byLine[l.key] || msg;
   };
   if (doc.poDate && dayjs(doc.poDate).isAfter(today, 'day')) blocking.push('The PO date cannot be in the future.');
+  if (!String(doc.paymentTerms ?? '').trim()) blocking.push('Select payment terms.');
   doc.lines.forEach((l, i) => {
     if (!(Number(l.poQty) > 0)) lineError(l, i, 'enter a quantity (V5)');
     else if (!dp(l.poQty, 2)) lineError(l, i, 'quantity takes at most two decimals');

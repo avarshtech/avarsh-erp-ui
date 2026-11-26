@@ -80,7 +80,8 @@ export const buildBillActions = ({
       },
     });
   }
-  if (bill.status === S.ON_HOLD && can.verify) {
+  // Whoever may put a bill on hold may release it (the server checks verify || approve for both).
+  if (bill.status === S.ON_HOLD && (can.verify || can.approve)) {
     out.push({
       key: 'release', action: 'refresh', text: 'Release Hold',
       onClick: ask('release', 'Release this bill from hold', 'Release remarks', 'Hold released',

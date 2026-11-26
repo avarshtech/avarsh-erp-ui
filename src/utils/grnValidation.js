@@ -24,7 +24,12 @@ const findDuplicateRollNumbersWithinGRN = ({ rolls = [] }) => {
   return [...new Set(dups)];
 };
 
-const baseHeaderValidations = ({ data, po, errors }) => {
+const baseHeaderValidations = ({ data, po, errors, isMultiBranch = false }) => {
+  // The receiving branch is a required picker only for a multi-branch company (hidden otherwise)
+  if (isMultiBranch && (data.branchId === null || data.branchId === undefined || data.branchId === '')) {
+    errors.push('Received At (Branch) is required');
+  }
+
   // PO + line items required for both draft and submit
   if (!data.poId) errors.push('Purchase Order is required');
   if (!data.lineItems || data.lineItems.length === 0) errors.push('Select at least one PO line item');
@@ -145,9 +150,9 @@ const validateCartonRows = ({ cartons, items, errors, isSubmit }) => {
  */
 export const validateFabricGRN = (data, isSubmit = false, ctx = {}) => {
   const errors = [];
-  const { po = null } = ctx;
+  const { po = null, isMultiBranch = false } = ctx;
 
-  baseHeaderValidations({ data, po, errors });
+  baseHeaderValidations({ data, po, errors, isMultiBranch });
   validateSupplierInvoice({ data, errors, isSubmit });
 
   const rolls = data.rolls || (data.lineItems || []).flatMap((li) => li.rolls || []);
@@ -162,9 +167,9 @@ export const validateFabricGRN = (data, isSubmit = false, ctx = {}) => {
  */
 export const validateTrimsGRN = (data, isSubmit = false, ctx = {}) => {
   const errors = [];
-  const { po = null } = ctx;
+  const { po = null, isMultiBranch = false } = ctx;
 
-  baseHeaderValidations({ data, po, errors });
+  baseHeaderValidations({ data, po, errors, isMultiBranch });
   validateSupplierInvoice({ data, errors, isSubmit });
 
   // Items: quantity checks. Excess vs PO balance is ALLOWED (see fabric note) —

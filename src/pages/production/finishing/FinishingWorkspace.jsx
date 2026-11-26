@@ -43,7 +43,7 @@ const FinishingWorkspace = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Finishing"
-        subtitle="Finishing floor — receiving to shade segregation, AQL 2.5 quality gates (design preview on sample data)"
+        subtitle="Finishing floor — receiving to shade segregation, AQL 2.5 quality gates"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       />
       <Tabs

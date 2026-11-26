@@ -462,6 +462,19 @@ const StyleMaster = ({ onDirtyChange }) => {
               <Form.Item name="description" label="Fabric Description">
                 <Input.TextArea rows={3} placeholder="Fabric description (optional)" maxLength={500} />
               </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="hsCode"
+                    label="HS Code (ITC-HS)"
+                    tooltip="The 8-digit ITC-HS code. Export invoice lines of this style start with it."
+                    normalize={(v) => (v || '').replace(/\D/g, '')}
+                    rules={[{ pattern: /^\d{8}$/, message: 'Enter the 8-digit ITC-HS code' }]}
+                  >
+                    <Input maxLength={8} inputMode="numeric" />
+                  </Form.Item>
+                </Col>
+              </Row>
 
               {/* Style Image */}
               <div

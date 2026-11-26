@@ -82,6 +82,12 @@ export const changeOrderStatus = async (id, status, reason, version) => {
   return response.data;
 };
 
+/** What cancelling the order does to the documents raised against it. GET /api/v1/orders/{id}/cancel-impact */
+export const getOrderCancelImpact = async (id) => {
+  const response = await axiosInstance.get(`${BASE}/${id}/cancel-impact`);
+  return response.data;
+};
+
 /**
  * Delete a draft order. DELETE /api/v1/orders/{id}
  */

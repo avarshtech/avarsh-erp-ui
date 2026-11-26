@@ -1,4 +1,4 @@
-import { getFinishingDashboard, USE_MOCK_FINISHING_DATA } from '../../../services/production/finishingService';
+import { USE_MOCK_FINISHING_DATA } from '../../../services/production/finishingService';
 import { fetchShipments } from '../../../services/virtual-factory/twinShippingApi';
 import { fetchOrders, fetchPurchaseOrders } from '../../../services/virtual-factory/twinOrdersApi';
 import { fetchFabricQc, fetchFabricStock, fetchGrns, fetchIssues, fetchTrimStock } from '../../../services/virtual-factory/twinInventoryApi';
@@ -6,7 +6,7 @@ import { fetchCuttingTables } from '../../../services/virtual-factory/twinCuttin
 import {
   fetchGarmentIssues, fetchPendingBundleIssues, fetchProductionLines, fetchSewingPlans, fetchTopse,
 } from '../../../services/virtual-factory/twinSewingApi';
-import { fetchProcessIssues } from '../../../services/virtual-factory/twinOutputApi';
+import { fetchFinishingDashboard, fetchProcessIssues } from '../../../services/virtual-factory/twinOutputApi';
 import { loadCutting, loadPacking, loadProductionOrders, loadSewingFloor, loadShortages } from './composedLoaders';
 
 export const TIER_MS = { fast: 45_000, slow: 300_000 };
@@ -35,16 +35,14 @@ export const SOURCES = [
   { id: 'bundleIssues', label: 'Bundles in transit', perm: 'production-sewing', tier: 'fast', keys: ['pendingBundleIssues'], load: one('pendingBundleIssues', fetchPendingBundleIssues) },
   { id: 'garmentIssues', label: 'Sewing to finishing', perm: 'production-sewing', tier: 'slow', keys: ['garmentIssues'], load: one('garmentIssues', fetchGarmentIssues) },
   { id: 'processIssues', label: 'External processes', perm: 'production-finishing', tier: 'slow', keys: ['processIssues'], load: one('processIssues', fetchProcessIssues) },
-  { id: 'finishing', label: 'Finishing stations', perm: 'production-finishing', tier: 'slow', keys: ['finishingDashboard'], demo: USE_MOCK_FINISHING_DATA, load: one('finishingDashboard', () => getFinishingDashboard()) },
+  { id: 'finishing', label: 'Finishing stations', perm: 'production-finishing', tier: 'slow', keys: ['finishingDashboard'], demo: USE_MOCK_FINISHING_DATA, load: one('finishingDashboard', fetchFinishingDashboard) },
   { id: 'packing', label: 'Packing', perm: 'production-packing', tier: 'fast', keys: ['packingEntries', 'packingDaily'], load: loadPacking },
   { id: 'shipments', label: 'Shipments', perm: 'export-shipments', tier: 'slow', keys: ['shipments'], load: one('shipments', fetchShipments) },
   { id: 'productionOrders', label: 'Production orders', perm: ['cutting-po', 'work-order', 'finishing-po'], tier: 'slow', keys: ['cuttingPoList', 'workOrders', 'finishingPos'], load: loadProductionOrders },
 ];
 
-// Shipments are the API's (read through a silent client); Finishing is still a demo store.
+// Shipments and Finishing are the API's, read through a silent client.
 export const DEMO = { finishing: USE_MOCK_FINISHING_DATA, shipping: false };
 
-// When Finishing moves off its mock, read it through a silent client in services/virtual-factory
-// (like the others), or a failure there would raise the global error toast.
 // /sewing/garment-issues and /sewing/topse return every row ever written (no date or page filter),
 // so they stay on the slow tier; a dated or paged variant of each is a backend follow-up.
