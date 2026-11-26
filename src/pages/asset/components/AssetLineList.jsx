@@ -3,7 +3,7 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { ActionButton } from '../../../components/buttons';
 
 /**
- * The lines inside one section.
+ * The lines on one floor.
  *
  * An indented list rather than a nested table. A line has a name and little
  * else, so a second table's worth of chrome - its own grey header bar repeating
@@ -13,12 +13,12 @@ import { ActionButton } from '../../../components/buttons';
  * Only an inactive line is tagged. The eye should catch the exception, not
  * confirm the normal case once per row.
  */
-const AssetLineList = ({ section, onEdit, onDelete }) => (
+const AssetLineList = ({ floor, onEdit, onDelete }) => (
   <div className="asset-sublist">
     <div className="asset-sublist-head">
-      {section.lines.length} line{section.lines.length === 1 ? '' : 's'} in {section.name}
+      {floor.lines.length} line{floor.lines.length === 1 ? '' : 's'} on {floor.name}
     </div>
-    {section.lines.map((line) => (
+    {floor.lines.map((line) => (
       <div className="asset-subrow" key={line.id}>
         <span className="asset-subrow-name">{line.name}</span>
         {!line.active && <Tag>Inactive</Tag>}

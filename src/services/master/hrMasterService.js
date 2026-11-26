@@ -68,6 +68,44 @@ export const deleteDesignation = async (id) => {
   return response.data;
 };
 
+// ── Floors ──
+//
+// A floor belongs to a department, the way a designation does. B1 runs Production on
+// the 1st floor and on the 2nd and they are separate places, so the pair is what says
+// where somebody is - the department alone no longer does.
+
+const FLOOR_URL = '/hr/floors';
+
+export const getAllFloors = async () => {
+  const response = await axiosInstance.get(FLOOR_URL);
+  return response.data;
+};
+
+export const getActiveFloors = async () => {
+  const response = await axiosInstance.get(`${FLOOR_URL}/active`);
+  return response.data;
+};
+
+export const getActiveFloorsByDepartment = async (deptId) => {
+  const response = await axiosInstance.get(`${FLOOR_URL}/active`, { params: { departmentId: deptId } });
+  return response.data;
+};
+
+export const createFloor = async (data) => {
+  const response = await axiosInstance.post(FLOOR_URL, data);
+  return response.data;
+};
+
+export const updateFloor = async (id, data) => {
+  const response = await axiosInstance.put(`${FLOOR_URL}/${id}`, { id, ...data });
+  return response.data;
+};
+
+export const deleteFloor = async (id) => {
+  const response = await axiosInstance.delete(`${FLOOR_URL}/${id}`);
+  return response.data;
+};
+
 // ── Shifts ──
 
 const SHIFT_URL = '/hr/shifts';

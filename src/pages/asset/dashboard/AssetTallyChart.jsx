@@ -3,6 +3,14 @@ import { Card, Progress } from 'antd';
 import EmptyState from '../../../components/EmptyState';
 
 /**
+ * Width, not only height. The dashboard drops these cards into flex columns, and
+ * a Card is a plain block div: as a flex item it sizes to its content, so a card
+ * holding one short bar rendered a quarter of its column wide and left the rest
+ * of the row blank. Height keeps the three in a row level with each other.
+ */
+const CARD = { height: '100%', width: '100%' };
+
+/**
  * One of the dashboard's charts, as a bar per row.
  *
  * Bars rather than a pie, and drawn with Progress rather than a charting
@@ -21,7 +29,7 @@ const AssetTallyChart = memo(function AssetTallyChart({
   const widest = Math.max(...rows.map((r) => r.count), 1);
 
   return (
-    <Card title={title} loading={loading} style={{ height: '100%' }}>
+    <Card title={title} loading={loading} size="small" style={CARD}>
       {!loading && rows.length === 0 && <EmptyState title={emptyText} />}
       {rows.map((row) => {
         const label = labelOf ? labelOf(row.label) : row.label;
@@ -29,7 +37,7 @@ const AssetTallyChart = memo(function AssetTallyChart({
           <div
             key={row.label}
             onClick={onRowClick ? () => onRowClick(row) : undefined}
-            style={{ marginBottom: 14, cursor: onRowClick ? 'pointer' : 'default' }}
+            style={{ marginBottom: 10, cursor: onRowClick ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2, gap: 8 }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

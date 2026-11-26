@@ -41,7 +41,6 @@ const AssetTransferForm = () => {
   const isEdit = !!id;
   const toUnitId = Form.useWatch('toUnitId', form);
   const toDepartmentId = Form.useWatch('toDepartmentId', form);
-  const toSectionId = Form.useWatch('toSectionId', form);
   const reasonCode = Form.useWatch('reasonCode', form);
 
   // Everything on one request leaves the same unit, so the first asset settles
@@ -63,8 +62,7 @@ const AssetTransferForm = () => {
         form.setFieldsValue({
           toUnitId: loaded.toUnitId,
           toDepartmentId: loaded.toDepartmentId,
-          toSectionId: loaded.toSectionId ?? undefined,
-          toLineId: loaded.toLineId ?? undefined,
+          toFloorId: loaded.toFloorId ?? undefined,
           toCustodianEmpId: loaded.toCustodianEmpId ?? undefined,
           reasonCode: loaded.reasonCode,
           reasonText: loaded.reasonText ?? undefined,
@@ -151,6 +149,9 @@ const AssetTransferForm = () => {
                   <Select
                     disabled={!toUnitId}
                     showSearch
+                    // A floor belongs to one department, so one left behind from the
+                    // previously chosen department is refused by the server on save.
+                    onChange={() => form.setFieldValue('toFloorId', undefined)}
                     optionFilterProp="label"
                     placeholder={toUnitId ? 'Select department' : 'Pick a unit first'}
                     options={lookups.departmentsOf(toUnitId)}
@@ -158,26 +159,22 @@ const AssetTransferForm = () => {
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={8}>
-                <Form.Item name="toSectionId" label="Section">
+                {/* No destination line. A transfer moves an asset to a floor and no
+                    further - which line it stands on is decided on the floor once it
+                    arrives, from the asset's own screen. A line picked here would also
+                    be stale by the time the machine landed. */}
+                <Form.Item
+                  name="toFloorId"
+                  label="Floor"
+                  tooltip="Which floor it is going to. The line it stands on is set after it arrives."
+                >
                   <Select
                     disabled={!toDepartmentId}
                     allowClear
                     showSearch
                     optionFilterProp="label"
                     placeholder={toDepartmentId ? 'Optional' : 'Pick a department first'}
-                    options={lookups.sectionsOf(toDepartmentId)}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item name="toLineId" label="Line">
-                  <Select
-                    disabled={!toSectionId}
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    placeholder={toSectionId ? 'Optional' : 'Pick a section first'}
-                    options={lookups.linesOf(toSectionId)}
+                    options={lookups.floorsOf(toDepartmentId)}
                   />
                 </Form.Item>
               </Col>

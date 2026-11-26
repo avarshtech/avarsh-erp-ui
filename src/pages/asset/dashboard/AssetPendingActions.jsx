@@ -28,7 +28,7 @@ const AssetPendingActions = memo(function AssetPendingActions({ pending, loading
   const waiting = ROWS.filter((row) => (pending?.[row.key] ?? 0) > 0);
 
   return (
-    <Card title="Pending actions" loading={loading} style={{ height: '100%' }}>
+    <Card title="Pending actions" loading={loading} style={{ height: '100%', width: '100%' }}>
       {!loading && waiting.length === 0 && (
         <Empty description="Nothing is waiting on anybody" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       )}

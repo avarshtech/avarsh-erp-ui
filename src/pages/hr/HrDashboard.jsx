@@ -4,16 +4,20 @@ import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   BankOutlined, ApartmentOutlined, IdcardOutlined,
   ClockCircleOutlined, CalendarOutlined, FileProtectOutlined, PercentageOutlined,
-  MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined,
+  MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined, SolutionOutlined,
+  BuildOutlined,
 } from '@ant-design/icons';
 import UnitMaster from './masters/UnitMaster';
 import DepartmentMaster from './masters/DepartmentMaster';
+import FloorMaster from './masters/FloorMaster';
 import DesignationMaster from './masters/DesignationMaster';
 import ShiftMaster from './masters/ShiftMaster';
 import HolidayMaster from './masters/HolidayMaster';
 import LeaveTypeMaster from './masters/LeaveTypeMaster';
 import PtSlabMaster from './masters/PtSlabMaster';
-import { hasModuleAccess } from '../../utils/permissions';
+import StatutoryRateMaster from './masters/StatutoryRateMaster';
+import ContractorMaster from './masters/ContractorMaster';
+import { hasModuleAccess, isSuperuser } from '../../utils/permissions';
 
 // Group accent colors for left border on group headers
 const GROUP_ACCENT = {
@@ -46,12 +50,33 @@ const NAV_GROUPS = [
         description: 'Departments within each unit',
       },
       {
+        // B1 runs Production on the 1st floor and on the 2nd, and they are
+        // different places. The pair - department and floor - is what an
+        // employee and an asset are filed against.
+        key: 'floor',
+        label: 'Floors',
+        icon: <BuildOutlined />,
+        moduleId: 'hr-masters',
+        Component: FloorMaster,
+        description: 'Floors within each department, shared with the asset register',
+      },
+      {
         key: 'designation',
         label: 'Designations',
         icon: <IdcardOutlined />,
         moduleId: 'hr-masters',
         Component: DesignationMaster,
         description: 'Job titles and employee categories',
+      },
+      {
+        // Administrator only: no role, however many HR keys it holds, is shown this.
+        key: 'contractor',
+        label: 'Contractors',
+        icon: <SolutionOutlined />,
+        moduleId: 'hr-masters',
+        superuserOnly: true,
+        Component: ContractorMaster,
+        description: 'Labour contractors supplying contract workers (administrator only)',
       },
     ],
   },
@@ -105,6 +130,17 @@ const NAV_GROUPS = [
         Component: PtSlabMaster,
         description: 'Professional Tax slabs by state and half-yearly income',
       },
+      {
+        // Effective-dated since the table was written, and read correctly by every
+        // payroll, bonus and gratuity calculation - but with no controller and no
+        // screen, so the PF ceiling was changed by connecting to the database.
+        key: 'statutory-rate',
+        label: 'Statutory Figures',
+        icon: <PercentageOutlined />,
+        moduleId: 'hr-masters',
+        Component: StatutoryRateMaster,
+        description: 'PF and ESI rates and ceilings, bonus and gratuity limits, and the wage-days basis',
+      },
     ],
   },
 ];
@@ -114,7 +150,7 @@ const getAccessibleGroups = () =>
   NAV_GROUPS
     .map(group => ({
       ...group,
-      items: group.items.filter(item => hasModuleAccess(item.moduleId)),
+      items: group.items.filter(item => hasModuleAccess(item.moduleId) && (!item.superuserOnly || isSuperuser())),
     }))
     .filter(group => group.items.length > 0);
 

@@ -1,0 +1,77 @@
+/*
+ * The statutory figures form.
+ *
+ * It is the tallest master form in the app - an explanation, five fields and three
+ * buttons - and the split view clipped anything past the panel height instead of
+ * scrolling it. The buttons fell below the cut, so a figure could be opened and then
+ * neither saved nor closed. The panel scrolls now; this keeps the heading and the
+ * actions out of that scroll, so the way back is on screen whatever the height.
+ */
+
+.statutory-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.statutory-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  /* A fixed band, not a sticky one. Sticking it inside a box whose content
+     overflows put it wherever that box ended, which was the middle of the
+     form - the bar sat on top of "Applies from". The body below scrolls
+     instead, between two bands that do not move. */
+  flex: 0 0 auto;
+  background: var(--bg-container, #fff);
+}
+
+.statutory-form-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.statutory-form-sub {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* Monospaced only where it is actually a code. The same class over the prose
+   shown when adding made a sentence look like an identifier. */
+.statutory-form-sub.is-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.statutory-form-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* The scroller. Nothing above or below it moves. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px 8px;
+}
+
+.statutory-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+  flex: 0 0 auto;
+  background: var(--bg-container, #fff);
+}
+
+/* The form sits inside a Card body that paints its own surface. Match it rather
+   than assuming white, or the two bands are the wrong colour in dark mode. */
+[data-theme='dark'] .statutory-form-head,
+[data-theme='dark'] .statutory-form-actions {
+  background: #1e293b;
+  border-color: #334155;
+}

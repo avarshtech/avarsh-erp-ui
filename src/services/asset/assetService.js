@@ -49,14 +49,13 @@ export const createCategory = async (payload) =>
 export const updateCategory = async (id, payload) =>
   (await axiosInstance.put(`${SETUP}/categories/${id}`, payload)).data;
 
-export const getSections = async (departmentId) =>
-  (await axiosInstance.get(`${SETUP}/sections${query({ departmentId })}`)).data;
-
-export const createSection = async (payload) =>
-  (await axiosInstance.post(`${SETUP}/sections`, payload)).data;
-
-export const updateSection = async (id, payload) =>
-  (await axiosInstance.put(`${SETUP}/sections/${id}`, payload)).data;
+/**
+ * Floors with their lines. Read only here - a floor is HR's record, maintained under
+ * HR Masters beside units and departments, because the people standing on it are
+ * filed against the same row. Lines below it belong to this module.
+ */
+export const getFloors = async (departmentId) =>
+  (await axiosInstance.get(`${SETUP}/floors${query({ departmentId })}`)).data;
 
 export const createLine = async (payload) => (await axiosInstance.post(`${SETUP}/lines`, payload)).data;
 
@@ -86,6 +85,15 @@ export const getEmployeeOptions = async (search) =>
 export const changeAssetStatus = async (id, payload) =>
   (await axiosInstance.put(`${ASSETS}/${id}/status`, payload)).data;
 
+/**
+ * Put the asset on another line of the floor it is already on, or take it off one
+ * with a null lineId. Not a transfer: a machine changes line between styles and
+ * requiring a challan for that would mean nobody recorded it. It is marked in the
+ * asset's history as a line change and nothing else moves.
+ */
+export const changeAssetLine = async (id, payload) =>
+  (await axiosInstance.put(`${ASSETS}/${id}/line`, payload)).data;
+
 export const getAssetStatusHistory = async (id) =>
   (await axiosInstance.get(`${ASSETS}/${id}/status-history`)).data;
 
@@ -98,8 +106,5 @@ export const getStatusReasons = async () =>
 
 export const deleteCategory = async (id) =>
   (await axiosInstance.delete(`${SETUP}/categories/${id}`)).data;
-
-export const deleteSection = async (id) =>
-  (await axiosInstance.delete(`${SETUP}/sections/${id}`)).data;
 
 export const deleteLine = async (id) => (await axiosInstance.delete(`${SETUP}/lines/${id}`)).data;

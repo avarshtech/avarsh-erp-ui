@@ -2062,7 +2062,17 @@ textarea.ant-input:active {
 .employee-photo .ant-image img { display: block; border-radius: 0; }
 
 .employee-photo-empty {
-  color: rgba(0, 0, 0, 0.22);
+  /* Stacked, because the silhouette alone was read as something still loading
+     or something that had failed - which is exactly what it looked like when a
+     photo's file had gone and the screen toasted a server error over it. */
+  flex-direction: column;
+  gap: 4px;
+  color: rgba(0, 0, 0, 0.3);
+}
+.employee-photo-empty-label {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.2px;
 }
 
 /* The empty-but-addable state is one big target rather than a small button
@@ -2194,6 +2204,37 @@ textarea.ant-input:active {
   overflow: hidden;
 }
 [data-theme="dark"] .asset-label-preview { border-color: rgba(255, 255, 255, 0.35); }
+
+/* The file chosen for an attendance import, on a line of its own under the
+   buttons. antd's own upload list rendered inside the Upload, which grew that
+   one control to two lines and pulled the row of three buttons out of line. */
+.attendance-import-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+  /* The row is as wide as its column, so a long file name truncates instead of
+     pushing the remove button out of reach. */
+  max-width: 100%;
+  min-width: 0;
+}
+.attendance-import-file-icon { opacity: 0.55; flex: 0 0 auto; }
+.attendance-import-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attendance-import-file-size { flex: 0 0 auto; font-size: 12px; }
+[data-theme="dark"] .attendance-import-file {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
 
 /* A pending-action row on the asset dashboard. Each one is a way into the queue
    it counts, so the whole row is the target rather than the number alone. */

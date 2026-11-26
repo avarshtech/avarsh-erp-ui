@@ -101,11 +101,14 @@ const AssetDashboard = () => {
         </Col>
       </Row>
 
+      {/* Eight short queue rows against a table of locations: the queue needs a
+          third of the width, the table wants the rest. Both stretch, so the two
+          cards end level instead of one trailing a ragged edge below the other. */}
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 16 }}>
-        <Col xs={24} lg={10} style={{ display: 'flex' }}>
+        <Col xs={24} lg={8} style={{ display: 'flex' }}>
           <AssetPendingActions pending={data?.pending} loading={loading} onOpen={go} />
         </Col>
-        <Col xs={24} lg={14}>
+        <Col xs={24} lg={16} style={{ display: 'flex' }}>
           <AssetRecentMovements
             rows={data?.recentMovements ?? []}
             loading={loading}

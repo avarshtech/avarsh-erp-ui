@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App } from 'antd';
 import {
-  getCategories, getSections, getUnitOptions, getDepartmentOptions, getSupplierOptions,
+  getCategories, getFloors, getUnitOptions, getDepartmentOptions, getSupplierOptions,
 } from '../services/asset/assetService';
 import { toastUnlessHandled } from '../utils/apiError';
 
@@ -13,16 +13,16 @@ import { toastUnlessHandled } from '../utils/apiError';
  */
 const useAssetLookups = () => {
   const { message } = App.useApp();
-  const [data, setData] = useState({ categories: [], sections: [], units: [], departments: [], suppliers: [] });
+  const [data, setData] = useState({ categories: [], floors: [], units: [], departments: [], suppliers: [] });
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [categories, sections, units, departments, suppliers] = await Promise.all([
-        getCategories(), getSections(), getUnitOptions(), getDepartmentOptions(), getSupplierOptions(),
+      const [categories, floors, units, departments, suppliers] = await Promise.all([
+        getCategories(), getFloors(), getUnitOptions(), getDepartmentOptions(), getSupplierOptions(),
       ]);
-      setData({ categories, sections, units, departments, suppliers });
+      setData({ categories, floors, units, departments, suppliers });
     } catch (e) {
       toastUnlessHandled(message, e, 'Could not load the asset categories and locations');
     } finally {
@@ -49,13 +49,18 @@ const useAssetLookups = () => {
     .filter((d) => !unitId || d.parentId === null || d.parentId === unitId)
     .map((d) => ({ value: d.id, label: d.label })), [data.departments]);
 
-  const sectionsOf = useCallback((departmentId) => data.sections
-    .filter((s) => s.departmentId === departmentId)
-    .map((s) => ({ value: s.id, label: s.name })), [data.sections]);
+  /** Floors of one department. B1's Production has two, and they are different places. */
+  const floorsOf = useCallback((departmentId) => data.floors
+    .filter((f) => f.departmentId === departmentId)
+    .map((f) => ({ value: f.id, label: f.name })), [data.floors]);
 
-  const linesOf = useCallback((sectionId) => (data.sections
-    .find((s) => s.id === sectionId)?.lines ?? [])
-    .map((l) => ({ value: l.id, label: l.name })), [data.sections]);
+  const linesOf = useCallback((floorId) => (data.floors
+    .find((f) => f.id === floorId)?.lines ?? [])
+    .map((l) => ({ value: l.id, label: l.name })), [data.floors]);
+
+  /** The floor itself, for a screen that needs more than its name. */
+  const floorById = useCallback((floorId) => data.floors.find((f) => f.id === floorId) ?? null,
+    [data.floors]);
 
   /**
    * The extra fields to render: the sub-category's when it defines any, else the
@@ -81,9 +86,9 @@ const useAssetLookups = () => {
    */
   return useMemo(() => ({
     ...data, options, loading, reload: load,
-    subCategoriesOf, departmentsOf, sectionsOf, linesOf, fieldDefsFor,
+    subCategoriesOf, departmentsOf, floorsOf, linesOf, floorById, fieldDefsFor,
   }), [data, options, loading, load,
-    subCategoriesOf, departmentsOf, sectionsOf, linesOf, fieldDefsFor]);
+    subCategoriesOf, departmentsOf, floorsOf, linesOf, floorById, fieldDefsFor]);
 };
 
 export default useAssetLookups;

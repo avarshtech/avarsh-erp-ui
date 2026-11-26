@@ -1,13 +1,17 @@
 import { Alert, Col, Form, Row, Select } from 'antd';
 
 /**
- * Unit, department, section, line and custodian.
+ * Unit, department, floor, line and custodian.
  *
  * Read-only once the asset exists: an asset moves through a transfer, which
  * records who moved it, when and why. Letting Edit change it would leave the
  * current location and the history disagreeing, and the server refuses it too.
+ *
+ * The line is the exception, and it is changed from the asset's own screen rather
+ * than here - a machine moves between lines on the same floor constantly, and that
+ * is a note in the history rather than a move.
  */
-const AssetLocationFields = ({ lookups, unitId, departmentId, sectionId, employeeOptions, onEmployeeSearch, locked }) => (
+const AssetLocationFields = ({ lookups, unitId, departmentId, floorId, employeeOptions, onEmployeeSearch, locked }) => (
   <>
     {locked && (
       <Alert
@@ -42,26 +46,30 @@ const AssetLocationFields = ({ lookups, unitId, departmentId, sectionId, employe
         </Form.Item>
       </Col>
       <Col xs={24} sm={12} md={8}>
-        <Form.Item name="sectionId" label="Section" tooltip="Optional - set it up under Asset Setup">
+        <Form.Item
+          name="floorId"
+          label="Floor"
+          tooltip="Which floor of the department. Set floors up under HR Masters."
+        >
           <Select
             disabled={locked || !departmentId}
             allowClear
             showSearch
             optionFilterProp="label"
-            placeholder={departmentId ? 'Select section' : 'Pick a department first'}
-            options={lookups.sectionsOf(departmentId)}
+            placeholder={departmentId ? 'Select floor' : 'Pick a department first'}
+            options={lookups.floorsOf(departmentId)}
           />
         </Form.Item>
       </Col>
       <Col xs={24} sm={12} md={8}>
-        <Form.Item name="lineId" label="Line">
+        <Form.Item name="lineId" label="Line" tooltip="Optional. Changed later from the asset itself.">
           <Select
-            disabled={locked || !sectionId}
+            disabled={locked || !floorId}
             allowClear
             showSearch
             optionFilterProp="label"
-            placeholder={sectionId ? 'Select line' : 'Pick a section first'}
-            options={lookups.linesOf(sectionId)}
+            placeholder={floorId ? 'Select line' : 'Pick a floor first'}
+            options={lookups.linesOf(floorId)}
           />
         </Form.Item>
       </Col>

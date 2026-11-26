@@ -167,11 +167,11 @@ export const LOAN_STATUS = [
   { value: 'CANCELLED', label: 'Cancelled', color: 'default' },
 ];
 
-export const PF_RATE = 0.12;
-export const PF_CEILING = 15000;
-export const ESI_EMPLOYEE_RATE = 0.0075;
-export const ESI_EMPLOYER_RATE = 0.0325;
-export const ESI_CEILING = 21000;
+// PF_RATE, PF_CEILING, ESI_EMPLOYEE_RATE, ESI_EMPLOYER_RATE and ESI_CEILING were
+// here as literals. Nothing imported them, and they had already drifted: the real
+// figures live in hr_statutory_rates, effective-dated, and are now editable under
+// HR Masters > Statutory Figures. A second copy in the browser reads as truth to
+// whoever finds it next, and would have said 15,000 after November.
 
 export const ADVANCE_STATUS = [
   { value: 'PENDING', label: 'Pending', color: 'processing' },

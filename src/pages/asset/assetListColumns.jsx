@@ -36,7 +36,7 @@ export const buildAssetListColumns = ({ onOpen, onEdit, canUpdate }) => [
     key: 'location',
     width: 240,
     render: (_, row) => {
-      const parts = [row.unitName, row.departmentName, row.sectionName, row.lineName].filter(Boolean);
+      const parts = [row.unitName, row.departmentName, row.floorName, row.lineName].filter(Boolean);
       const text = parts.join(' / ');
       return <Tooltip title={text}>{text || '-'}</Tooltip>;
     },

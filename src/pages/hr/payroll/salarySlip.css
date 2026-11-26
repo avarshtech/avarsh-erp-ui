@@ -1,0 +1,250 @@
+/*
+ * Form 25B.
+ *
+ * Laid out as a printed form rather than as a web page: fixed borders, every cell
+ * drawn, both languages stacked in each label. It is handed to somebody on a factory
+ * floor, not scrolled.
+ *
+ * The print rules are the part that did not exist. SalarySlipView has always carried
+ * `salary-slip-print` and `no-print` classes, but no @media print block anywhere in
+ * the app defined them - so printing a payslip printed the sidebar, the header and the
+ * notification bell along with it.
+ */
+
+/* 210 x 144mm - half an A4, the box it prints inside - held as an aspect ratio so
+   the screen cannot flatter a layout that will not fit on paper. Anything that
+   overflows here overflows there, which is the point of looking at it. */
+.slip-sheet {
+  max-width: 940px;
+  aspect-ratio: 210 / 144;
+  margin: 0 auto;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+  padding: 10px 12px 12px;
+  font-size: 11px;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+/* On the foot of the half-page, where a signature belongs. */
+.slip-sheet .slip-signatures { flex: 0 0 78px; }
+
+/* Tamil and Hindi beneath their English, smaller and quieter, on every label.
+   The two share a line rather than taking one each: a third language stacked
+   would add a line to every label on the sheet, and the sheet has to stay half
+   an A4 so two still print on one page. They wrap onto a second line only where
+   the column is genuinely too narrow for both. */
+.slip-en { display: block; }
+.slip-ta,
+.slip-hi {
+  display: inline;
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 400;
+}
+.slip-hi::before {
+  content: ' · ';
+  opacity: 0.5;
+}
+
+.slip-head {
+  text-align: center;
+  border-bottom: 1px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.slip-company { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+.slip-title { margin-top: 4px; font-weight: 700; }
+.slip-title .slip-en { display: inline; }
+.slip-title .slip-ta { margin-inline-start: 6px; }
+.slip-form-no { float: right; font-weight: 600; }
+.slip-period { margin-top: 4px; }
+.slip-period .slip-en { display: inline; }
+.slip-period .slip-ta { margin-inline-start: 4px; }
+
+/* Three columns. The form has two, but the form is not printed on a sheet this
+   wide - in two columns these facts alone took a third of the page. */
+.slip-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid #000;
+  border-bottom: none;
+}
+.slip-fact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #000;
+  min-width: 0;
+}
+.slip-fact:not(:nth-child(3n)) { border-inline-end: 1px solid #000; }
+.slip-fact-blank { border-bottom: 1px solid #000; }
+.slip-fact-label { flex: 0 0 44%; font-weight: 600; }
+.slip-fact-value { flex: 1; word-break: break-word; }
+.slip-of { opacity: 0.6; }
+
+.slip-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.slip-grid th,
+.slip-grid td {
+  border: 1px solid #000;
+  padding: 3px 6px;
+  /* Middle, not top. A particulars cell runs to two lines - English above Tamil
+     and Hindi - while the amount beside it is one, so top-aligning left every
+     figure pinned to the border above it with the whole row's depth beneath. */
+  vertical-align: middle;
+}
+
+/* The table takes whatever height is left in the half-page and shares it out
+   across its rows, instead of sitting tight at the top and leaving a dead band
+   above the signatures. Rows that breathe are also rows somebody can read. */
+.slip-grid { flex: 1 1 auto; }
+.slip-grid th {
+  font-weight: 700;
+  text-align: center;
+  background: #f2f2f2;
+}
+.slip-grid col,
+.slip-grid th:nth-child(1) { width: 24%; }
+.slip-grid th:nth-child(2),
+.slip-grid th:nth-child(3) { width: 15%; }
+.slip-grid th:nth-child(4) { width: 28%; }
+.slip-grid th:nth-child(5) { width: 18%; }
+
+.slip-particular { font-weight: 600; }
+.slip-figure { text-align: right; font-variant-numeric: tabular-nums; }
+.slip-total td { font-weight: 700; background: #f7f7f7; }
+
+/* Four cells across the foot of the grid rather than four stacked rows. The
+   numbers are read together - what was earned against what was taken - and
+   side by side is both shorter and the way they are compared. */
+.slip-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid #000;
+  border-top: none;
+}
+.slip-summary > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  min-width: 0;
+}
+.slip-summary > div:not(:last-child) { border-inline-end: 1px solid #000; }
+.slip-summary strong { font-variant-numeric: tabular-nums; }
+.slip-summary .slip-en { display: inline; }
+.slip-summary .slip-ta { margin-inline-start: 6px; }
+.slip-net { background: #f2f2f2; font-weight: 700; }
+
+/* The account number sits with the signatures, where the form puts it. */
+.slip-foot { margin-top: 10px; }
+.slip-bank { font-size: 11px; }
+.slip-bank .slip-en { display: inline; }
+.slip-bank .slip-ta { margin-inline-start: 6px; }
+.slip-bank strong { margin-inline-start: 6px; font-variant-numeric: tabular-nums; }
+
+/* A reserved band, not the space the table happens to leave. The rules sit at
+   the BOTTOM of it, so the blank paper is above them - which is where a hand
+   actually signs. Letting the table take everything put the rules immediately
+   under the totals with nothing to write on. */
+.slip-signatures {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+.slip-signatures > div {
+  border-top: 1px solid #000;
+  padding-top: 2px;
+  min-width: 170px;
+  text-align: center;
+  font-size: 10px;
+}
+
+/* Dark mode is for the screen. The sheet is a printed form and stays on paper. */
+[data-theme='dark'] .slip-sheet {
+  background: #fff;
+  color: #000;
+}
+
+@media print {
+  /* Everything but the slip. The classes existed; nothing ever defined them, so
+     printing a payslip printed the whole application around it. */
+  body * { visibility: hidden; }
+  .salary-slip-print,
+  .salary-slip-print * { visibility: visible; }
+  .salary-slip-print {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+  .no-print { display: none !important; }
+
+  /* A4 portrait, with the slip occupying its top half. It was A5 landscape, which
+     made the PAGE half an A4 - so a printer loaded with A4 put one slip on a sheet
+     and wasted the rest. On a full sheet with the slip boxed to half of it, the
+     free half takes the next slip. Everything below keeps it inside that half: on
+     a payslip, spilling means the signatures arrive without the wages. */
+  @page { size: A4 portrait; margin: 4mm; }
+
+  /* Exactly half the printable height, so the slip occupies the top half of the
+     sheet and the bottom half is free for the next one. A4 is 297mm; less the 4mm
+     margins top and bottom that leaves 289mm, and half of that is 144mm.
+
+     aspect-ratio is cleared: on screen it is what holds the shape, but here the
+     height is given outright and a ratio left in place would fight it for the
+     width. */
+  .slip-sheet {
+    height: 144mm;
+    aspect-ratio: auto;
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #000;
+    box-shadow: none;
+    font-size: 7.5px;
+    padding: 4px 6px 5px;
+    line-height: 1.12;
+  }
+  /* A reserved band for signing, 20mm of it, with the rules on its lower edge so
+     the blank paper is above them. Everything left over after this band goes to
+     the table, which has ten rows to spread it across - the two were fighting
+     over the same height, and whichever won, the other looked wrong. */
+  .slip-signatures { flex: 0 0 20mm; margin-top: 5px; }
+  .slip-signatures > div { padding-top: 1.5px; }
+  /* Nothing may break across a page, because there is only one. */
+  .slip-sheet, .slip-facts, .slip-grid, .slip-summary, .slip-signatures {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .slip-head { padding-bottom: 4px; margin-bottom: 5px; }
+  .slip-company { font-size: 11px; letter-spacing: 0.2px; }
+  .slip-title, .slip-period { font-size: 7.5px; margin-top: 0; }
+  .slip-ta, .slip-hi { font-size: 6.3px; }
+
+  /* Room to breathe, now that the table has the height the signatures were
+     holding. These were under a pixel of vertical padding, which is what put
+     every figure against the line above it. */
+  .slip-fact { padding: 2.2px 4px; gap: 4px; }
+  .slip-grid th, .slip-grid td { padding: 2.2px 4px; }
+  .slip-summary > div { padding: 2.5px 5px; }
+
+  .slip-signatures > div { min-width: 110px; font-size: 7px; padding-top: 1px; }
+
+  .slip-grid th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slip-total td,
+  .slip-net { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

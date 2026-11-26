@@ -123,6 +123,8 @@ const AttendanceEntry = lazyRoute(() => import('./pages/hr/attendance/Attendance
 const AttendanceImport = lazyRoute(() => import('./pages/hr/attendance/AttendanceImport'));
 const MissPunchList = lazyRoute(() => import('./pages/hr/attendance/MissPunchList'));
 const GatePassList = lazyRoute(() => import('./pages/hr/attendance/GatePassList'));
+const PermissionList = lazyRoute(() => import('./pages/hr/attendance/PermissionList'));
+const StrengthReport = lazyRoute(() => import('./pages/hr/reports/StrengthReport'));
 const LeaveApplicationList = lazyRoute(() => import('./pages/hr/leave/LeaveApplicationList'));
 const LeaveBalanceView = lazyRoute(() => import('./pages/hr/leave/LeaveBalanceView'));
 // Payroll & Loans (lazy-loaded)
@@ -130,6 +132,7 @@ const PayrollList = lazyRoute(() => import('./pages/hr/payroll/PayrollList'));
 const PayrollWizard = lazyRoute(() => import('./pages/hr/payroll/PayrollWizard'));
 const PayrollRunView = lazyRoute(() => import('./pages/hr/payroll/PayrollRunView'));
 const SalarySlipView = lazyRoute(() => import('./pages/hr/payroll/SalarySlipView'));
+const SalaryRegister = lazyRoute(() => import('./pages/hr/payroll/register/SalaryRegister'));
 const LoanList = lazyRoute(() => import('./pages/hr/loan/LoanList'));
 const AdvanceList = lazyRoute(() => import('./pages/hr/loan/AdvanceList'));
 const LoanView = lazyRoute(() => import('./pages/hr/loan/LoanView'));
@@ -138,6 +141,7 @@ const BonusList = lazyRoute(() => import('./pages/hr/bonus/BonusList'));
 const BonusWizard = lazyRoute(() => import('./pages/hr/bonus/BonusWizard'));
 const BonusRunView = lazyRoute(() => import('./pages/hr/bonus/BonusRunView'));
 const PtReturnList = lazyRoute(() => import('./pages/hr/statutory/PtReturnList'));
+const LwfReturn = lazyRoute(() => import('./pages/hr/statutory/LwfReturn'));
 const PtReturnView = lazyRoute(() => import('./pages/hr/statutory/PtReturnView'));
 const ElEncashmentList = lazyRoute(() => import('./pages/hr/statutory/ElEncashmentList'));
 const ContributionFiling = lazyRoute(() => import('./pages/hr/statutory/ContributionFiling'));
@@ -479,12 +483,15 @@ const ThemedApp = () => {
             <Route path="hr/attendance/import" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceImport /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/miss-punch" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><MissPunchList /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/gate-pass" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><GatePassList /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/permissions" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><PermissionList /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/strength" element={<PermissionRoute module="hr-attendance" operation="view"><Suspense fallback={<PageSkeleton />}><StrengthReport /></Suspense></PermissionRoute>} />
             {/* Leave */}
             <Route path="hr/leaves" element={<PermissionRoute module="hr-leave" operation="view"><Suspense fallback={<PageSkeleton />}><LeaveApplicationList /></Suspense></PermissionRoute>} />
             <Route path="hr/leaves/balances" element={<PermissionRoute module="hr-leave" operation="view"><Suspense fallback={<PageSkeleton />}><LeaveBalanceView /></Suspense></PermissionRoute>} />
             {/* Payroll */}
             <Route path="hr/payroll" element={<PermissionRoute module="hr-payroll" operation="view"><Suspense fallback={<PageSkeleton />}><PayrollList /></Suspense></PermissionRoute>} />
             <Route path="hr/payroll/new" element={<PermissionRoute module="hr-payroll" operation="add"><Suspense fallback={<PageSkeleton />}><PayrollWizard /></Suspense></PermissionRoute>} />
+            <Route path="hr/payroll/register" element={<PermissionRoute module="hr-payroll" operation="view"><Suspense fallback={<PageSkeleton />}><SalaryRegister /></Suspense></PermissionRoute>} />
             <Route path="hr/payroll/slip/:id" element={<PermissionRoute module="hr-payroll" operation="view"><Suspense fallback={<PageSkeleton />}><SalarySlipView /></Suspense></PermissionRoute>} />
             <Route path="hr/payroll/:id" element={<PermissionRoute module="hr-payroll" operation="view"><Suspense fallback={<PageSkeleton />}><PayrollRunView /></Suspense></PermissionRoute>} />
             {/* Loans */}
@@ -498,6 +505,7 @@ const ThemedApp = () => {
             {/* Statutory */}
             <Route path="hr/statutory/pt" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><PtReturnList /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/pt/:id" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><PtReturnView /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/lwf" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><LwfReturn /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/el" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><ElEncashmentList /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/el/:id" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><ElEncashmentRunView /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/pf" element={<PermissionRoute module="hr-statutory" operation="view"><Suspense fallback={<PageSkeleton />}><ContributionFiling scheme="PF" /></Suspense></PermissionRoute>} />

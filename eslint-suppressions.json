@@ -307,11 +307,6 @@
       "count": 7
     }
   },
-  "src/pages/hr/payroll/SalarySlipView.jsx": {
-    "no-restricted-syntax": {
-      "count": 6
-    }
-  },
   "src/pages/inventory/adjustment/AdjustmentViewDrawer.jsx": {
     "no-restricted-syntax": {
       "count": 8

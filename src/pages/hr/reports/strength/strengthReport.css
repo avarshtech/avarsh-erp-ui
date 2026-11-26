@@ -1,0 +1,43 @@
+/*
+ * Strength report tables. index.css paints every body cell (and its hover) with
+ * !important, so the total rows and the Absent % tints need a more specific
+ * selector with !important to show - an inline style on the cell loses.
+ * Colours match the Excel and PDF the server builds.
+ */
+.strength-table .ant-table-tbody > tr.strength-row-unit > td,
+.strength-table .ant-table-tbody > tr.strength-row-unit:hover > td {
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent) !important;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.strength-table .ant-table-tbody > tr.strength-row-dept > td,
+.strength-table .ant-table-tbody > tr.strength-row-dept:hover > td {
+  background: var(--bg-tertiary) !important;
+  font-weight: 600;
+}
+
+.strength-table .ant-table-tbody > tr.strength-row-unitTotal > td,
+.strength-table .ant-table-tbody > tr.strength-row-unitTotal:hover > td {
+  background: color-mix(in srgb, var(--primary-color) 16%, transparent) !important;
+  font-weight: 700;
+}
+
+.strength-table .ant-table-tbody > tr.strength-row-grand > td,
+.strength-table .ant-table-tbody > tr.strength-row-grand:hover > td {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.strength-table .ant-table-tbody > tr > td.strength-tone-warn {
+  background: color-mix(in srgb, #faad14 18%, transparent) !important;
+  color: #d48806 !important;
+  font-weight: 600;
+}
+
+.strength-table .ant-table-tbody > tr > td.strength-tone-alert {
+  background: color-mix(in srgb, #ff4d4f 16%, transparent) !important;
+  color: #cf1322 !important;
+  font-weight: 600;
+}

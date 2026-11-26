@@ -9,9 +9,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/hr/employeeService';
 import {
-  getActiveDepartmentsByUnit, getActiveDesignationsByDepartment, getActiveShifts,
+  getActiveDepartmentsByUnit, getActiveDesignationsByDepartment, getActiveFloorsByDepartment,
+  getActiveShifts,
 } from '../../../services/master/hrMasterService';
 import { getActiveUnits } from '../../../services/master/unitService';
+import { getContractors } from '../../../services/hr/contractorService';
+import { isSuperuser } from '../../../utils/permissions';
 import { useBranch } from '../../../context/BranchContext';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import {
@@ -49,6 +52,7 @@ const FIELD_TAB = {
   employeeNo: 'employment',
   departmentId: 'employment',
   designationId: 'employment',
+  floorId: 'employment',
   unitId: 'employment',
   shiftId: 'employment',
   category: 'employment',
@@ -187,6 +191,7 @@ const EmployeeForm = () => {
   // Dropdown options
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [floors, setFloors] = useState([]);
   const [units, setUnits] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [managers, setManagers] = useState([]);
@@ -197,8 +202,22 @@ const EmployeeForm = () => {
   // all of them let a user pick a department from another unit, which saves
   // fine but leaves the employee unfindable by department on the attendance
   // calendar. Each level is now scoped to its parent.
+  // Watched, not read once: the header sits outside the tabs and has to keep
+  // saying whose record this is while somebody moves between Personal,
+  // Employment and the rest - and to follow the name as it is typed on a new one.
+  const watchedFullName = Form.useWatch('fullName', form);
+  const watchedEmployeeNo = Form.useWatch('employeeNo', form);
   const watchedUnitId = Form.useWatch('unitId', form);
   const watchedDepartmentId = Form.useWatch('departmentId', form);
+  const watchedEmployeeType = Form.useWatch('employeeType', form);
+
+  // Administrator only: nobody else is told contractors exist, so the list is
+  // not even requested for them (the server would refuse it anyway).
+  const [canSeeContractors] = useState(isSuperuser);
+  const [contractors, setContractors] = useState([]);
+  useEffect(() => {
+    if (canSeeContractors) getContractors(true).then(setContractors).catch(() => setContractors([]));
+  }, [canSeeContractors]);
 
   useEffect(() => {
     getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
@@ -216,9 +235,14 @@ const EmployeeForm = () => {
   useEffect(() => {
     if (!watchedDepartmentId) {
       setDesignations([]);
+      setFloors([]);
       return;
     }
     getActiveDesignationsByDepartment(watchedDepartmentId).then(setDesignations).catch(() => setDesignations([]));
+    // The floor is required only where the department has one. Most do not yet,
+    // and the people already on the roll have none - so an empty list hides the
+    // field rather than blocking the save.
+    getActiveFloorsByDepartment(watchedDepartmentId).then(setFloors).catch(() => setFloors([]));
   }, [watchedDepartmentId]);
 
   // Load employee for edit
@@ -309,9 +333,14 @@ const EmployeeForm = () => {
         return;
       }
 
+      const unnamedOther = documents.some(
+        (d) => d.documentType === 'OTHER' && !String(d.documentName || '').trim(),
+      );
       const documentError = documents.some((d) => !d.documentType)
         ? 'Every document row needs a type. Remove blank rows or pick a type.'
-        : null;
+        : (unnamedOther
+          ? 'A document filed as Other needs a name saying what it is.'
+          : null);
       if (documentError) {
         setActiveTab('documents');
         message.error(documentError);
@@ -405,7 +434,9 @@ const EmployeeForm = () => {
         // carries the file id, so the link survives either way.
         entityId: isEdit ? Number(id) : undefined,
         fileCategory: 'DOCUMENT',
-        description: row.documentType || undefined,
+        // The stored file says what it is too, so the file library is readable
+        // without joining back to the employee's document row.
+        description: (row.documentType === 'OTHER' && row.documentName) || row.documentType || undefined,
       });
       setDocuments((prev) => {
         const arr = [...prev];
@@ -426,7 +457,7 @@ const EmployeeForm = () => {
     }
   };
 
-  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', fileUrl: '', fileName: '', fileType: '', remarks: '' }]);
+  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', documentName: '', fileUrl: '', fileName: '', fileType: '', remarks: '' }]);
   const removeDocument = (key) => setDocuments((prev) => prev.filter((d) => (d.key || d.id) !== key));
 
   const nomineeColumns = [
@@ -439,7 +470,47 @@ const EmployeeForm = () => {
   ];
 
   const documentColumns = [
-    { title: 'Type', dataIndex: 'documentType', key: 'documentType', width: 200, render: (_, rec, idx) => <Select showSearch optionFilterProp="label" value={rec.documentType} onChange={(v) => { const arr = [...documents]; arr[idx] = { ...arr[idx], documentType: v }; setDocuments(arr); setIsDirty(true); }} options={DOCUMENT_TYPES} style={{ width: '100%' }} /> },
+    {
+      title: 'Type',
+      dataIndex: 'documentType',
+      key: 'documentType',
+      width: 230,
+      render: (_, rec, idx) => {
+        const setRow = (patch) => {
+          const arr = [...documents];
+          arr[idx] = { ...arr[idx], ...patch };
+          setDocuments(arr);
+          setIsDirty(true);
+        };
+        return (
+          <>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              value={rec.documentType}
+              /* Changing away from Other drops the name with it, so a row cannot
+                 keep a name that no longer describes what it is. */
+              onChange={(v) => setRow({ documentType: v, documentName: v === 'OTHER' ? rec.documentName : '' })}
+              options={DOCUMENT_TYPES}
+              style={{ width: '100%' }}
+            />
+            {/* "Other" names nothing by itself, and two of them are indistinguishable
+                in a list a year later. Named, they are fine in any number - the name
+                is what tells them apart, which is why it is required rather than the
+                second Other being refused. */}
+            {rec.documentType === 'OTHER' && (
+              <Input
+                value={rec.documentName}
+                onChange={(e) => setRow({ documentName: e.target.value })}
+                placeholder="What is it? e.g. Rental agreement"
+                maxLength={200}
+                style={{ marginTop: 6 }}
+              />
+            )}
+          </>
+        );
+      },
+    },
     {
       title: 'File',
       dataIndex: 'fileUrl',
@@ -551,8 +622,8 @@ const EmployeeForm = () => {
       children: (
         <Row gutter={[16, 0]}>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo" rules={[{ required: true, message: 'Employee number is required' }, { max: 50, message: 'Employee number cannot exceed 50 characters' }]}><Input disabled={isEdit} maxLength={50} /></Form.Item></Col>
-          {/* Unit -> Department -> Designation. Changing a parent clears its
-              children, otherwise a stale child from the previous parent would
+          {/* Unit -> Department -> Floor and Designation. Changing a parent clears
+              its children, otherwise a stale child from the previous parent would
               stay selected and fail server-side validation. */}
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Unit" name="unitId" rules={[{ required: true, message: 'Unit is required' }]}>
@@ -560,7 +631,7 @@ const EmployeeForm = () => {
                 showSearch
                 optionFilterProp="label"
                 options={unitOptions(units)}
-                onChange={() => form.setFieldsValue({ departmentId: undefined, designationId: undefined })}
+                onChange={() => form.setFieldsValue({ departmentId: undefined, designationId: undefined, floorId: undefined })}
               />
             </Form.Item>
           </Col>
@@ -576,7 +647,7 @@ const EmployeeForm = () => {
                 optionFilterProp="label"
                 disabled={!watchedUnitId}
                 options={departments.map((d) => ({ value: d.id, label: d.name }))}
-                onChange={() => form.setFieldsValue({ designationId: undefined })}
+                onChange={() => form.setFieldsValue({ designationId: undefined, floorId: undefined })}
               />
             </Form.Item>
           </Col>
@@ -595,9 +666,42 @@ const EmployeeForm = () => {
               />
             </Form.Item>
           </Col>
+          {/* Only where the department has floors. B1 runs Production on the 1st
+              floor and on the 2nd and they are different places, so once a
+              department is mapped the floor has to be said; a department nobody
+              has mapped cannot ask, and the field stays out of the way. */}
+          {floors.length > 0 && (
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label="Floor"
+                name="floorId"
+                rules={[{ required: true, message: 'Floor is required' }]}
+                extra="This department works across more than one floor."
+              >
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  options={floors.map((f) => ({ value: f.id, label: f.name }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
           <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
+          {canSeeContractors && watchedEmployeeType === 'CONTRACT' && (
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="Contractor" name="contractorId" extra="Visible to the administrator only">
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Direct contract (no contractor)"
+                  options={contractors.map((c) => ({ value: c.id, label: c.name }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
           <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: gradeLabel(g) }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Reporting Manager" name="reportingManagerId">
@@ -763,6 +867,10 @@ const EmployeeForm = () => {
     <>
       <PageHeader
         title={isEdit ? 'Edit Employee' : 'New Employee'}
+        /* Which employee, not just which screen. Four tabs deep in a form that
+           says only "Edit Employee", there is nothing on the page naming the
+           person whose pay and bank details are being changed. */
+        subtitle={[watchedFullName, watchedEmployeeNo].filter(Boolean).join('  ·  ') || undefined}
         backPath="/hr/employees"
         /* A photo is a file against an employee id. On a new employee there is
            no id yet, so the picture is held here and uploaded by handleSave
@@ -770,7 +878,7 @@ const EmployeeForm = () => {
         avatar={(
           <EmployeePhoto
             employeeId={isEdit ? Number(id) : null}
-            employeeName={form.getFieldValue('fullName')}
+            employeeName={watchedFullName}
             canEdit
             onPendingChange={(file) => { pendingPhoto.current = file; }}
           />
@@ -786,7 +894,7 @@ const EmployeeForm = () => {
         form={form}
         layout="vertical"
         onValuesChange={() => setIsDirty(true)}
-        initialValues={{ status: 'ACTIVE', employeeType: 'PERMANENT', isMigrantWorker: false, pfApplicable: false, esiApplicable: false, ptApplicable: false, lwfApplicable: false, tdsApplicable: false }}
+        initialValues={{ status: 'ACTIVE', employeeType: 'PERMANENT', isMigrantWorker: false, pfApplicable: false, esiApplicable: false, ptApplicable: false, lwfApplicable: true, tdsApplicable: false }}
       >
         {/*
           forceRender mounts every pane up front. Without it Antd only mounts a

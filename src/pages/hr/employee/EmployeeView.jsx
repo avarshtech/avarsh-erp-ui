@@ -17,6 +17,7 @@ import { isStoredFile, isOpenableLink, downloadStoredFile } from '../../../utils
 import PageHeader from '../../../components/PageHeader';
 import EmployeePhoto from '../../../components/EmployeePhoto';
 import SalaryStructureDrawer from './SalaryStructureDrawer';
+import EmployeePayslipHistory from './EmployeePayslipHistory';
 
 const getLabel = (list, value) => list.find((i) => i.value === value)?.label || value || '-';
 const getStatusColor = (status) => EMPLOYEE_STATUS.find((s) => s.value === status)?.color || 'default';
@@ -171,7 +172,12 @@ const EmployeeView = () => {
           <Descriptions.Item label="Blood Group">{employee.bloodGroup || '-'}</Descriptions.Item>
           <Descriptions.Item label="Mobile">{employee.mobileNumber || '-'}</Descriptions.Item>
           <Descriptions.Item label="Emergency Contact">{employee.emergencyContactName ? `${employee.emergencyContactName} (${employee.emergencyContactPhone || ''})` : '-'}</Descriptions.Item>
-          <Descriptions.Item label="Department">{employee.departmentName || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Department">
+            {employee.departmentName || '-'}
+            {employee.floorName && (
+              <span style={{ opacity: 0.65 }}>{' · '}{employee.floorName}</span>
+            )}
+          </Descriptions.Item>
           <Descriptions.Item label="Designation">{employee.designationName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Unit">{employee.unitName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Category">{getLabel(EMPLOYEE_CATEGORY, employee.category)}</Descriptions.Item>
@@ -248,7 +254,16 @@ const EmployeeView = () => {
           pagination={false}
           size="small"
           columns={[
-            { title: 'Type', dataIndex: 'documentType', key: 'documentType', render: (v) => getLabel(DOCUMENT_TYPES, v) },
+            {
+              title: 'Type',
+              dataIndex: 'documentType',
+              key: 'documentType',
+              // An "Other" document is whatever its name says it is; the type alone
+              // would list three rows all reading "Other".
+              render: (v, row) => (v === 'OTHER' && row.documentName
+                ? <>{row.documentName}<div style={{ fontSize: 12, opacity: 0.65 }}>Other</div></>
+                : getLabel(DOCUMENT_TYPES, v)),
+            },
             {
               title: 'File',
               dataIndex: 'fileUrl',
@@ -268,42 +283,52 @@ const EmployeeView = () => {
       key: 'salary',
       label: 'Salary History',
       children: (
-        <Card
-          size="small"
-          extra={canUpdate && <Button type="primary" size="small" onClick={() => { setEditSalary(null); setSalaryDrawerOpen(true); }}>Add Salary Structure</Button>}
-        >
-          <Table
-            rowKey="id"
-            dataSource={salaryHistory}
-            pagination={false}
+        <>
+          <Card
             size="small"
-            columns={[
-              {
-                title: 'Status', dataIndex: 'isCurrent', key: 'isCurrent', width: 110,
-                render: (isCurrent) => isCurrent
-                  ? <Tag color="success">Active</Tag>
-                  : <Tag>Superseded</Tag>,
-              },
-              { title: 'Effective From', dataIndex: 'effectiveFrom', key: 'effectiveFrom', render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '-' },
-              {
-                title: 'Effective To', dataIndex: 'effectiveTo', key: 'effectiveTo',
-                render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '—',
-              },
-              { title: 'Basic', dataIndex: 'basic', key: 'basic', render: (v) => v?.toLocaleString('en-IN') },
-              { title: 'DA', dataIndex: 'da', key: 'da', render: (v) => v?.toLocaleString('en-IN') || '0' },
-              { title: 'HRA', dataIndex: 'hra', key: 'hra', render: (v) => v?.toLocaleString('en-IN') || '0' },
-              { title: 'Gross', dataIndex: 'grossSalary', key: 'grossSalary', render: (v) => v?.toLocaleString('en-IN') },
-              ...(canUpdate ? [{
-                // Superseded rows are closed history - editing them would break the
-                // effectiveFrom/effectiveTo chain, so only the active row is editable.
-                title: 'Action', key: 'action', width: 80,
-                render: (_, rec) => rec.isCurrent
-                  ? <Button type="link" size="small" onClick={() => { setEditSalary(rec); setSalaryDrawerOpen(true); }}>Edit</Button>
-                  : null,
-              }] : []),
-            ]}
-          />
-        </Card>
+            title="Salary Structure"
+            style={{ marginBottom: 16 }}
+            extra={canUpdate && <Button type="primary" size="small" onClick={() => { setEditSalary(null); setSalaryDrawerOpen(true); }}>Add Salary Structure</Button>}
+          >
+            <Table
+              rowKey="id"
+              dataSource={salaryHistory}
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: 'Status', dataIndex: 'isCurrent', key: 'isCurrent', width: 110,
+                  render: (isCurrent) => isCurrent
+                    ? <Tag color="success">Active</Tag>
+                    : <Tag>Superseded</Tag>,
+                },
+                { title: 'Effective From', dataIndex: 'effectiveFrom', key: 'effectiveFrom', render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '-' },
+                {
+                  title: 'Effective To', dataIndex: 'effectiveTo', key: 'effectiveTo',
+                  render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '—',
+                },
+                { title: 'Basic', dataIndex: 'basic', key: 'basic', render: (v) => v?.toLocaleString('en-IN') },
+                { title: 'DA', dataIndex: 'da', key: 'da', render: (v) => v?.toLocaleString('en-IN') || '0' },
+                { title: 'HRA', dataIndex: 'hra', key: 'hra', render: (v) => v?.toLocaleString('en-IN') || '0' },
+                { title: 'Gross', dataIndex: 'grossSalary', key: 'grossSalary', render: (v) => v?.toLocaleString('en-IN') },
+                ...(canUpdate ? [{
+                  // Superseded rows are closed history - editing them would break the
+                  // effectiveFrom/effectiveTo chain, so only the active row is editable.
+                  title: 'Action', key: 'action', width: 80,
+                  render: (_, rec) => rec.isCurrent
+                    ? <Button type="link" size="small" onClick={() => { setEditSalary(rec); setSalaryDrawerOpen(true); }}>Edit</Button>
+                    : null,
+                }] : []),
+              ]}
+            />
+          </Card>
+
+          {/* The tab was named for history and showed only the structure - the
+              entitlement - so the months anyone actually asks about were nowhere on
+              the employee's own record. Structure above, because it is what the tab
+              has always opened on and what is edited here; paid months below it. */}
+          <EmployeePayslipHistory employeeId={Number(id)} />
+        </>
       ),
     },
   ];
@@ -312,6 +337,11 @@ const EmployeeView = () => {
     <>
       <PageHeader
         title={employee.fullName}
+        /* The number as well as the name: it is what a payslip, a bank advice and
+           a PF filing identify somebody by, and it is what gets read out over a
+           phone when a record is in question. */
+        subtitle={[employee.employeeNo, employee.designationName, employee.departmentName]
+          .filter(Boolean).join('  ·  ') || undefined}
         backPath="/hr/employees"
         status={<Tag color={getStatusColor(employee.status)}>{getLabel(EMPLOYEE_STATUS, employee.status)}</Tag>}
         /* Read-only here, whatever the user's rights: this screen shows a

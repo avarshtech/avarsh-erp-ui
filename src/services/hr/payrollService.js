@@ -57,6 +57,17 @@ export const getPayrollRecords = async (runId) => {
 };
 
 /**
+ * One employee's salary history - every month they have been paid, newest first.
+ * GET /api/v1/hr/payroll/employees/{employeeId}/records
+ *
+ * On the payroll permission, not the employee one: these are pay figures.
+ */
+export const getEmployeeSalaryRecords = async (employeeId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/employees/${employeeId}/records`);
+  return response.data;
+};
+
+/**
  * Get salary slip for a specific payroll record.
  * GET /api/v1/hr/payroll/records/{recordId}/slip
  */
@@ -92,6 +103,18 @@ export const markPayrollPaid = async (runId, { paymentDate, reference, mode } = 
  */
 export const cancelPayrollRun = async (runId, reason) => {
   const response = await axiosInstance.post(`${BASE_URL}/${runId}/cancel`, null, {
+    params: { reason },
+  });
+  return response.data;
+};
+
+/**
+ * Takes back an approval so the run can be worked out again.
+ * The loan and advance recoveries it posted are given back.
+ * POST /api/v1/hr/payroll/{id}/reopen
+ */
+export const reopenPayrollRun = async (runId, reason) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${runId}/reopen`, null, {
     params: { reason },
   });
   return response.data;

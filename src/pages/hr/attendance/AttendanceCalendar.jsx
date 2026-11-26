@@ -399,7 +399,14 @@ const AttendanceCalendar = () => {
                     <Statistic title="OT Hours" value={summary.totalOtHours ?? 0} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Payable Days" value={summary.payableDays ?? 0} styles={{ content: { fontWeight: 600 } }} />
+                    {/* Days OF THE MONTH that are paid - the weekly offs and holidays
+                        among them - so in a 31-day month this runs well past 26. The
+                        wage figures below are the ones payroll uses. */}
+                    <Statistic
+                      title="Payable Days (calendar)"
+                      value={summary.payableDays ?? 0}
+                      styles={{ content: { fontWeight: 600 } }}
+                    />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
                     <Statistic title="LOP Days" value={summary.lopDays ?? 0} styles={{ content: { color: '#ff4d4f' } }} />
@@ -412,6 +419,41 @@ const AttendanceCalendar = () => {
                     />
                   </Col>
                 </Row>
+
+                {/* What payroll will actually pay, from payroll's own calculation.
+                    The counts above are days of the month; these are days of wage out
+                    of the basis the month's salary is divided by - a different number
+                    in a different unit. Both on one screen, because the month that
+                    showed 1.5 days lost here and a full month's pay on the payslip was
+                    only findable by holding the two side by side. Absent for a custom
+                    range: part of a month has no wage days. */}
+                {summary.wageDays != null && (
+                  <>
+                    <Divider style={{ margin: '12px 0' }} />
+                    <Row gutter={[16, 12]} align="middle">
+                      <Col xs={24} md={10}>
+                        <Text type="secondary">
+                          As payroll pays it, out of {summary.wageDaysBasis} wage days a month
+                        </Text>
+                      </Col>
+                      <Col xs={12} sm={8} md={4}>
+                        <Statistic
+                          title="Paid Days"
+                          value={summary.wageDays}
+                          suffix={<Text type="secondary" style={{ fontSize: 13 }}>/ {summary.wageDaysBasis}</Text>}
+                          styles={{ content: { fontWeight: 600 } }}
+                        />
+                      </Col>
+                      <Col xs={12} sm={8} md={4}>
+                        <Statistic
+                          title="Unpaid Days"
+                          value={summary.wageLopDays}
+                          styles={{ content: { color: '#ff4d4f' } }}
+                        />
+                      </Col>
+                    </Row>
+                  </>
+                )}
 
                 {summary.leaveBreakdown?.length > 0 && (
                   <>
