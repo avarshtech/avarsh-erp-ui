@@ -622,6 +622,19 @@ const PREVIEW_ROUTES = SCREENS.filter((s) => s.preview).flatMap((s) => (s.routes
 /** True when `pathname` is one of a preview screen's routes. */
 export const isPreviewPath = (pathname) => PREVIEW_ROUTES.some((re) => re.test(pathname));
 
+// Every screen's routes, most specific first, so '/bom/cut-panel/:id' wins over a shorter match.
+const SCREEN_ROUTES = SCREENS
+  .flatMap((screen) => (screen.routes || [screen.path]).filter(Boolean).map((route) => ({ screen, route })))
+  .sort((a, b) => b.route.length - a.route.length)
+  .map(({ screen, route }) => ({ screen, pattern: routePattern(route) }));
+
+/**
+ * The SCREENS entry whose route matches `pathname` (e.g. '/orders/edit/42' → the 'orders' screen), or
+ * null. The feedback widget uses it to say which module a bug report came from.
+ */
+export const findScreenByPath = (pathname) =>
+  SCREEN_ROUTES.find(({ pattern }) => pattern.test(pathname))?.screen ?? null;
+
 /** What a preview screen tells its users (PreviewBanner, the menu tag's tooltip). */
 export const PREVIEW_MESSAGE =
   'Preview: data entered here is kept in this browser only and is not saved to the server.';

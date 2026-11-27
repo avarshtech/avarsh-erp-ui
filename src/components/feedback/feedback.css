@@ -1,0 +1,51 @@
+/* Feedback widget: the report dialog's capture section and screenshot annotator. */
+
+.feedback-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-capture-element {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.feedback-capture-element-text {
+  max-width: 360px;
+}
+
+.feedback-annotator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feedback-annotator-label {
+  width: 180px;
+}
+
+.feedback-annotator-canvas {
+  /* Scaled only by width, so a pointer position maps straight to image pixels (annotationDrawing). */
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 6px;
+}
+
+.feedback-context-preview {
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+  border-radius: 6px;
+}

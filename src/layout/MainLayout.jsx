@@ -73,6 +73,7 @@ import NotificationCenter from "../components/NotificationCenter";
 import BranchSwitcher from "../components/branch/BranchSwitcher";
 import { useBranch } from "../context/BranchContext";
 import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
+import FeedbackMount from "../components/feedback/FeedbackMount";
 import GenieProvider from "../components/genie/GenieProvider";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
@@ -1060,6 +1061,7 @@ const MainLayoutInner = () => {
           </Content>
         </Layout>
         <LiveActivityFeedWindow />
+        <FeedbackMount />
       </Layout>
       </GenieProvider>
     </SessionExpiryGuard>
