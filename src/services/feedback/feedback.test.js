@@ -7,7 +7,7 @@ import {
 import { buildIssuePayload, parseUserAgent, resolveModule } from './captureContext';
 import { detectBuildEnvironment, environmentFields, normaliseEnvironment } from './environment';
 import { buildSelector, describeElement, stableClasses, visibleText } from './elementMetadata';
-import { describeSubmitError } from './feedbackApi';
+import { describeSubmitError, reporterFromSession } from './feedbackApi';
 import { findScreenByPath } from '../../utils/permissions';
 
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.c2lnbmF0dXJlLWJ5dGVz';
@@ -213,5 +213,22 @@ describe('environment', () => {
     expect(fromServer.environment).toBeUndefined();
     expect(fromServer.environmentSource).toBeUndefined();
     expect(fromServer.reporterContact).toBeUndefined();
+  });
+});
+
+describe('reporter without an ERP token', () => {
+  test('the signed-in user is named from the ERP session', () => {
+    expect(reporterFromSession({
+      id: 7, username: 'priya', name: 'Priya S', email: 'priya@factory.in', role: 'Merchandiser', permissions: {},
+    })).toEqual({ userId: '7', username: 'priya', name: 'Priya S', email: 'priya@factory.in', role: 'Merchandiser' });
+  });
+
+  test("login's placeholder e-mail is not sent, and missing fields stay out", () => {
+    expect(reporterFromSession({ id: 'u1', username: 'ravi', email: 'ravi@avarsh.com' }))
+      .toEqual({ userId: 'u1', username: 'ravi', name: undefined, email: undefined, role: undefined });
+  });
+
+  test('no session, no reporter', () => {
+    expect(reporterFromSession(null)).toBeNull();
   });
 });
