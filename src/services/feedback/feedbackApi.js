@@ -12,11 +12,7 @@
 import axios from 'axios';
 import axiosInstance from '../core/axiosInstance';
 import { getCachedUserDisplay } from '../auth/sessionStore';
-
-const FEEDBACK_API_URL = import.meta.env.VITE_FEEDBACK_API_URL;
-
-/** The widget is shown only where an issue service is configured. */
-export const isFeedbackConfigured = () => Boolean(FEEDBACK_API_URL);
+import { FEEDBACK_API_URL } from './feedbackConfig';
 
 const issueClient = axios.create({
   baseURL: FEEDBACK_API_URL,

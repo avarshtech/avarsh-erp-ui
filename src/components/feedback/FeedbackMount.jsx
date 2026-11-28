@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { App, Button, Tooltip } from 'antd';
 import { BugOutlined } from '@ant-design/icons';
+import { isFeedbackConfigured } from '../../services/feedback/feedbackConfig';
 
 // Everything but the button loads the first time someone uses it (dialog, annotator, picker, screenshot),
 // so the widget adds next to nothing to the app's initial bundle.
@@ -18,7 +19,6 @@ const loadCaptureTools = () => Promise.all([
 /** Same value as screenshot.js IGNORE_ATTR, repeated so the button does not pull that module in. */
 const IGNORE_ATTR = 'data-feedback-ignore';
 
-const isFeedbackConfigured = () => Boolean(import.meta.env.VITE_FEEDBACK_API_URL);
 
 const ignoreProps = { [IGNORE_ATTR]: '' };
 

@@ -73,6 +73,7 @@ Each site builds from its own environment, never from the committed `.env`, whic
 |---|---|---|---|
 | `VITE_API_BASE_URL` | `https://api.avarshai.com/api/v1` | the QA API (`https://apiqa.avarshai.com/api/v1`, to confirm) | the production API (the API's prod profile names `sristi.avarshai.com`, to confirm) |
 | `VITE_APP_ENV` | `development` | `qa` | `production` |
+| `VITE_FEEDBACK_API_URL` | unset (the default, `https://bugapi.avarshai.com/api/v1`) | unset | unset; set it empty to hide the bug-report widget |
 | `NODE_VERSION` | **unset** | **unset** | **unset** |
 | `VITE_SENTRY_DSN` | unset | optional | the Sentry project's DSN |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | unset | optional | set (the token as a secret) |
