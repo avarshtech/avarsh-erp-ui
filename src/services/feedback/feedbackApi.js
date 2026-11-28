@@ -18,9 +18,24 @@ const issueClient = axios.create({
   withCredentials: false,
 });
 
-async function fetchReporterToken() {
+async function fetchReporterSession() {
   const { data } = await axiosInstance.post('/feedback/token', null, { silent: true, feedbackIgnore: true });
-  return data.token;
+  return data;
+}
+
+/**
+ * Who the report will be filed as and which environment the ERP server says it is, for the dialog to
+ * show. The token in the same answer is discarded: submitting always asks for a fresh one, so a report
+ * can never go out under a previous user's token.
+ * @returns {Promise<{environment: string|null, reporter: {userId, username, name, email, role}|null}>}
+ */
+export async function loadReporterDetails() {
+  const data = await fetchReporterSession();
+  return { environment: data?.environment || null, reporter: data?.reporter || null };
+}
+
+async function fetchReporterToken() {
+  return (await fetchReporterSession()).token;
 }
 
 const extensionFor = (blob) => (blob.type === 'image/jpeg' ? 'jpg' : 'png');
@@ -53,7 +68,10 @@ export function describeSubmitError(error) {
   if (status === 429) return 'You have sent many reports in the last hour. Please try again later.';
   if (status === 413 || code === 'PAYLOAD_TOO_LARGE') return 'The screenshot is too large. Remove it and try again.';
   if (status === 401) return 'Your session has expired. Please sign in again and resend the report.';
-  if (status === 400 && code === 'VALIDATION_FAILED') return 'Please check the title and description and try again.';
+  if (status === 400 && code === 'VALIDATION_FAILED') {
+    if (error?.response?.data?.fieldErrors?.environment) return 'Please choose the environment this happened in.';
+    return 'Please check the title and description and try again.';
+  }
   if (!error?.response) return 'Could not reach the issue service. Please try again in a moment.';
   return 'The report could not be sent. Please try again.';
 }

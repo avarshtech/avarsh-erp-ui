@@ -4,7 +4,8 @@ import {
   MAX_API_FAILURES, MAX_CONSOLE_ENTRIES, formatConsoleArgs, getDiagnostics, pushBounded,
   recordApiFailure, recordConsoleError, resetDiagnostics, toPathTemplate,
 } from './diagnostics';
-import { parseUserAgent, resolveModule } from './captureContext';
+import { buildIssuePayload, parseUserAgent, resolveModule } from './captureContext';
+import { detectBuildEnvironment, environmentFields, normaliseEnvironment } from './environment';
 import { buildSelector, describeElement, stableClasses, visibleText } from './elementMetadata';
 import { describeSubmitError } from './feedbackApi';
 import { findScreenByPath } from '../../utils/permissions';
@@ -164,5 +165,53 @@ describe('submit errors', () => {
     expect(describeSubmitError({ response: { status: 413, data: {} } })).toMatch(/too large/);
     expect(describeSubmitError({ isOfflineError: true })).toMatch(/offline/);
     expect(describeSubmitError({ message: 'Network Error' })).toMatch(/Could not reach/);
+    expect(describeSubmitError({ response: { status: 400, data: { error: 'VALIDATION_FAILED', fieldErrors: { environment: 'x' } } } }))
+      .toMatch(/environment/);
+  });
+});
+
+describe('environment', () => {
+  test('build and profile names map to the names the ERP and the issue service use', () => {
+    expect(normaliseEnvironment('production')).toBe('PROD');
+    expect(normaliseEnvironment('PROD')).toBe('PROD');
+    expect(normaliseEnvironment('qa')).toBe('QA');
+    expect(normaliseEnvironment('development')).toBe('DEV');
+    expect(normaliseEnvironment(' dev ')).toBe('DEV');
+    expect(normaliseEnvironment('local')).toBe('LOCAL');
+    expect(normaliseEnvironment('e2e')).toBe('TEST');
+    expect(normaliseEnvironment('e2e-pg')).toBe('TEST');
+    expect(normaliseEnvironment('staging')).toBeNull();
+    expect(normaliseEnvironment(undefined)).toBeNull();
+    expect(detectBuildEnvironment('qa')).toBe('QA');
+    expect(detectBuildEnvironment('')).toBeNull();
+  });
+
+  test('the ERP server decides when it can; otherwise the form value is labelled by where it came from', () => {
+    expect(environmentFields({ serverEnvironment: 'QA', buildEnvironment: 'DEV', chosen: 'PROD' })).toEqual({});
+    expect(environmentFields({ serverEnvironment: null, buildEnvironment: 'DEV', chosen: 'DEV' }))
+      .toEqual({ environment: 'DEV', environmentSource: 'APP_BUILD' });
+    expect(environmentFields({ serverEnvironment: null, buildEnvironment: 'DEV', chosen: 'PROD' }))
+      .toEqual({ environment: 'PROD', environmentSource: 'REPORTER' });
+    expect(environmentFields({ serverEnvironment: null, buildEnvironment: null, chosen: 'QA' }))
+      .toEqual({ environment: 'QA', environmentSource: 'REPORTER' });
+    expect(environmentFields({ serverEnvironment: null, buildEnvironment: null, chosen: undefined })).toEqual({});
+  });
+
+  test('the submission carries the environment fields and a typed contact, trimmed', () => {
+    const win = { navigator: { userAgent: '' }, screen: {}, innerWidth: 1280, innerHeight: 720 };
+    const location = { pathname: '/orders', href: 'http://localhost/orders' };
+    const values = {
+      type: 'BUG', title: ' T ', description: ' D ', priority: 'HIGH', environment: 'PROD', reporterContact: '  98765 43210 ',
+    };
+
+    const chosen = buildIssuePayload({ values, environment: { serverEnvironment: null, buildEnvironment: 'DEV' }, location, win });
+    expect(chosen).toMatchObject({ environment: 'PROD', environmentSource: 'REPORTER', reporterContact: '98765 43210' });
+
+    const fromServer = buildIssuePayload({
+      values: { ...values, reporterContact: '   ' }, environment: { serverEnvironment: 'QA', buildEnvironment: 'DEV' }, location, win,
+    });
+    expect(fromServer.environment).toBeUndefined();
+    expect(fromServer.environmentSource).toBeUndefined();
+    expect(fromServer.reporterContact).toBeUndefined();
   });
 });

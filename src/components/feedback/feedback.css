@@ -49,3 +49,21 @@
   background: var(--ant-color-fill-quaternary, #fafafa);
   border-radius: 6px;
 }
+
+/* Priority and environment side by side; stacked on narrow screens */
+.feedback-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+@media (max-width: 576px) {
+  .feedback-row { grid-template-columns: 1fr; }
+}
+.feedback-environment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.feedback-reported-by { margin-bottom: 12px; }
+.feedback-reporter { overflow-wrap: anywhere; }

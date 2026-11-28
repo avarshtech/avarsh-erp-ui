@@ -13,7 +13,18 @@ export const PRIORITIES = [
   { value: 'LOW', label: 'Low' },
 ];
 
-export const INITIAL_VALUES = { type: 'BUG', priority: 'MEDIUM', title: '', description: '' };
+/** The three everyday environments first; Local and Test are for developers and automated runs. */
+export const ENVIRONMENT_OPTIONS = [
+  { value: 'DEV', label: 'Development' },
+  { value: 'QA', label: 'QA' },
+  { value: 'PROD', label: 'Production' },
+  { value: 'LOCAL', label: 'Local' },
+  { value: 'TEST', label: 'Test / automation' },
+];
+
+export const ENVIRONMENT_COLORS = { PROD: 'red', QA: 'orange', DEV: 'blue', LOCAL: 'default', TEST: 'purple' };
+
+export const INITIAL_VALUES ={ type: 'BUG', priority: 'MEDIUM', title: '', description: '' };
 
 export const PLACEHOLDERS = {
   BUG: {

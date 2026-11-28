@@ -5,6 +5,7 @@
 import { findScreenByPath, SECTIONS } from '../../utils/permissions';
 import { redactText } from './redaction';
 import { getDiagnostics } from './diagnostics';
+import { environmentFields } from './environment';
 
 export const APP_NAME = 'Garments ERP';
 
@@ -87,8 +88,11 @@ export function collectBrowserContext(win = window) {
   return Object.fromEntries(Object.entries(context).filter(([, v]) => v !== undefined && v !== null));
 }
 
-/** The JSON part of the submission (the reporter's identity is not here: the ERP-signed token carries it). */
-export function buildIssuePayload({ values, element, location = window.location, win = window }) {
+/**
+ * The JSON part of the submission. The reporter's identity is not here: the ERP-signed token carries it.
+ * `environment` is {serverEnvironment, buildEnvironment}; the form's own choice is in `values.environment`.
+ */
+export function buildIssuePayload({ values, element, environment, location = window.location, win = window }) {
   const { module, moduleSection } = resolveModule(location.pathname);
   const { consoleErrors, apiFailures } = getDiagnostics();
   return {
@@ -99,6 +103,12 @@ export function buildIssuePayload({ values, element, location = window.location,
     module,
     moduleSection,
     pageUrl: redactText(location.href),
+    ...environmentFields({
+      serverEnvironment: environment?.serverEnvironment,
+      buildEnvironment: environment?.buildEnvironment,
+      chosen: values.environment,
+    }),
+    reporterContact: values.reporterContact?.trim() || undefined,
     context: {
       browser: collectBrowserContext(win),
       element: element || undefined,
